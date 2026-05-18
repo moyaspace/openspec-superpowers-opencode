@@ -1,0 +1,47 @@
+{
+  "name": "@moyaspace/openspec-superpowers-opencode",
+  "version": "1.0.1",
+  "description": "Scaffold OpenSpec + Superpowers projects for OpenCode with git worktree isolation",
+  "keywords": [
+    "openspec",
+    "superpowers",
+    "opencode",
+    "git-worktree",
+    "workflow",
+    "template",
+    "spec-driven-development",
+    "scaffold",
+    "cli",
+    "bridge",
+    "isolation"
+  ],
+  "bin": {
+    "create-openspec-superpowers-opencode": "./bin/create-project.js",
+    "openspec-superpowers-opencode": "./bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "template/",
+    "template/.gitignore",
+    "template/.gitattributes",
+    "scripts/",
+    "docs/QUICKSTART.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "author": "rl <robincn@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moyaspace/openspec-superpowers-opencode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/moyaspace/openspec-superpowers-opencode/issues"
+  },
+  "homepage": "https://github.com/moyaspace/openspec-superpowers-opencode#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,15 @@
+# npm pack artifact
+*.tgz
+
+# 可能因在项目目录中测试产生，或作为本地 OpenSpec workspace 存在
+# 本项目的 openspec/ 和 .opencode/ 均在 template/ 中
+openspec/
+.opencode/
+
+# database
+data/
+
+# OS files
+Thumbs.db
+.DS_Store
+
