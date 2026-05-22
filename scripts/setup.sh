@@ -902,3 +902,4 @@ echo "$(t "  2. 或 /opsx-onboard 进行引导式入门" "  2. Or /opsx-onboard 
 echo ""
 echo "$(t "重置： openspec-superpowers-opencode reset" "Reset: openspec-superpowers-opencode reset")"
 echo "$(t "预览： openspec-superpowers-opencode dry-run" "Preview: openspec-superpowers-opencode dry-run")"
+# EOF - intentionally empty trailing line for LF normalization
