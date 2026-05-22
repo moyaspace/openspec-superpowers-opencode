@@ -1,6 +1,6 @@
 {
   "name": "@moyaspace/openspec-superpowers-opencode",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Scaffold OpenSpec + Superpowers projects for OpenCode with git worktree isolation",
   "keywords": [
     "openspec",
@@ -16,8 +16,8 @@
     "isolation"
   ],
   "bin": {
-    "create-openspec-superpowers-opencode": "./bin/create-project.js",
-    "openspec-superpowers-opencode": "./bin/cli.js"
+    "create-openspec-superpowers-opencode": "bin/create-project.js",
+    "openspec-superpowers-opencode": "bin/cli.js"
   },
   "files": [
     "bin/",
