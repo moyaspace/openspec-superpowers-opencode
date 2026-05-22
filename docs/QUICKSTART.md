@@ -12,7 +12,7 @@ npm install -g @moyaspace/openspec-superpowers-opencode
 
 ```bash
 # 在项目根目录（或用绝对路径）
-npm install -g ./moyaspace-openspec-superpowers-opencode-1.0.1.tgz
+npm install -g ./<name>-<version>.tgz
 ```
 
 ### 验证安装

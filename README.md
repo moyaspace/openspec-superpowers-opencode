@@ -31,7 +31,7 @@
 npm install -g @moyaspace/openspec-superpowers-opencode
 
 # From local tgz (offline/preview)
-npm install -g ./moyaspace-openspec-superpowers-opencode-1.0.1.tgz
+npm install -g ./<name>-<version>.tgz
 
 # Verify
 openspec-superpowers-opencode --help
