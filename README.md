@@ -1,4 +1,4 @@
-# openspec-superpowers-opencode
+# openspec-superpowers-opencode (aka oso)
 
 > **中文版 → [docs/README.zh.md](docs/README.zh.md)**
 
