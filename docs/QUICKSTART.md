@@ -5,14 +5,14 @@
 ### 从 npm 安装
 
 ```bash
-npm install -g openspec-superpowers-opencode
+npm install -g @moyaspace/openspec-superpowers-opencode
 ```
 
 ### 从本地 tgz 安装（离线/预览）
 
 ```bash
 # 在项目根目录（或用绝对路径）
-npm install -g ./openspec-superpowers-opencode-1.0.1.tgz
+npm install -g ./moyaspace-openspec-superpowers-opencode-1.0.1.tgz
 ```
 
 ### 验证安装

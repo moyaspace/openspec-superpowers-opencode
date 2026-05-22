@@ -28,10 +28,10 @@
 
 ```bash
 # From npm
-npm install -g openspec-superpowers-opencode
+npm install -g @moyaspace/openspec-superpowers-opencode
 
 # From local tgz (offline/preview)
-npm install -g ./openspec-superpowers-opencode-1.0.1.tgz
+npm install -g ./moyaspace-openspec-superpowers-opencode-1.0.1.tgz
 
 # Verify
 openspec-superpowers-opencode --help
