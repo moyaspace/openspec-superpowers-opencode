@@ -131,3 +131,69 @@ scripts/setup.ps1   text eol=lf
 | P12: BROWN_OVERRIDE_* | ✅ |
 
 端到端确认修复有效。
+
+---
+
+## 第五层：第一版修复的盲区
+
+### 为什么 `.gitattributes` 没能立即解决 CRLF
+
+`.gitattributes` 保护的是**未来的 checkout**，不能修复已存在于磁盘上的文件。用户在实际发布时的流程：
+
+```
+第一次 clone（没有 .gitattributes）
+  → autocrlf=true 把 scripts/setup.sh 转写成 CRLF 写到磁盘
+
+第二次 git pull（拿到 574fcb2）
+  → .gitattributes 新增 ✅
+  → scripts/setup.sh 本身没有被修改 → git 不会重新 checkout 它
+  → 磁盘上的 setup.sh 仍然是 CRLF ← ⚠️
+    → npm publish 读磁盘 → CRLF 进 tarball
+    → Linux npm install → bash 崩溃
+```
+
+Commit `574fcb2` 的变更：
+
+```
+ .gitattributes | 16 ++++++++++++++++   ← 新增 .gitattributes
+ scripts/setup.sh                       ← 没有被修改！
+```
+
+**关键洞察**：`.gitattributes` 是 git 的换行控制策略，但它只影响被它**触发之后的 git 操作**。如果文件已经在磁盘上（在 `.gitattributes` 创建之前就存在），git 不会自动重写它。这本质上是 git 的一个设计决定——`git pull` 只更新有变更的文件。
+
+### 补救措施：强制触发重新 checkout（提交 `f4054d7`）
+
+在 Linux 上对 `scripts/setup.sh` 做一次无功能影响的标记变更（新增一行尾注释），迫使 git 认为文件被修改了：
+
+```diff
+ echo "$(t "预览： openspec-superpowers-opencode dry-run" "Preview: openspec-superpowers-opencode dry-run")"
++# EOF - intentionally empty trailing line for LF normalization
+```
+
+这样 Windows 用户 `git pull` 时：
+1. git 看到 `scripts/setup.sh` 有变更
+2. 重新 checkout 该文件
+3. checkout 过程中读取 `.gitattributes` → `text eol=lf` → 写出 LF
+4. 磁盘上的文件变成 LF ✅
+
+### 验证（Windows PowerShell）
+
+```powershell
+$ Format-Hex .\scripts\setup.sh | Select-Object -First 2
+
+0000000000000000 23 21 2F 75 73 72 2F 62 69 6E 2F 65 6E 76 20 62 #!/usr/bin/env b
+0000000000000010 61 73 68 0A 23 20 6F 70 65 6E 73 70 65 63 2D 73 ash# openspec-s
+```
+
+`61 73 68 0A` — `ash` 后面紧跟 `0A`（LF），没有 `0D`。确认文件是纯 LF。
+
+### 以后不会再出现了
+
+- `.gitattributes` 已经生效
+- 任何未来的 `git checkout` / `git pull` 都会输出 LF
+- 即使 Windows 上编辑后用 `git add`，git 的 clean filter 也会自动 normalize 回 LF
+- `.gitattributes` 包含了 npm `files` 白名单，tarball 总有换行策略保护
+
+### 教训
+
+`.gitattributes` 的创建和 **被规则保护的文件** 不能在同一 commit 里分开。如果 `.gitattributes` 新增时目标文件没有被修改，git 不会重新 checkout 它们。分步操作时，需要手动 `git add --renormalize .` 或强制重新 checkout 来让 `.gitattributes` 生效。
