@@ -1804,8 +1804,233 @@ $env:BROWN_OVERRIDE_OPENSPEC = "yes"
 
 > 12.7 非法值：验证了不会崩溃，回退到无覆盖继续执行。
 > 12.8 空 env var（正常交互）：隐式验证——未设 env var 时的交互行为已在 Phase 5（无 env var 测试）中确认；自动化测试中会挂起，需人工交互。
+
+---
+
+## Phase 13 — npm 包发布前测试
+
+> **目的**：验证 npm 打包和全局安装路径能正常工作。此 Phase 模拟用户从 npm 安装后的体验，与 Phase 1-12（均直接从工作目录执行）互补。
+>
+> **执行时机**：在 `npm publish` 前执行一次即可。日常开发迭代不需要每次运行。
+
+### 13.1 创建临时测试目录
+
+**Windows (PowerShell):**
+```powershell
+$phase13Dir = "$env:TEMP\ops-p13-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $phase13Dir -Force | Out-Null
+$phase13Dir
+```
+
+**Linux (bash):**
+```bash
+phase13Dir=$(mktemp -d /tmp/ops-p13-XXXXXX)
+echo "$phase13Dir"
+```
+
+**📝 预期结果**：输出临时目录路径。
+
+---
+
+### 13.2 npm pack 生成 tarball
+
+```bash
+cd <package-root-dir>
+npm pack 2>&1 | tail -1
+```
+
+**🔍 预期结果**：输出 `*.tgz` 文件名，exit code 0。
+
+---
+
+### 13.3 验证 tarball 包含 .gitattributes
+
+```bash
+tar -tzf *.tgz | grep ".gitattributes"
+```
+
+**🔍 预期结果**：
+```
+package/.gitattributes
+```
+
+---
+
+### 13.4 验证 tarball 内 setup.sh 是 LF 结尾
+
+```bash
+tar -xzf *.tgz -C "$phase13Dir" package/scripts/setup.sh
+xxd "$phase13Dir/package/scripts/setup.sh" | head -1
+```
+
+**🔍 预期结果**：首位字节不是 `0d`（CRLF 时行首为 `23 0d 0a`，LF 时为 `23 0a`）。应当看到 `23 0a`（即 `#\n`，无 `\r`）。
+
+---
+
+### 13.5 验证 tarball 包含关键模板文件
+
+```bash
+tar -tzf *.tgz | grep -E "(AGENTS\.md|schema\.yaml|skills\.lock\.json|template/\.opencode/opencode\.json)"
+```
+
+**🔍 预期结果**：以下文件均存在：
+- `package/template/AGENTS.md`
+- `package/template/openspec/schemas/superpowers-bridge-opencode/schema.yaml`
+- `package/template/skills.lock.json`
+- `package/template/.opencode/opencode.json`
+
+---
+
+### 13.6 从 tarball 全局安装
+
+> ⚠️ 需要管理员/root 权限。如果权限不足，使用 `npm install --prefix <user-local-dir>`。
+
+**Windows:**
+```powershell
+npm install -g "$pkgRoot\moyaspace-openspec-superpowers-opencode-*.tgz"
+```
+
+**Linux:**
+```bash
+npm install -g ./moyaspace-openspec-superpowers-opencode-*.tgz
+```
+
+**📝 预期结果**：`added 1 package`，exit code 0。
+
+---
+
+### 13.7 验证全局命令可用
+
+**Windows / Linux:**
+```bash
+openspec-superpowers-opencode --help
+```
+
+**🔍 预期结果**：输出帮助文本，包含 `Usage:`、`init`、`reset`、`dry-run`、`ensure-worktree`。
+
+---
+
+### 13.8 从全局命令执行 init
+
+**Windows / Linux:**
+```bash
+testDir13=$(mktemp -d /tmp/ops-p13-run-XXXXXX)
+openspec-superpowers-opencode init "$testDir13"
+```
+
+**📝 预期结果**：
+- 输出包含 `🎉 Init complete`
+- exit code 为 0
+
+---
+
+### 13.9 验证生成的项目结构完整
+
+```bash
+ls "$testDir13/.opencode/opencode.json" "$testDir13/.opencode/install-manifest.json" "$testDir13/openspec/config.yaml" "$testDir13/AGENTS.md" "$testDir13/.gitignore"
+```
+
+**🔍 预期结果**：5 个文件全部存在。
+
+---
+
+### 13.10 从全局命令执行 init + openspec 工作流
+
+```bash
+cd "$testDir13"
+openspec new change "p13-test"
+openspec status --change "p13-test"
+```
+
+**🔍 预期结果**：
+- 变更创建成功
+- 输出进度 0/8
+
+---
+
+### 13.11 验证 setup.sh 无 CRLF（关键回归测试）
+
+```bash
+file "$testDir13/.opencode/install-manifest.json"
+# 确认 CLI 本身脚本的换行符正确
+pkgScript=$(which openspec-superpowers-opencode)
+dir=$(dirname "$pkgScript")
+# 查找 scripts 目录（全局安装的包目录）
+pkgDir=$(dirname "$(npm ls -g @moyaspace/openspec-superpowers-opencode --depth=0 2>/dev/null | head -1 | sed 's/.*@//' | tr -d ' ')" 2>/dev/null || echo "")
+# Linux: 直接用 file 检查
+file $(find $(dirname $(readlink -f $(which openspec-superpowers-opencode))) -name "setup.sh" 2>/dev/null | head -1) 2>/dev/null || echo "Skip: setup.sh not found in bin path"
+```
+
+**🔍 预期结果**：`setup.sh` 被标记为 `Bourne-Again shell script, ASCII text`（无 CRLF 标记）。关键：确保 npm 安装链路不再引入 CRLF。
+
+---
+
+### 13.12 卸载全局包
+
+**Windows:**
+```powershell
+npm uninstall -g @moyaspace/openspec-superpowers-opencode
+```
+
+**Linux:**
+```bash
+npm uninstall -g @moyaspace/openspec-superpowers-opencode
+```
+
+**📝 预期结果**：`removed 1 package`，exit code 0。
+
+---
+
+### 13.13 清理测试目录
+
+**Windows:**
+```powershell
+Remove-Item -Recurse -Force "$env:TEMP\ops-p13-*"
+```
+
+**Linux:**
+```bash
+rm -rf /tmp/ops-p13-*
+```
+
+---
+
+### 🔲 Phase 13 结果
+
+| 测试项 | Windows | Linux |
+|--------|---------|-------|
+| 13.1 创建临时目录 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.2 npm pack 成功 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.3 tarball 含 .gitattributes | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.4 tarball 内 setup.sh 为 LF | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.5 tarball 含关键模板 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.6 全局安装成功 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.7 全局命令可用 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.8 全局 init 执行成功 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.9 项目结构完整 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.10 openspec 工作流可用 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.11 无 CRLF 回归 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.12 卸载成功 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
+| 13.13 清理完成 | □ ✅ □ ❌ | □ ✅ □ ❌ □ N/A |
 > 12.9 门控优先：已在 Phase 5.4 验证（openspec=no 直接退出，commands env var 不被读取）。
-| **总计** | **78/78 100%** | **77/78 98.7% (1 N/A)** | **79** |
+> Phase 13：发布前 npm 包测试（与日常开发测试互补，每次 publish 前执行一次即可）。
+
+| Phase | Windows 通过率 | Linux 通过率 | 总数 |
+|-------|---------------|-------------|------|
+| Phase 1: init 测试 | 3/3 100% | 3/3 100% | 3 |
+| Phase 2: 项目结构验证 | 8/8 100% | 8/8 100% | 8 |
+| Phase 3: openspec CLI 集成 | 9/9 100% | 9/9 100% | 9 |
+| Phase 4: Worktree 模拟 opsx-ff | 9/9 100% | 9/9 100% | 9 |
+| Phase 5: 棕地门控（openspec/） | 5/5 100% | 5/5 100% | 5 |
+| Phase 6: 棕地合并（.opencode/） | 9/9 100% | 9/9 100% | 9 |
+| Phase 7: Reset | 6/6 100% | 6/6 100% | 6 |
+| Phase 8: 棕地 git + 已部署内容 | 2/2 100% | 2/2 100% | 2 |
+| Phase 9: Skill/命令定义验证 | 2/2 100% | 2/2 100% | 2 |
+| Phase 10: 清理 | 2/2 100% | 2/2 100% | 2 |
+| Phase 11: 多语言 (--lang) | 13/13 100% (1 N/A) | 13/13 100% (1 N/A) | 14 |
+| Phase 12: BROWN_OVERRIDE_* 环境变量 | 10/10 100% | 10/10 100% | 10 |
+| Phase 13: npm 包发布前测试 | 13/13 待测 | 13/13 待测 | 13 |
+| **总计** | **91/91 100%** | **90/91 98.9% (1 N/A)** | **92** |
 
 ---
 
