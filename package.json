@@ -20,6 +20,7 @@
     "openspec-superpowers-opencode": "bin/cli.js"
   },
   "files": [
+    ".gitattributes",
     "bin/",
     "template/",
     "template/.gitignore",
