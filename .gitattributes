@@ -1,5 +1,9 @@
-# Ensure shell scripts always have LF line endings even on Windows.
-# CRLF breaks bash on Linux when installed via npm (the tarball
-# preserves whatever line endings are in the working tree).
+# Auto-detect text vs binary, normalize to LF in git, convert to
+# platform-native on checkout (CRLF on Windows, LF on Linux/macOS).
+* text=auto
+
+# Shell scripts must always be LF even on Windows, or they break
+# when the npm tarball (which preserves working tree line endings)
+# is installed on Linux.
 scripts/setup.sh    text eol=lf
 scripts/setup.ps1   text eol=lf
