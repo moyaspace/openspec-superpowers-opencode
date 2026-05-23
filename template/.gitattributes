@@ -1,1 +1,4 @@
-* text=auto
+# Ensure shell scripts always have LF line endings even on Windows.
+# CRLF breaks bash on Linux when installed via npm.
+scripts/setup.sh    text eol=lf
+scripts/setup.ps1   text eol=lf

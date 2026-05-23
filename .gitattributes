@@ -1,16 +1,5 @@
-# Ensure shell scripts and PowerShell scripts always have LF line endings
-# even on Windows. CRLF breaks bash and pwsh on Linux.
+# Ensure shell scripts always have LF line endings even on Windows.
+# CRLF breaks bash on Linux when installed via npm (the tarball
+# preserves whatever line endings are in the working tree).
 scripts/setup.sh    text eol=lf
 scripts/setup.ps1   text eol=lf
-
-# Source code - auto-detect
-*.js    text
-*.json  text
-*.md    text
-*.yaml  text
-*.yml   text
-
-# Binary files
-*.png   binary
-*.jpg   binary
-*.ico   binary
