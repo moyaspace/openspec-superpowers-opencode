@@ -1,9 +1,9 @@
 name: superpowers-bridge-opencode
 version: 1
 description: >
-  OpenCode 專用版本。基於 superpowers-bridge v1 改造。
-  使用 Read 替代 Skill 調用，使用 task() 替代 Task 調用，
-  以適配 OpenCode 平台。
+  OpenCode 专用版本。基于 superpowers-bridge v1 改造。
+  使用 Read 替代 Skill 调用，使用 task() 替代 Task 調用，
+  以适配 OpenCode 平台。
   brainstorm → proposal → specs → tasks → plan → verify → retrospective.
   design is optional (produced from brainstorm but not required by tasks).
   Apply phase uses git worktrees + subagent-driven-development
@@ -17,23 +17,23 @@ artifacts:
     description: Collaborative design exploration using Superpowers brainstorming
     template: brainstorm.md
     instruction: |
-      PRECHECK — 載入 brainstorming skill：
+      PRECHECK — 载入 brainstorming skill：
 
-      Read 以下檔案：
+      Read 以下文件：
         {{SUPERPOWERS_BASE_PATH}}brainstorming/SKILL.md
 
-      如果 Read 失敗，STOP 並告知用戶需安裝 Superpowers 插件
-      （或用戶可選擇手動撰寫 brainstorm.md，使用 template 結構）。
-      不要靜默降級。
+      如果 Read 失败，STOP 并告知用户需安装 Superpowers 插件
+      （或用户可选择手动撰写 brainstorm.md，使用 template 结构）。
+      不要静默降级。
 
-      按 Read 到的內容執行 brainstorming。
+      按 Read 到的内容执行 brainstorming。
 
-      IMPORTANT 輸出重定向：
-      - 不要寫到 `docs/superpowers/specs/`。改為寫到本變更的 `brainstorm.md`。
-      - 如果 brainstorming 產生了 design 文件，也寫到本變更的 `design.md`
-        （這會預填 design artifact）。
+      IMPORTANT 输出重定向：
+      - 不要写到 `docs/superpowers/specs/`。改为写到本变更的 `brainstorm.md`。
+      - 如果 brainstorming 产生了 design 文件，也写到本变更的 `design.md`
+        （这会预填 design artifact）。
 
-      Brainstorming 完成後，使用 template 結構總結已確認的設計到 brainstorm.md。
+      Brainstorming 完成后，使用 template 结构总结已确认的设计到 brainstorm.md。
 
       The brainstorming skill will:
       1. Explore project context
@@ -443,89 +443,89 @@ apply:
   requires: [plan]
   tracks: tasks.md
   instruction: |
-     實現前設置隔離工作區和執行器。apply 只負責在 worktree 中實現和提交，
-     不碰主分支。合併、清理、retrospective、archive、PR 由 `/opsx-finish` 處理。
+    實現前設置隔離工作區和執行器。apply 只負責在 worktree 中實現和提交，
+    不碰主分支。合併、清理、retrospective、archive、PR 由 `/opsx-finish` 處理。
 
-      Worktree 由 `/opsx-propose`、`/opsx-new` 或 `/opsx-ff` 提前創建，
-      apply 直接進入已存在的 worktree，不再創建。
+     Worktree 由 `/opsx-propose`、`/opsx-new` 或 `/opsx-ff` 提前創建，
+     apply 直接進入已存在的 worktree，不再創建。
 
-     0. **Pre-flight — 確認環境就緒**：
+    0. **Pre-flight — 確認環境就緒**：
 
-        確認以下 skill 檔案可讀取，若有任一 Read 失敗則 STOP：
+       確認以下 skill 檔案可讀取，若有任一 Read 失敗則 STOP：
 
-        Read 以下檔案：
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/spec-reviewer-prompt.md
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/code-quality-reviewer-prompt.md
-          {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
+       Read 以下檔案：
+         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
+         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
+         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/spec-reviewer-prompt.md
+         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/code-quality-reviewer-prompt.md
+         {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
 
-        同時確認專案所需的 CLI 工具可用。讀取 plan.md 找出所有提到的工具
-        （如 `mvn`/`mvnw`、`docker`、`python3`、`node`/`npm` 等）。
-        若缺少工具，報告 WARNING（不停止）——用戶可能有替代方案。
+       同時確認專案所需的 CLI 工具可用。讀取 plan.md 找出所有提到的工具
+       （如 `mvn`/`mvnw`、`docker`、`python3`、`node`/`npm` 等）。
+       若缺少工具，報告 WARNING（不停止）——用戶可能有替代方案。
 
-     1. **Workspace — 檢測並進入已有 worktree**：
+    1. **Workspace — 檢測並進入已有 worktree**：
 
-        檢查 `.worktrees/<name>/` 目錄是否存在：
+       檢查 `.worktrees/<name>/` 目錄是否存在：
 
-        - 存在 → `cd .worktrees/<name>`
-        - 不存在 → STOP，提示用戶先運行 `/opsx-ff <name>` 或 `/opsx-new <name>` 創建 worktree
+       - 存在 → `cd .worktrees/<name>`
+       - 不存在 → STOP，提示用戶先運行 `/opsx-ff <name>` 或 `/opsx-new <name>` 創建 worktree
 
-     2. **Executor — subagent-driven-development**：
+    2. **Executor — subagent-driven-development**：
 
-       從 plan.md 中提取每個微任務，對每個任務調用子 Agent：
+      從 plan.md 中提取每個微任務，對每個任務調用子 Agent：
 
-       a) 讀取 implementer-prompt.md 模板，按模板構造 prompt：
-          模板路徑：
-            {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
+      a) 讀取 implementer-prompt.md 模板，按模板構造 prompt：
+         模板路徑：
+           {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
 
-       b) 構建實現 prompt 之前，先載入 TDD skill：
+      b) 構建實現 prompt 之前，先載入 TDD skill：
 
-          Read 以下檔案：
-            {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
+         Read 以下檔案：
+           {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
 
-          提取 RED-GREEN-REFACTOR 流程、鐵律（No production code without a failing test first）、
-          驗證檢查清單，作為實現 prompt 的前置指令。
+         提取 RED-GREEN-REFACTOR 流程、鐵律（No production code without a failing test first）、
+         驗證檢查清單，作為實現 prompt 的前置指令。
 
-          然後使用 task() 調用子 Agent 執行任務（load_skills=[]，純 prompt 驅動）：
-             task(
-               category="deep",
-               load_skills=[],
-               description="實現 <任務名>",
-               prompt="<TDD 前置指令 + 模板填充的內容>",
-               run_in_background=true
-             )
+         然後使用 task() 調用子 Agent 執行任務（load_skills=[]，純 prompt 驅動）：
+            task(
+              category="deep",
+              load_skills=[],
+              description="實現 <任務名>",
+              prompt="<TDD 前置指令 + 模板填充的內容>",
+              run_in_background=true
+            )
 
-        c) 任務完成後，讀取 spec-reviewer-prompt.md 做 spec 審查：
+       c) 任務完成後，讀取 spec-reviewer-prompt.md 做 spec 審查：
 
-        d) 審查通過後，讀取 code-quality-reviewer-prompt.md 做代碼質量審查：
+       d) 審查通過後，讀取 code-quality-reviewer-prompt.md 做代碼質量審查：
 
-        e) 審查全部通過後，標記 tasks.md 中的 checkbox 為完成。
+       e) 審查全部通過後，標記 tasks.md 中的 checkbox 為完成。
 
-        重要 — TDD 方法論通過 Read + prompt 嵌入傳遞給子 Agent，
-        而非透過 load_skills（Superpowers skills 為檔案系統路徑，
-        不支援 load_skills 機制）。
+       重要 — TDD 方法論通過 Read + prompt 嵌入傳遞給子 Agent，
+       而非透過 load_skills（Superpowers skills 為檔案系統路徑，
+       不支援 load_skills 機制）。
 
-       本 schema 不支援 `executing-plans` 作為降級方案。
+      本 schema 不支援 `executing-plans` 作為降級方案。
 
-     3. **Verification**：所有任務完成後，在 worktree 中執行驗證：
+    3. **Verification**：所有任務完成後，在 worktree 中執行驗證：
 
-        執行 `openspec status --change <name> --json`，確認所有 artifacts 已完成。
+       執行 `openspec status --change <name> --json`，確認所有 artifacts 已完成。
 
-     4. **Commit**：在 worktree 中提交所有變更：
+    4. **Commit**：在 worktree 中提交所有變更：
 
-        ```bash
-        git add -A && git commit -m "<name>: <描述>"
-        ```
+       ```bash
+       git add -A && git commit -m "<name>: <描述>"
+       ```
 
-     5. **完成**：
+    5. **完成**：
 
-        apply 階段結束。通知用戶：
+       apply 階段結束。通知用戶：
 
-        ```
-        ✓ 變更 <name> 已實現並提交。
-          Worktree 路徑: .worktrees/<name>/
-          分支: feature/<name>
+       ```
+       ✓ 變更 <name> 已實現並提交。
+         Worktree 路徑: .worktrees/<name>/
+         分支: feature/<name>
 
-        下一步: 運行 /opsx-finish 進行合併、清理和歸檔。
-        ```
+       下一步: 運行 /opsx-finish 進行合併、清理和歸檔。
+       ```
