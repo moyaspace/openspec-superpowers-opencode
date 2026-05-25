@@ -1,6 +1,6 @@
 {
   "name": "@moyaspace/openspec-superpowers-opencode",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Scaffold OpenSpec + Superpowers projects for OpenCode with git worktree isolation",
   "keywords": [
     "openspec",
