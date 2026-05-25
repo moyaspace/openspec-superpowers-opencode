@@ -666,7 +666,7 @@ if [ -f "$AGENTS_SRC" ]; then
 fi
 
 # .gitignore（追加基础设施排除规则，不覆盖已有内容）
-GITIGNORE_SRC="$TEMPLATE_DIR/.gitignore"
+GITIGNORE_SRC="$TEMPLATE_DIR/_gitignore"
 GITIGNORE_DST="$PROJECT_ROOT/.gitignore"
 GITIGNORE_ENTRIES=(
     ".opencode/"
@@ -675,47 +675,55 @@ GITIGNORE_ENTRIES=(
     ".worktrees/"
 )
 GITIGNORE_COMMENTS=(
-    "OpenCode 配置 — 不追踪"
-    "OpenSpec Schema — 不追踪"
-    "OpenSpec 配置 — 不追踪"
-    "Worktree 隔离目录 — 不追踪"
+    "OpenCode config — do not track"
+    "OpenSpec Schema — do not track"
+    "OpenSpec config — do not track"
+    "Worktree isolation directory — do not track"
 )
-if [ -f "$GITIGNORE_SRC" ]; then
-    if [ ! -f "$GITIGNORE_DST" ]; then
-        # 绿地：从模板复制，再追加基础设施排除规则
+# 注意：不依赖 $GITIGNORE_SRC 是否存在 — 绕过 npm 11.x 下 .npmignore 对嵌套 .gitignore 的异常排除
+if [ ! -f "$GITIGNORE_DST" ]; then
+    # 绿地：优先从模板复制
+    if [ -f "$GITIGNORE_SRC" ]; then
         run_cmd cp "$GITIGNORE_SRC" "$GITIGNORE_DST"
-        INSTALLED_FILES+=(".gitignore")
-        HAS_CONTENT=$(cat "$GITIGNORE_DST" 2>/dev/null | wc -l)
-        for i in "${!GITIGNORE_ENTRIES[@]}"; do
-            ENTRY="${GITIGNORE_ENTRIES[$i]}"
-            COMMENT="${GITIGNORE_COMMENTS[$i]}"
-            PATTERN=$(echo "$ENTRY" | sed 's/\./\\./g')
-            if ! grep -q "$PATTERN" "$GITIGNORE_DST" 2>/dev/null; then
-                echo "" >> "$GITIGNORE_DST"
-                echo "# $COMMENT" >> "$GITIGNORE_DST"
-                echo "$ENTRY" >> "$GITIGNORE_DST"
-            fi
-        done
-        log "$(t "  ✓ .gitignore" "  ✓ .gitignore")"
+    fi
+    # Fallback: 模板不存在或拷贝失败时直接用 echo 创建
+    if [ ! -f "$GITIGNORE_DST" ]; then
+        echo "# Worktree isolation" > "$GITIGNORE_DST"
+        echo ".worktrees/" >> "$GITIGNORE_DST"
+        log "$(t "  ✓ .gitignore（fallback 创建）" "  ✓ .gitignore (fallback created)")"
     else
-        # 棕地：逐个检查追加缺失的条目
-        APPENDED=false
-        for i in "${!GITIGNORE_ENTRIES[@]}"; do
-            ENTRY="${GITIGNORE_ENTRIES[$i]}"
-            COMMENT="${GITIGNORE_COMMENTS[$i]}"
-            PATTERN=$(echo "$ENTRY" | sed 's/\./\\./g')
-            if ! grep -q "$PATTERN" "$GITIGNORE_DST" 2>/dev/null; then
-                echo "" >> "$GITIGNORE_DST"
-                echo "# $COMMENT" >> "$GITIGNORE_DST"
-                echo "$ENTRY" >> "$GITIGNORE_DST"
-                APPENDED=true
-            fi
-        done
-        if [ "$APPENDED" = true ]; then
-            log "$(t "  ✓ .gitignore（已追加基础设施排除规则）" "  ✓ .gitignore (infra exclusions appended)")"
-        else
-            log "$(t "  - .gitignore（所有排除规则已存在，跳过）" "  - .gitignore (all exclusions exist, skipping)")"
+        log "$(t "  ✓ .gitignore" "  ✓ .gitignore")"
+    fi
+    INSTALLED_FILES+=(".gitignore")
+    # 追加基础设施排除规则
+    for i in "${!GITIGNORE_ENTRIES[@]}"; do
+        ENTRY="${GITIGNORE_ENTRIES[$i]}"
+        COMMENT="${GITIGNORE_COMMENTS[$i]}"
+        PATTERN=$(echo "$ENTRY" | sed 's/\./\\./g')
+        if ! grep -q "$PATTERN" "$GITIGNORE_DST" 2>/dev/null; then
+            echo "" >> "$GITIGNORE_DST"
+            echo "# $COMMENT" >> "$GITIGNORE_DST"
+            echo "$ENTRY" >> "$GITIGNORE_DST"
         fi
+    done
+else
+    # 棕地：逐个检查追加缺失的条目
+    APPENDED=false
+    for i in "${!GITIGNORE_ENTRIES[@]}"; do
+        ENTRY="${GITIGNORE_ENTRIES[$i]}"
+        COMMENT="${GITIGNORE_COMMENTS[$i]}"
+        PATTERN=$(echo "$ENTRY" | sed 's/\./\\./g')
+        if ! grep -q "$PATTERN" "$GITIGNORE_DST" 2>/dev/null; then
+            echo "" >> "$GITIGNORE_DST"
+            echo "# $COMMENT" >> "$GITIGNORE_DST"
+            echo "$ENTRY" >> "$GITIGNORE_DST"
+            APPENDED=true
+        fi
+    done
+    if [ "$APPENDED" = true ]; then
+        log "$(t "  ✓ .gitignore（已追加基础设施排除规则）" "  ✓ .gitignore (infra exclusions appended)")"
+    else
+        log "$(t "  - .gitignore（所有排除规则已存在，跳过）" "  - .gitignore (all exclusions exist, skipping)")"
     fi
 fi
 

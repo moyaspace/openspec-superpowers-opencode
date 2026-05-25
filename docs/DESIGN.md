@@ -147,3 +147,16 @@ main 目录（仓库）                 worktree（AI 办公室）
 | `.gitattributes` | ✅ | 需要，行尾规范化 | 不存在才创建 |
 | `LICENSE` | ❌ | 包的许可，非项目许可 | 不部署 |
 | `skills.lock.json` | ❌ | 包校验数据 | 不部署 |
+
+#### ADR-10: npm 11.x `.gitignore` → `.npmignore` 重命名 Bug
+
+- **背景**: `npm install <tarball>`（如 `npm install -g ./tgz` 或发布后 `npm install -g`）在 npm 11.x 中会将包内的 `.gitignore` 文件自动重命名为 `.npmignore`。确认复现：npm 11.9.0，Windows 和 Linux 均触发。
+- **影响**: 包内 `template/.gitignore` 在安装时变成 `template/.npmignore`，setup 脚本按 `.gitignore` 文件名读取失败，导致 init 后的项目缺少 `.gitignore`。
+- **排除其他原因**:
+  - 不是 `.npmignore` 文件模式导致（删除 `/.gitignore` 后问题依旧）
+  - 不是 package.json `files` 字段配置错误（显式列入 `template/.gitignore` 仍被重命名）
+  - 不影响 `.editorconfig`、`.gitattributes`、`_gitignore` 等其他点前缀文件
+- **决策**: 将 `template/.gitignore` 重命名为 `template/_gitignore`，setup 脚本读取 `_gitignore` 后在目标写入 `.gitignore`。
+- **额外防御**: setup 脚本添加 fallback 逻辑，如果源文件复制失败则直接通过 echo/Set-Content 创建 `.gitignore`，不依赖 npm 版本行为。
+- **验证**: test Phase 13 覆盖文件存在性、grep 模式匹配、以及 `git diff --cached` 确认基础设施文件不被 stage。
+- **参考**: 无官方 issue — 此为经验发现。当前 npm 11.9.0 行为，未来版本可能修复。重新启用 `template/.gitignore` 前需验证目标 npm 版本无此 bug。

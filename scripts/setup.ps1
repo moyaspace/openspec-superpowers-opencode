@@ -592,45 +592,55 @@ Write-Host (t "[5/7] 部署 Git 配置 + AGENTS.md..." "[5/7] Deploying git conf
     }
 
 # .gitignore（追加基础设施排除规则，不覆盖已有内容）
-$gitignoreSrc = Join-Path $templateDir ".gitignore"
+# 注意：不依赖 $gitignoreSrc 是否存在 — 绕过 npm 11.x 下 .npmignore 对嵌套 .gitignore 的异常排除
+$gitignoreSrc = Join-Path $templateDir "_gitignore"
 $gitignoreDst = Join-Path $projectRoot ".gitignore"
 $gitignoreEntries = @(
-    @{ Pattern = '\.opencode/';  Line = '.opencode/';  Comment = 'OpenCode 配置 — 不追踪' }
-    @{ Pattern = 'openspec/schemas/'; Line = 'openspec/schemas/'; Comment = 'OpenSpec Schema — 不追踪' }
-    @{ Pattern = 'openspec/config\.yaml'; Line = 'openspec/config.yaml'; Comment = 'OpenSpec 配置 — 不追踪' }
-    @{ Pattern = '\.worktrees/'; Line = '.worktrees/'; Comment = 'Worktree 隔离目录 — 不追踪' }
+    @{ Pattern = '\.opencode/';  Line = '.opencode/';  Comment = 'OpenCode config - do not track' }
+    @{ Pattern = 'openspec/schemas/'; Line = 'openspec/schemas/'; Comment = 'OpenSpec Schema - do not track' }
+    @{ Pattern = 'openspec/config\.yaml'; Line = 'openspec/config.yaml'; Comment = 'OpenSpec config - do not track' }
+    @{ Pattern = '\.worktrees/'; Line = '.worktrees/'; Comment = 'Worktree isolation - do not track' }
 )
-if (Test-Path $gitignoreSrc) {
-    if (-not (Test-Path $gitignoreDst)) {
-        # 绿地：从模板复制，再追加基础设施排除规则
+if (-not (Test-Path $gitignoreDst)) {
+    # 绿地：优先从模板复制
+    if (Test-Path $gitignoreSrc) {
         run -block { Copy-Item -Force $gitignoreSrc $gitignoreDst -ErrorAction Stop } -description "创建 .gitignore"
-        $installedFiles += ".gitignore"
-        $content = Get-Content $gitignoreDst -Raw
-        $appended = $false
-        foreach ($entry in $gitignoreEntries) {
-            if ($content -notmatch $entry.Pattern) {
-                $append = "`n# $($entry.Comment)`n$($entry.Line)"
-                Add-Content -Path $gitignoreDst -Value $append -NoNewline -Encoding utf8
-                $appended = $true
-            }
-        }
-        if (-not $DryRun) { Write-Host (t "  ✓ .gitignore" "  ✓ .gitignore") -ForegroundColor Green }
+    }
+    # Fallback: 模板不存在或拷贝失败时直接用 Set-Content 创建
+    if (-not (Test-Path $gitignoreDst)) {
+        @"
+# Worktree isolation
+.worktrees/
+"@ | Set-Content -Path $gitignoreDst -NoNewline -Encoding utf8
+        if (-not $DryRun) { Write-Host (t "  ✓ .gitignore（fallback 创建）" "  ✓ .gitignore (fallback created)") -ForegroundColor Green }
     } else {
-        # 棕地：逐个检查追加缺失的条目
-        $content = Get-Content $gitignoreDst -Raw
-        $appended = $false
-        foreach ($entry in $gitignoreEntries) {
-            if ($content -notmatch $entry.Pattern) {
-                $append = "`n# $($entry.Comment)`n$($entry.Line)"
-                Add-Content -Path $gitignoreDst -Value $append -NoNewline -Encoding utf8
-                $appended = $true
-            }
+        if (-not $DryRun) { Write-Host (t "  ✓ .gitignore" "  ✓ .gitignore") -ForegroundColor Green }
+    }
+    $installedFiles += ".gitignore"
+    $content = Get-Content $gitignoreDst -Raw
+    $appended = $false
+    foreach ($entry in $gitignoreEntries) {
+        if ($content -notmatch $entry.Pattern) {
+            $append = "`n# $($entry.Comment)`n$($entry.Line)"
+            Add-Content -Path $gitignoreDst -Value $append -NoNewline -Encoding utf8
+            $appended = $true
         }
-        if ($appended) {
-            if (-not $DryRun) { Write-Host (t "  ✓ .gitignore（已追加基础设施排除规则）" "  ✓ .gitignore (infra exclusions appended)") -ForegroundColor Green }
-        } else {
-            Write-Host (t "  - .gitignore（所有排除规则已存在，跳过）" "  - .gitignore (all exclusions exist, skipping)") -ForegroundColor Gray
+    }
+} else {
+    # 棕地：逐个检查追加缺失的条目
+    $content = Get-Content $gitignoreDst -Raw
+    $appended = $false
+    foreach ($entry in $gitignoreEntries) {
+        if ($content -notmatch $entry.Pattern) {
+            $append = "`n# $($entry.Comment)`n$($entry.Line)"
+            Add-Content -Path $gitignoreDst -Value $append -NoNewline -Encoding utf8
+            $appended = $true
         }
+    }
+    if ($appended) {
+        if (-not $DryRun) { Write-Host (t "  ✓ .gitignore（已追加基础设施排除规则）" "  ✓ .gitignore (infra exclusions appended)") -ForegroundColor Green }
+    } else {
+        Write-Host (t "  - .gitignore（所有排除规则已存在，跳过）" "  - .gitignore (all exclusions exist, skipping)") -ForegroundColor Gray
     }
 }
 

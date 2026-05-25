@@ -23,7 +23,7 @@
     ".gitattributes",
     "bin/",
     "template/",
-    "template/.gitignore",
+    "template/_gitignore",
     "template/.gitattributes",
     "scripts/",
     "docs/QUICKSTART.md",

@@ -1772,17 +1772,54 @@ testDir13=$(mktemp -d /tmp/ops-p13-run-XXXXXX)
 
 ---
 
-### 13.9 验证生成的项目结构完整
+### 13.9 验证生成的项目结构完整（含 .gitignore 排除规则）
 
 ```bash
-ls "$testDir13/.opencode/opencode.json" "$testDir13/.opencode/install-manifest.json" "$testDir13/openspec/config.yaml" "$testDir13/AGENTS.md" "$testDir13/.gitignore"
+# 1. 关键文件全部存在
+ls "$testDir13/.opencode/opencode.json" \
+   "$testDir13/.opencode/install-manifest.json" \
+   "$testDir13/openspec/config.yaml" \
+   "$testDir13/AGENTS.md" \
+   "$testDir13/.gitignore"
+
+# 2. .gitignore 包含正确的排除规则
+grep -q "\.opencode/" "$testDir13/.gitignore" && echo "✅ .opencode/ ignored" || echo "❌ .opencode/ missing"
+grep -q "openspec/schemas/" "$testDir13/.gitignore" && echo "✅ schemas/ ignored" || echo "❌ schemas/ missing"
+grep -q "openspec/config\.yaml" "$testDir13/.gitignore" && echo "✅ config.yaml ignored" || echo "❌ config.yaml missing"
+grep -q "\.worktrees/" "$testDir13/.gitignore" && echo "✅ .worktrees/ ignored" || echo "❌ .worktrees/ missing"
+
+# 3. 模拟 git add 确认排除规则生效（隔离项目是全新 git init，此时尚未 commit）
+cd "$testDir13"
+git init . 2>/dev/null  # 如果已 init 则无害
+git add -A 2>&1
+# .opencode/ 不应在待提交列表中
+git diff --cached --name-only | grep -q "\.opencode/" && echo "❌ .opencode/ staged (BUG: .gitignore not working)" || echo "✅ .opencode/ NOT staged"
 ```
 
-**🔍 预期结果**：5 个文件全部存在。
+**🔍 预期结果**：
+- 5 个关键文件全部存在
+- 4 条排除规则全部匹配
+- `.opencode/` 未出现在 staged 列表中
 
 ---
 
-### 13.10 在隔离项目内执行 openspec 工作流
+### 13.10 验证生成的项目结构——直接 init 后的 git add 排除（回归：之前 .gitignore 缺失导致 infra 文件被追踪）
+
+```bash
+cd "$testDir13"
+
+# openspec/schemas/ 不应在待提交列表中
+git diff --cached --name-only | grep -q "openspec/schemas/" && echo "❌ schemas/ staged (BUG)" || echo "✅ schemas/ NOT staged"
+
+# openspec/config.yaml 不应在待提交列表中
+git diff --cached --name-only | grep -q "openspec/config.yaml" && echo "❌ config.yaml staged (BUG)" || echo "✅ config.yaml NOT staged"
+```
+
+**🔍 预期结果**：`openspec/schemas/` 和 `openspec/config.yaml` 均未被 staged。
+
+---
+
+### 13.11 在隔离项目内执行 openspec 工作流
 
 ```bash
 cd "$testDir13"

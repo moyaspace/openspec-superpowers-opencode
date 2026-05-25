@@ -7,10 +7,6 @@ node_modules/
 /.opencode/
 /AGENTS.md
 
-# 配置文件（避免 files 白名单变动后泄露）
-/.gitignore
-/.npmignore
-
 # 系统文件
 .DS_Store
 Thumbs.db
