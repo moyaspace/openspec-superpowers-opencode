@@ -171,7 +171,7 @@ if [ "$UNINSTALL" = true ]; then
     fi
 
     # 受保护文件列表（reset 不碰）
-    PROTECTED_FILES=("opencode.json" "AGENTS.md" ".gitignore" ".gitattributes")
+    PROTECTED_FILES=("opencode.json" "AGENTS.md" ".gitignore" ".gitattributes" ".editorconfig")
 
     # 解析 overwriteDecisions
     OVERWRITE_DECISIONS_MANIFEST=$(echo "$MANIFEST_JSON" | python3 -c "
@@ -473,13 +473,17 @@ for key, val in tmpl.get('permission', {}).items():
     if key not in merged['permission']:
         merged['permission'][key] = val
 
-# 对 write/edit：强制插入 required 路径
-required_paths = ['.worktrees/**', 'openspec/**', '.opencode/**']
+# 对 write/edit：强制插入 required 路径和 deny 规则
+required_paths = ['.worktrees/**', 'openspec/changes/**', 'openspec/specs/**', '.opencode/**']
+deny_paths = ['openspec/schemas/**', 'openspec/config.yaml']
 for action in ('write', 'edit'):
     action_obj = merged['permission'].get(action)
     if isinstance(action_obj, dict):
         for rp in required_paths:
             action_obj[rp] = 'allow'
+        # 强制插入 deny 规则（保护基础设施文件不被 AI 修改）
+        for dp in deny_paths:
+            action_obj[dp] = 'deny'
 
 # 对 bash：补充模板中有但用户没有的条目
 tmpl_bash = tmpl.get('permission', {}).get('bash')
@@ -661,23 +665,57 @@ if [ -f "$AGENTS_SRC" ]; then
     fi
 fi
 
-# .gitignore（追加 .worktrees/ 条目，不覆盖已有规则）
+# .gitignore（追加基础设施排除规则，不覆盖已有内容）
 GITIGNORE_SRC="$TEMPLATE_DIR/.gitignore"
 GITIGNORE_DST="$PROJECT_ROOT/.gitignore"
+GITIGNORE_ENTRIES=(
+    ".opencode/"
+    "openspec/schemas/"
+    "openspec/config.yaml"
+    ".worktrees/"
+)
+GITIGNORE_COMMENTS=(
+    "OpenCode 配置 — 不追踪"
+    "OpenSpec Schema — 不追踪"
+    "OpenSpec 配置 — 不追踪"
+    "Worktree 隔离目录 — 不追踪"
+)
 if [ -f "$GITIGNORE_SRC" ]; then
     if [ ! -f "$GITIGNORE_DST" ]; then
+        # 绿地：从模板复制，再追加基础设施排除规则
         run_cmd cp "$GITIGNORE_SRC" "$GITIGNORE_DST"
         INSTALLED_FILES+=(".gitignore")
+        HAS_CONTENT=$(cat "$GITIGNORE_DST" 2>/dev/null | wc -l)
+        for i in "${!GITIGNORE_ENTRIES[@]}"; do
+            ENTRY="${GITIGNORE_ENTRIES[$i]}"
+            COMMENT="${GITIGNORE_COMMENTS[$i]}"
+            PATTERN=$(echo "$ENTRY" | sed 's/\./\\./g')
+            if ! grep -q "$PATTERN" "$GITIGNORE_DST" 2>/dev/null; then
+                echo "" >> "$GITIGNORE_DST"
+                echo "# $COMMENT" >> "$GITIGNORE_DST"
+                echo "$ENTRY" >> "$GITIGNORE_DST"
+            fi
+        done
         log "$(t "  ✓ .gitignore" "  ✓ .gitignore")"
-    elif ! grep -q '\.worktrees/' "$GITIGNORE_DST" 2>/dev/null; then
-        if [ "$DRY_RUN" = false ]; then
-            echo "" >> "$GITIGNORE_DST"
-            echo "# Worktree 隔离目录 — 不追踪" >> "$GITIGNORE_DST"
-            echo ".worktrees/" >> "$GITIGNORE_DST"
-        fi
-        log "$(t "  ✓ .gitignore（已追加 .worktrees/）" "  ✓ .gitignore (.worktrees/ appended)")"
     else
-        log "$(t "  - .gitignore（已有 .worktrees/ 规则，跳过）" "  - .gitignore (.worktrees/ exists, skipping)")"
+        # 棕地：逐个检查追加缺失的条目
+        APPENDED=false
+        for i in "${!GITIGNORE_ENTRIES[@]}"; do
+            ENTRY="${GITIGNORE_ENTRIES[$i]}"
+            COMMENT="${GITIGNORE_COMMENTS[$i]}"
+            PATTERN=$(echo "$ENTRY" | sed 's/\./\\./g')
+            if ! grep -q "$PATTERN" "$GITIGNORE_DST" 2>/dev/null; then
+                echo "" >> "$GITIGNORE_DST"
+                echo "# $COMMENT" >> "$GITIGNORE_DST"
+                echo "$ENTRY" >> "$GITIGNORE_DST"
+                APPENDED=true
+            fi
+        done
+        if [ "$APPENDED" = true ]; then
+            log "$(t "  ✓ .gitignore（已追加基础设施排除规则）" "  ✓ .gitignore (infra exclusions appended)")"
+        else
+            log "$(t "  - .gitignore（所有排除规则已存在，跳过）" "  - .gitignore (all exclusions exist, skipping)")"
+        fi
     fi
 fi
 
@@ -688,6 +726,15 @@ if [ -f "$GITATTR_SRC" ] && [ ! -f "$GITATTR_DST" ]; then
     run_cmd cp "$GITATTR_SRC" "$GITATTR_DST"
     INSTALLED_FILES+=(".gitattributes")
     log "$(t "  ✓ .gitattributes" "  ✓ .gitattributes")"
+fi
+
+# .editorconfig（编辑器规则）
+EDITORCONFIG_SRC="$TEMPLATE_DIR/.editorconfig"
+EDITORCONFIG_DST="$PROJECT_ROOT/.editorconfig"
+if [ -f "$EDITORCONFIG_SRC" ] && [ ! -f "$EDITORCONFIG_DST" ]; then
+    run_cmd cp "$EDITORCONFIG_SRC" "$EDITORCONFIG_DST"
+    INSTALLED_FILES+=(".editorconfig")
+    log "$(t "  ✓ .editorconfig" "  ✓ .editorconfig")"
 fi
 echo ""
 

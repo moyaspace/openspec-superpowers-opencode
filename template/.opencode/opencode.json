@@ -8,7 +8,10 @@
     "edit": {
       "*": "ask",
       ".worktrees/**": "allow",
-      "openspec/**": "allow",
+      "openspec/changes/**": "allow",
+      "openspec/specs/**": "allow",
+      "openspec/schemas/**": "deny",
+      "openspec/config.yaml": "deny",
       ".opencode/**": "allow",
       "AGENTS.md": "allow",
       "opencode.json": "allow"

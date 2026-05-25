@@ -142,7 +142,8 @@ if ($Uninstall) {
         "opencode.json",
         "AGENTS.md",
         ".gitignore",
-        ".gitattributes"
+        ".gitattributes",
+        ".editorconfig"
     )
 
     foreach ($file in $manifest.files) {
@@ -402,8 +403,9 @@ if (Test-Path $opencodeSrc) {
                 $mergedPermission[$key] = $tmplJson.permission.$key
             }
         }
-        # 对 write 和 edit：强制插入 required 路径
-        $requiredPaths = @(".worktrees/**", "openspec/**", ".opencode/**")
+        # 对 write 和 edit：强制插入 required 路径和 deny 规则
+        $requiredPaths = @(".worktrees/**", "openspec/changes/**", "openspec/specs/**", ".opencode/**")
+        $denyPaths = @("openspec/schemas/**", "openspec/config.yaml")
         foreach ($action in @("write", "edit")) {
             if ($mergedPermission.ContainsKey($action)) {
                 $actionObj = $mergedPermission[$action]
@@ -413,9 +415,13 @@ if (Test-Path $opencodeSrc) {
                     foreach ($k in $actionObj.PSObject.Properties.Name) {
                         $actionHash[$k] = $actionObj.$k
                     }
-                    # 强制插入 required 路径
+                    # 强制插入 required 路径（allow）
                     foreach ($rPath in $requiredPaths) {
                         $actionHash[$rPath] = "allow"
+                    }
+                    # 强制插入 deny 规则（保护基础设施文件不被 AI 修改）
+                    foreach ($dPath in $denyPaths) {
+                        $actionHash[$dPath] = "deny"
                     }
                     $mergedPermission[$action] = $actionHash
                 }
@@ -585,21 +591,46 @@ Write-Host (t "[5/7] 部署 Git 配置 + AGENTS.md..." "[5/7] Deploying git conf
         }
     }
 
-# .gitignore（追加 .worktrees/ 条目，不覆盖已有规则）
+# .gitignore（追加基础设施排除规则，不覆盖已有内容）
 $gitignoreSrc = Join-Path $templateDir ".gitignore"
 $gitignoreDst = Join-Path $projectRoot ".gitignore"
+$gitignoreEntries = @(
+    @{ Pattern = '\.opencode/';  Line = '.opencode/';  Comment = 'OpenCode 配置 — 不追踪' }
+    @{ Pattern = 'openspec/schemas/'; Line = 'openspec/schemas/'; Comment = 'OpenSpec Schema — 不追踪' }
+    @{ Pattern = 'openspec/config\.yaml'; Line = 'openspec/config.yaml'; Comment = 'OpenSpec 配置 — 不追踪' }
+    @{ Pattern = '\.worktrees/'; Line = '.worktrees/'; Comment = 'Worktree 隔离目录 — 不追踪' }
+)
 if (Test-Path $gitignoreSrc) {
     if (-not (Test-Path $gitignoreDst)) {
+        # 绿地：从模板复制，再追加基础设施排除规则
         run -block { Copy-Item -Force $gitignoreSrc $gitignoreDst -ErrorAction Stop } -description "创建 .gitignore"
         $installedFiles += ".gitignore"
+        $content = Get-Content $gitignoreDst -Raw
+        $appended = $false
+        foreach ($entry in $gitignoreEntries) {
+            if ($content -notmatch $entry.Pattern) {
+                $append = "`n# $($entry.Comment)`n$($entry.Line)"
+                Add-Content -Path $gitignoreDst -Value $append -NoNewline -Encoding utf8
+                $appended = $true
+            }
+        }
         if (-not $DryRun) { Write-Host (t "  ✓ .gitignore" "  ✓ .gitignore") -ForegroundColor Green }
-    } elseif ((Get-Content $gitignoreDst -Raw) -notmatch '\.worktrees/') {
-        run -block {
-            Add-Content -Path $gitignoreDst -Value "`n# Worktree 隔离目录 — 不追踪`n.worktrees/"
-        } -description "追加 .worktrees/ 到 .gitignore"
-        if (-not $DryRun) { Write-Host (t "  ✓ .gitignore（已追加 .worktrees/）" "  ✓ .gitignore (.worktrees/ appended)") -ForegroundColor Green }
     } else {
-        Write-Host (t "  - .gitignore（已有 .worktrees/ 规则，跳过）" "  - .gitignore (.worktrees/ exists, skipping)") -ForegroundColor Gray
+        # 棕地：逐个检查追加缺失的条目
+        $content = Get-Content $gitignoreDst -Raw
+        $appended = $false
+        foreach ($entry in $gitignoreEntries) {
+            if ($content -notmatch $entry.Pattern) {
+                $append = "`n# $($entry.Comment)`n$($entry.Line)"
+                Add-Content -Path $gitignoreDst -Value $append -NoNewline -Encoding utf8
+                $appended = $true
+            }
+        }
+        if ($appended) {
+            if (-not $DryRun) { Write-Host (t "  ✓ .gitignore（已追加基础设施排除规则）" "  ✓ .gitignore (infra exclusions appended)") -ForegroundColor Green }
+        } else {
+            Write-Host (t "  - .gitignore（所有排除规则已存在，跳过）" "  - .gitignore (all exclusions exist, skipping)") -ForegroundColor Gray
+        }
     }
 }
 
@@ -610,6 +641,15 @@ if ((Test-Path $gitattrSrc) -and -not (Test-Path $gitattrDst)) {
     run -block { Copy-Item -Force $gitattrSrc $gitattrDst -ErrorAction Stop } -description "创建 .gitattributes"
     $installedFiles += ".gitattributes"
     if (-not $DryRun) { Write-Host (t "  ✓ .gitattributes" "  ✓ .gitattributes") -ForegroundColor Green }
+}
+
+# .editorconfig（编辑器规则）
+$editorconfigSrc = Join-Path $templateDir ".editorconfig"
+$editorconfigDst = Join-Path $projectRoot ".editorconfig"
+if ((Test-Path $editorconfigSrc) -and -not (Test-Path $editorconfigDst)) {
+    run -block { Copy-Item -Force $editorconfigSrc $editorconfigDst -ErrorAction Stop } -description "创建 .editorconfig"
+    $installedFiles += ".editorconfig"
+    if (-not $DryRun) { Write-Host (t "  ✓ .editorconfig" "  ✓ .editorconfig") -ForegroundColor Green }
 }
 
 # ---- 语言文件清理（仅保留英文 + 所选语言，静默执行）----

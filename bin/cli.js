@@ -120,6 +120,20 @@ if (subcommand === 'init') {
 function runInit(targetDir, isWin, lang) {
     console.log(`\ninit: ${targetDir}`);
 
+    // ---- 0. 检查 git 仓库状态（在所有操作之前）----
+    // 必须先检查再行动，避免在 dirty 仓库中留下部署垃圾
+    const gitDir = path.join(targetDir, '.git');
+    if (fs.existsSync(gitDir)) {
+        const status = execSync('git status --porcelain', { cwd: targetDir, stdio: 'pipe' }).toString().trim();
+        if (status.length > 0) {
+            console.error(t(
+                '\n  ✗ 工作目录有未提交的变更。请先提交或 stash 后再执行 init。',
+                '\n  ✗ Working directory has uncommitted changes. Please commit or stash them before running init.'
+            ));
+            process.exit(1);
+        }
+    }
+
     // ---- 1. 创建目录 ----
     if (args[1] && !fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
@@ -145,7 +159,11 @@ function runInit(targetDir, isWin, lang) {
         execSync('git diff --cached --quiet', { cwd: targetDir, stdio: 'pipe' });
         console.log(t('  (无变更需要提交)', '  (Nothing to commit)'));
     } catch {
-        run('git -c core.autocrlf=false -c core.safecrlf=false commit -m "init"', targetDir);
+        // 展示即将提交的变更清单
+        const staged = execSync('git diff --cached --name-status', { cwd: targetDir }).toString();
+        console.log(t('\n  即将提交：', '\n  About to commit:'));
+        console.log(staged.split('\n').filter(l => l).map(l => '    ' + l).join('\n'));
+        run('git -c core.autocrlf=false -c core.safecrlf=false commit -m "oso: launch OpenSpec + Superpowers workflow"', targetDir);
     }
 
     // ---- 5. 完成 ----

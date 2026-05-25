@@ -53,6 +53,83 @@
 - **实现**: 全流程 `Test-Path dst → 不存在才复制`
 - **影响**: 绿地项目行为不变；棕地项目只补充缺失文件
 
+#### ADR-7: 基础设施文件单独 gitignore，不排除整个 openspec/
+
+- **决策**: 部署到用户项目后，仅 gitignore `openspec/schemas/` 和 `openspec/config.yaml`，不再 gitignore 整个 `openspec/` 目录
+- **理由**:
+  - `openspec/` 目录混合了基础设施文件（schemas/、config.yaml）和用户内容（changes/、specs/）
+  - 整个 `openspec/` 被 gitignore 导致用户的变更和规格文档无法被 git 追踪 → v1.0.5 的 bug
+  - gitignore 应只作用于非用户内容，不干扰用户工作流
+- **实现**: setup 脚本 `.gitignore` 追加条目从 `openspec/` 拆分为 `openspec/schemas/` 和 `openspec/config.yaml`
+- **影响**: 用户可正常提交 `openspec/changes/` 和 `openspec/specs/`；基础设施文件依然受 gitignore 保护
+
+#### ADR-8: opencode.json 权限防御（Deny-by-Default 细化）
+
+- **决策**: 在 `template/.opencode/opencode.json` 中将 `edit` 权限从 `"openspec/**": "allow"` 拆分为更细粒度的规则：
+  - `openspec/changes/**` → `allow`（用户需要编辑自己的变更）
+  - `openspec/specs/**` → `allow`（用户需要编辑规格）
+  - `openspec/schemas/**` → `deny`（基础设施，禁止 OpenCode 修改）
+  - `openspec/config.yaml` → `deny`（基础设施，禁止 OpenCode 修改）
+- **理由**:
+  - `openspec/` 同时包含用户内容和基础设施，不应一刀切允许
+  - 基础设施文件（schemas、config.yaml）是工具部署的，用户不应通过 AI 修改
+  - `deny` 是硬阻断，即使 AI 主动请求也无法修改（`ask` 仍可通过用户确认放行）
+- **实现**: `template/.opencode/opencode.json` 的 `edit` 权限对象中替换 `"openspec/**": "allow"` 为具体规则
+- **影响**:
+  - AI 对 `openspec/schemas/**` 和 `openspec/config.yaml` 的任何编辑操作被静默拒绝
+  - 用户仍然可以在文件系统中直接编辑这些文件
+  - 绿地项目直接使用新模板；棕地项目 merge 时 deny 规则由 ADR-9 机制强制注入
+
+#### ADR-9: 棕地合并强制注入 deny 规则
+
+- **决策**: Brownfield merge 时，除 required allow 路径外，同时向 `write` 和 `edit` 权限对象强制注入 deny 规则
+  - `openspec/schemas/**` → `deny`
+  - `openspec/config.yaml` → `deny`
+- **理由**:
+  - ADR-8 的 deny 规则在绿地项目直接生效，但棕地合并时未被携带到用户已有的 `opencode.json` 中
+  - `"*": "ask"` 虽提供兜底保护，但 deny 是更强的安全语义——任何 allow 规则都无法覆盖 deny
+  - 基础设施文件的不可修改性是不可协商的安全底线，同 required allow 路径一样必须强制注入
+- **实现**: `setup.ps1`（PowerShell）和 `setup.sh`（Python3）的 union merge 逻辑中新增 `$denyPaths` / `deny_paths` 数组，在 required paths 注入后追加 deny 规则写入
+- **影响**:
+  - 棕地项目 merge 后 `opencode.json` 的 `edit`/`write` 中自动包含 schemas/config.yaml 的 deny 规则
+  - 用户原有权限结构不受影响（deny 是追加，不覆盖已有条目）
+  - 与 ADR-8 一致，用户仍可文件系统直接编辑基础设施文件
+  - 需要记录到测试文档 Phase 6.3 的验证预期中
+
+### 概念解释：办公室与仓库
+
+理解本项目的工作区隔离（worktree）和权限设计，可以用一个比喻：
+
+> **`main` 目录是仓库，`.worktrees/<name>/` 是 AI 的办公室。**
+
+| 概念 | 比喻 | 说明 |
+|------|------|------|
+| `main` 目录 | 仓库 | 存放所有基础设施（schema、config、模板）。不在此处写代码。 |
+| `.worktrees/<name>/` | AI 的办公室 | 实际工作区。只放需要的东西（`changes/`、`specs/`）。 |
+| `openspec/schemas/` | 工具柜的说明书 | 仓库里有，办公室**不复制**。 |
+| `.gitignore` | 仓库门口的告示 | 说「说明书别装进快递箱（git commit）」。 |
+| `opencode.json` deny 规则 | 仓库的安全门禁 | AI 回仓库拿资料时不能乱翻工具柜。 |
+
+**为什么两个机制缺一不可：**
+
+1. **`.gitignore`**：确保 schemas 不进版本控制，worktree 基于 commit 创建，自然也不会有 schemas。解决了「别让每个工作区都背着一套说明书」的问题。
+2. **`opencode.json` deny 规则**：AI 虽然大多数时间在办公室（worktree）工作，但有时会回仓库（main）操作——`openspec status`、`opsx-archive`、查看配置等。此时 schemas **就在磁盘上**，deny 规则阻止 AI 误改。
+
+```
+main 目录（仓库）                 worktree（AI 办公室）
+├── .gitignore                    ├── .gitignore
+├── opencode.json                 ├── opencode.json
+│   └── edit: schemas → deny      │   └── edit: schemas → deny
+├── openspec/                     └── openspec/
+│   ├── schemas/  ← 存在 + 受保护   只复制 changes/ 和 specs/
+│   ├── changes/
+│   └── specs/
+└── .worktrees/
+    └── feature-a/  ← 实际工作区
+```
+
+两者针对同一批文件，但解决的问题不同，是**互补防御**而非重复。
+
 ### 文件分类
 
 | 文件 | 属于目标项目？ | 行为 | 部署方式 |
@@ -61,9 +138,12 @@
 | `.opencode/skills/` | ✅ | 需要，OPSX skill 定义 | 不覆盖，不存在才复制 |
 | `.opencode/opencode.json` | ✅ | 需要，AI 权限规则 | 不覆盖，不存在才复制 |
 | `.opencode/install-manifest.json` | ❌ 包管理数据 | 仅 reset 用，对项目透明 | 总是写入（记录实际安装文件） |
-| `openspec/` | ✅ | 需要，OpenSpec 工作流 | 覆盖（schema 更新） |
+| `openspec/changes/` | ✅ | 需要，用户变更数据 | 不存在才创建空目录 |
+| `openspec/specs/` | ✅ | 需要，用户规格文档 | 不存在才创建空目录 |
+| `openspec/schemas/` | ❌ 工具基础设施 | 只读，AI 不可修改 | 覆盖部署 |
+| `openspec/config.yaml` | ❌ 工具基础设施 | 只读，AI 不可修改 | 覆盖部署 |
 | `AGENTS.md` | ✅ | 需要，AI 指导 | 不覆盖已有 bridge 内容 |
-| `.gitignore` | ✅ | 需要，排除 .worktrees/ | 不存在才创建；已存在只追加 .worktrees/ |
+| `.gitignore` | ✅ | 需要，排除 .worktrees/ 等 | 不存在才创建；已存在只追加基础设施排除 |
 | `.gitattributes` | ✅ | 需要，行尾规范化 | 不存在才创建 |
 | `LICENSE` | ❌ | 包的许可，非项目许可 | 不部署 |
 | `skills.lock.json` | ❌ | 包校验数据 | 不部署 |
