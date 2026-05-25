@@ -146,7 +146,7 @@ cd <project-root>
 本项目发布新版后：
 
 ```bash
-npm update -g openspec-superpowers-opencode  # 升级包
+npm update -g @moyaspace/openspec-superpowers-opencode  # 升级包
 openspec-superpowers-opencode reset           # 删除旧配置
 openspec-superpowers-opencode init            # 安装新模板
 ```

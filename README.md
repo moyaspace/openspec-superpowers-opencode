@@ -144,7 +144,7 @@ Two types of updates:
 After a new release:
 
 ```bash
-npm update -g openspec-superpowers-opencode  # upgrade package
+npm update -g @moyaspace/openspec-superpowers-opencode  # upgrade package
 openspec-superpowers-opencode reset           # remove old config
 openspec-superpowers-opencode init            # install new templates
 ```

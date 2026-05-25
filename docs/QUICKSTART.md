@@ -86,7 +86,7 @@ main 分支始终保持干净。
 ## 更新
 
 ```bash
-npm update -g openspec-superpowers-opencode
+npm update -g @moyaspace/openspec-superpowers-opencode
 openspec-superpowers-opencode reset
 openspec-superpowers-opencode init
 ```
