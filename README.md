@@ -4,8 +4,8 @@
 
 **CLI scaffold that bridges Superpowers + OpenSpec workflows into OpenCode.**
 
-[![GitHub Stars](https://img.shields.io/github/stars/moyaspace/openspec-superpowers-opencode?style=social)](https://github.com/moyaspace/openspec-superpowers-opencode)
-[![npm Downloads](https://img.shields.io/npm/dm/@moyaspace/openspec-superpowers-opencode?style=social)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
+[![GitHub Stars](https://img.shields.io/github/stars/moyaspace/openspec-superpowers-opencode?style=for-the-badge&color=yellow&logo=github)](https://github.com/moyaspace/openspec-superpowers-opencode)
+[![npm Downloads](https://img.shields.io/npm/dm/@moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
 
 > If you find this useful, consider giving it a ⭐ on GitHub!
 
