@@ -5,8 +5,10 @@
 **将 Superpowers + OpenSpec 工作流桥接到 OpenCode 的 CLI 脚手架工具。**
 
 [![GitHub Stars](https://img.shields.io/github/stars/moyaspace/openspec-superpowers-opencode?style=for-the-badge&color=yellow&logo=github)](https://github.com/moyaspace/openspec-superpowers-opencode)
+[![npm Version](https://img.shields.io/npm/v/@moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
 [![npm Weekly Downloads](https://img.shields.io/npm/dw/@moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
 [![npm Monthly Downloads](https://img.shields.io/npm/dm/@moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
+[![License](https://img.shields.io/github/license/moyaspace/openspec-superpowers-opencode?style=for-the-badge&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
 
 > 如果觉得有用，请在 GitHub 上给个 ⭐！
 
