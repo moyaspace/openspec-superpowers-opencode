@@ -41,6 +41,9 @@ jobs:
           echo "Tarball: $PACKAGE"
           errors=0
 
+          # 将 tar 列表写入临时文件，避免 pipe+grep 的兼容性问题
+          tar -tzf "$PACKAGE" > /tmp/tarlist.txt
+
           for file in \
             "package/bin/cli.js" \
             "package/bin/create-project.js" \
@@ -56,7 +59,7 @@ jobs:
             "package/scripts/setup.ps1" \
             "package/docs/QUICKSTART.md" \
             "package/LICENSE"; do
-            if tar -tzf "$PACKAGE" 2>/dev/null | grep -q "$file"; then
+            if grep -q "$file" /tmp/tarlist.txt; then
               echo "  ✅ $file"
             else
               echo "  ❌ $file"
@@ -67,7 +70,7 @@ jobs:
           # 验证 template/.opencode/ 结构
           echo ""
           echo "--- template/.opencode/ structure ---"
-          tar -tzf "$PACKAGE" | grep "package/template/\.opencode/" | head -5
+          grep "package/template/\.opencode/" /tmp/tarlist.txt | head -5
 
           if [ $errors -gt 0 ]; then
             echo ""
