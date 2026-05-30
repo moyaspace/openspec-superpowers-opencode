@@ -127,7 +127,7 @@ npm publish                         # publish to npm
 
 ---
 
-**GitHub**: [moyaspace/openspec-superpowers-opencode](https://github.com/moyaspace/openspec-superpowers-opencode)
-**npm**: [@moyaspace/openspec-superpowers-opencode](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
-**Author**: rl <robincn@gmail.com>
+**GitHub**: [moyaspace/openspec-superpowers-opencode](https://github.com/moyaspace/openspec-superpowers-opencode)<br>
+**npm**: [@moyaspace/openspec-superpowers-opencode](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)<br>
+**Author**: rl (robincn@gmail.com)<br>
 **License**: MIT

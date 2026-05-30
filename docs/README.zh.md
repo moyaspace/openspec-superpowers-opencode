@@ -125,7 +125,7 @@ npm publish                         # 发布到 npm
 
 ---
 
-**GitHub**：https://github.com/moyaspace/openspec-superpowers-opencode
-**npm**：https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode
-**作者**：rl <robincn@gmail.com>
+**GitHub**：[moyaspace/openspec-superpowers-opencode](https://github.com/moyaspace/openspec-superpowers-opencode)<br>
+**npm**：[@moyaspace/openspec-superpowers-opencode](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)<br>
+**作者**：rl (robincn@gmail.com)<br>
 **许可**：MIT
