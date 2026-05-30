@@ -1,19 +1,22 @@
 {
   "name": "@moyaspace/openspec-superpowers-opencode",
   "version": "1.0.7",
-  "description": "Scaffold OpenSpec + Superpowers projects for OpenCode with git worktree isolation",
+  "description": "Bridges Superpowers + OpenSpec workflows into OpenCode with enforced worktree isolation",
   "keywords": [
     "openspec",
     "superpowers",
     "opencode",
     "git-worktree",
     "workflow",
-    "template",
-    "spec-driven-development",
-    "scaffold",
-    "cli",
     "bridge",
-    "isolation"
+    "spec-driven",
+    "sdd",
+    "ai-coding",
+    "developer-tools",
+    "parallel-development",
+    "worktree",
+    "cross-platform",
+    "code-generation"
   ],
   "bin": {
     "create-openspec-superpowers-opencode": "bin/create-project.js",

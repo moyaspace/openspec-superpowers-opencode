@@ -1,0 +1,92 @@
+name: PR Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # ── CLI 可用性 ──
+      - name: CLI --help
+        run: node bin/cli.js --help
+
+      - name: CLI --help (zh-CN)
+        run: node bin/cli.js --lang zh-CN --help
+
+      - name: CLI create-project alias --help
+        run: node bin/create-project.js --help
+
+      # ── Tarball 构建 ──
+      - name: npm pack
+        run: npm pack
+
+      # ── Tarball 内容完整性 ──
+      - name: Verify tarball contents
+        shell: bash
+        run: |
+          PACKAGE=$(ls *.tgz)
+          echo "Tarball: $PACKAGE"
+          errors=0
+
+          for file in \
+            "package/bin/cli.js" \
+            "package/bin/create-project.js" \
+            "package/.gitattributes" \
+            "package/package.json" \
+            "package/template/AGENTS.md" \
+            "package/template/openspec/schemas/superpowers-bridge-opencode/schema.yaml" \
+            "package/template/skills.lock.json" \
+            "package/template/_gitignore" \
+            "package/template/.editorconfig" \
+            "package/template/.gitattributes" \
+            "package/scripts/setup.sh" \
+            "package/scripts/setup.ps1" \
+            "package/docs/QUICKSTART.md" \
+            "package/LICENSE"; do
+            if tar -tzf "$PACKAGE" 2>/dev/null | grep -q "$file"; then
+              echo "  ✅ $file"
+            else
+              echo "  ❌ $file"
+              errors=$((errors + 1))
+            fi
+          done
+
+          # 验证 template/.opencode/ 结构
+          echo ""
+          echo "--- template/.opencode/ structure ---"
+          tar -tzf "$PACKAGE" | grep "package/template/\.opencode/" | head -5
+
+          if [ $errors -gt 0 ]; then
+            echo ""
+            echo "❌ $errors critical file(s) missing from tarball"
+            exit 1
+          fi
+          echo ""
+          echo "✅ All critical files present"
+
+      # ── CRLF 检查（仅 Linux，Windows 上 xxd 不可用）──
+      - name: CRLF check (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          PACKAGE=$(ls *.tgz)
+          tar -xzf "$PACKAGE" -C /tmp package/scripts/setup.sh
+          if xxd /tmp/package/scripts/setup.sh | head -1 | grep -q "0d 0a"; then
+            echo "❌ scripts/setup.sh has CRLF — check .gitattributes"
+            exit 1
+          else
+            echo "✅ scripts/setup.sh is LF only"
+          fi

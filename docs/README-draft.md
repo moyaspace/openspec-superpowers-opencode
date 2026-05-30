@@ -7,7 +7,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/moyaspace/openspec-superpowers-opencode?style=for-the-badge&color=yellow&logo=github)](https://github.com/moyaspace/openspec-superpowers-opencode)
 [![npm Version](https://img.shields.io/npm/v/@moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
 [![npm Weekly Downloads](https://img.shields.io/npm/dw/@moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
-[![npm Monthly Downloads](https://img.shields.io/npm/dm/@moyaspace/openspec-superpowers-opencode?style-for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
+[![npm Monthly Downloads](https://img.shields.io/npm/dm/@moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
 [![License](https://img.shields.io/github/license/moyaspace/openspec-superpowers-opencode?style=for-the-badge&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
 
 > If you find this useful, consider giving it a ⭐ on GitHub!
@@ -108,7 +108,7 @@ openspec-superpowers-opencode init
 
 ## Prerequisites
 
-- Node.js >= 16 (recommended)
+- Node.js >= 16（推荐）
 - `openspec` CLI v1.3+
 - `opencode` CLI
 - `git`
