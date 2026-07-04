@@ -43,7 +43,10 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode registry remove <name>    注册表删除变更
     openspec-superpowers-opencode registry update-status <name> <status>  更新变更状态
     openspec-superpowers-opencode registry list             列出所有活跃变更
-    openspec-superpowers-opencode registry verify           验证注册表和包装环境
+    openspec-superpowers-opencode registry reset            重置注册表为空
+    openspec-superpowers-opencode verify                   验证系统完整性（5 项检查）
+    openspec-superpowers-opencode registry verify           轻量验证（仅 changes.json + worktree）
+    openspec-superpowers-opencode install-shims             安装/修复垫片脚本
 
  语言:
     --lang zh-CN    简体中文
@@ -76,7 +79,10 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode registry remove <name>    Remove change from registry
     openspec-superpowers-opencode registry update-status <name> <status>  Update change status
     openspec-superpowers-opencode registry list             List active changes
-    openspec-superpowers-opencode registry verify           Verify registry and wrapper environment
+    openspec-superpowers-opencode registry reset            Reset registry to empty
+    openspec-superpowers-opencode verify                   Verify system integrity (5 checks)
+    openspec-superpowers-opencode registry verify           Lightweight verify (only changes.json + worktree)
+    openspec-superpowers-opencode install-shims             Install/repair shim scripts
 
   Language:
     --lang zh-CN    Simplified Chinese
@@ -123,9 +129,13 @@ if (subcommand === 'init') {
     runEnsureWorktree(subarg, process.cwd());
 } else if (subcommand === 'registry') {
     handleRegistry(args.slice(1));
+} else if (subcommand === 'verify') {
+    runVerifyTop();
+} else if (subcommand === 'install-shims') {
+    runInstallShims();
 } else {
     console.error(t(`未知子命令: ${subcommand}`, `Unknown subcommand: ${subcommand}`));
-    console.error(t('可用命令: init, reset, dry-run, ensure-worktree, registry', 'Available commands: init, reset, dry-run, ensure-worktree, registry'));
+    console.error(t('可用命令: init, reset, dry-run, ensure-worktree, registry, verify, install-shims', 'Available commands: init, reset, dry-run, ensure-worktree, registry, verify, install-shims'));
     process.exit(1);
 }
 
@@ -291,10 +301,10 @@ function findProjectRoot(dir) {
 async function handleRegistry(registryArgs) {
     const action = registryArgs[0];
 
-    if (!action || (action !== 'verify' && action !== 'list' && action !== 'add' && action !== 'remove' && action !== 'update-status')) {
+    if (!action || (action !== 'verify' && action !== 'list' && action !== 'add' && action !== 'remove' && action !== 'update-status' && action !== 'reset')) {
         console.error(t(
-            '用法: openspec-superpowers-opencode registry <add|remove|update-status|list|verify> [参数...]',
-            'Usage: openspec-superpowers-opencode registry <add|remove|update-status|list|verify> [args...]'
+            '用法: openspec-superpowers-opencode registry <add|remove|update-status|list|verify|reset> [参数...]',
+            'Usage: openspec-superpowers-opencode registry <add|remove|update-status|list|verify|reset> [args...]'
         ));
         process.exit(1);
     }
@@ -302,7 +312,8 @@ async function handleRegistry(registryArgs) {
     const projectRoot = findProjectRoot(process.cwd());
 
     if (action === 'verify') {
-        const ok = await runVerify(projectRoot);
+        // registry verify 为轻量版：只检查 changes.json + worktree 目录
+        const ok = runRegistryVerifyLight(projectRoot);
         process.exit(ok ? 0 : 1);
     }
 
@@ -315,7 +326,7 @@ async function handleRegistry(registryArgs) {
     }
 
     const registryPath = path.join(projectRoot, 'openspec', 'changes.json');
-    const registry = require(path.join(toolDir, 'scripts', 'registry'));
+        const registry = require(path.join(toolDir, 'lib', 'registry'));
 
     switch (action) {
         case 'add': {
@@ -371,93 +382,95 @@ async function handleRegistry(registryArgs) {
             console.log(output);
             break;
         }
+        case 'reset': {
+            try {
+                const result = registry.reset(registryPath);
+                const msg = result.backupPath
+                    ? `  ✓ 注册表已重置 (备份: ${result.backupPath}, 原条目: ${result.changesCount})`
+                    : `  ✓ 注册表已重置 (原条目: ${result.changesCount})`;
+                console.log(t(msg, `  ✓ Registry reset (backup: ${result.backupPath}, previous entries: ${result.changesCount})`));
+            } catch (e) {
+                console.error(t(`  ✗ 重置注册表失败: ${e.message}`, `  ✗ Registry reset failed: ${e.message}`));
+                process.exit(1);
+            }
+            break;
+        }
     }
 }
 
-// ---- runVerify — 检查注册表 + 包装环境四项 ----
-async function runVerify(projectRoot, silent) {
+// ---- runRegistryVerifyLight — registry verify 轻量版（只检查 changes.json + worktree 目录）----
+function runRegistryVerifyLight(projectRoot) {
     let allGood = true;
 
-    let openspecPath = null;
-    let openspecOrigPath = null;
-    try {
-        const whichCmd = isWin ? 'where openspec' : 'which openspec';
-        const whichOutput = execSync(whichCmd, { stdio: 'pipe' }).toString().trim().split('\n')[0];
-        if (whichOutput) {
-            openspecPath = whichOutput.trim();
-            const binDir = path.dirname(openspecPath);
-            for (const c of ['openspec-orig', 'openspec-orig.cmd', 'openspec-orig.ps1']) {
-                const p = path.join(binDir, c);
-                if (fs.existsSync(p)) { openspecOrigPath = p; break; }
-            }
-        }
-    } catch {}
+    if (!projectRoot) {
+        console.log('  ∼ changes.json: not in a project, skipped');
+        return true;
+    }
 
-    if (openspecOrigPath) {
-        if (!silent) console.log(`  ✓ openspec-orig: ${openspecOrigPath}`);
-    } else {
-        if (openspecPath) {
-            if (!silent) console.log(`  ⚠ openspec-orig: not found`);
-        } else {
-            if (!silent) console.log(`  ⚠ openspec: not installed`);
+    const registryPath = path.join(projectRoot, 'openspec', 'changes.json');
+    if (fs.existsSync(registryPath)) {
+        try {
+            const data = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+            const count = data && Array.isArray(data.changes) ? data.changes.length : 0;
+            console.log(`  ${count > 0 ? '✓' : '∼'} changes.json: ${count} change(s)`);
+        } catch {
+            console.log('  ⚠ changes.json: corrupted');
+            allGood = false;
         }
+    } else {
+        console.log('  ⚠ changes.json: not found');
         allGood = false;
     }
 
-    if (openspecPath) {
-        try {
-            const firstLine = fs.readFileSync(openspecPath, 'utf-8').split('\n')[0].trim();
-            if (firstLine.includes('openspec wrapper for oso registry')) {
-                if (!silent) console.log(`  ✓ openspec: wrapper intact`);
-            } else {
-                if (!silent) console.log(`  ⚠ openspec: not wrapper`);
+    try {
+    const registry = require(path.join(toolDir, 'lib', 'registry'));
+        const data = registry.read(registryPath);
+        let worktreeOk = true;
+        for (const c of data.changes) {
+            if (!fs.existsSync(path.join(projectRoot, c.worktree))) {
+                console.log(`  ⚠ worktree ${c.name}: not found (${c.worktree})`);
+                worktreeOk = false;
                 allGood = false;
             }
-        } catch {
-            allGood = false;
         }
-    }
-
-    if (projectRoot) {
-        const registryPath = path.join(projectRoot, 'openspec', 'changes.json');
-        if (fs.existsSync(registryPath)) {
-            try {
-                const data = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
-                const count = data.changes ? data.changes.length : 0;
-                if (!silent) console.log(`  ✓ changes.json: valid (${count} changes)`);
-            } catch {
-                if (!silent) console.log(`  ⚠ changes.json: corrupted`);
-                allGood = false;
-            }
-        } else {
-            if (!silent) console.log(`  ⚠ changes.json: not found`);
-            allGood = false;
+        if (worktreeOk && data.changes.length > 0) {
+            console.log('  ✓ worktrees: all present');
+        } else if (data.changes.length === 0) {
+            console.log('  ∼ worktrees: no active changes');
         }
-
-        if (!silent) {
-            const registry = require(path.join(toolDir, 'scripts', 'registry'));
-            const data = registry.read(registryPath);
-            let worktreeOk = true;
-            for (const c of data.changes) {
-                if (!fs.existsSync(path.join(projectRoot, c.worktree))) {
-                    console.log(`  ⚠ worktree ${c.name}: not found (${c.worktree})`);
-                    worktreeOk = false;
-                    allGood = false;
-                }
-            }
-            if (worktreeOk && data.changes.length > 0) {
-                console.log(`  ✓ worktrees: all present`);
-            } else if (data.changes.length === 0) {
-                console.log(`  ∼ worktrees: no active changes`);
-            }
-        }
-    } else {
-        if (!silent) console.log(`  ∼ changes.json: not in a project, skipped`);
-    }
-
-    if (!allGood && !silent) {
-        console.log(`\n⚠ Issues detected. Use --repair to fix wrapper issues.`);
+    } catch {
+        // registry module 加载或读取失败
     }
 
     return allGood;
 }
+
+// ---- runVerifyTop — 顶层 verify 命令：完整 5 项检查 ----
+function runVerifyTop() {
+    const verify = require(path.join(toolDir, 'lib', 'verify'));
+    const projectRoot = findProjectRoot(process.cwd());
+    const results = verify.runAllChecks(toolDir, isWin, projectRoot);
+    const output = verify.formatResults(results);
+    console.log(output);
+    const ok = verify.allPass(results);
+    process.exit(ok ? 0 : 1);
+}
+
+// ---- runInstallShims — 安装/修复 openspec CLI 垫片脚本 ----
+function runInstallShims() {
+    const installer = require(path.join(toolDir, 'lib', 'install-shims'));
+    const result = installer.installShims(toolDir, isWin);
+
+    if (result.success) {
+        console.log('  ✓ Shim scripts installed successfully');
+    } else {
+        console.log('  ⚠ Failed to install shim scripts');
+    }
+
+    for (const d of result.details) {
+        console.log(`    ${d}`);
+    }
+
+    process.exit(result.success ? 0 : 1);
+}
+
