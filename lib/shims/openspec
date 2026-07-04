@@ -1,0 +1,24 @@
+#!/bin/sh
+# openspec shim for oso registry
+TOOL_DIR="{{TOOL_DIR}}"
+
+if [ "$1" = "list" ] && [ -n "$TOOL_DIR" ] && [ "$TOOL_DIR" != "{{TOOL_DIR}}" ]; then
+    find_project_root() {
+        dir="$1"
+        while [ "$dir" != "$(dirname "$dir")" ]; do
+            if [ -f "$dir/openspec/changes.json" ]; then
+                echo "$dir"
+                return 0
+            fi
+            dir="$(dirname "$dir")"
+        done
+        return 1
+    }
+
+    ROOT=$(find_project_root "$PWD")
+    if [ -n "$ROOT" ]; then
+        exec node "$TOOL_DIR/lib/registry-utils.js" list "$ROOT"
+    fi
+fi
+
+exec openspec-orig "$@"
