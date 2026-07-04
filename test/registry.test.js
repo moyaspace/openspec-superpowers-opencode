@@ -5,7 +5,7 @@ const path = require('path');
 const os = require('os');
 
 // registry 模块（测试前还不存在——RED）
-const registry = require('./registry');
+const registry = require('../lib/registry');
 
 /** 创建临时目录用于每个测试 */
 function tmpDir() {
@@ -214,5 +214,73 @@ describe('list()', () => {
         assert.ok(output.includes('b'));
         assert.ok(output.includes('implementing'));
         assert.ok(output.includes('.worktrees/b'));
+    });
+});
+
+// ============================================================
+// reset()
+// ============================================================
+describe('reset()', () => {
+    test('clears changes and creates .bak when backup=true', () => {
+        const dir = tmpDir();
+        const rp = writeRegistry(dir, { changes: [{ name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: 'x' }] });
+        const result = registry.reset(rp, true);
+        assert.strictEqual(result.changesCount, 1);
+        assert.ok(result.backupPath.endsWith('.bak'));
+        const data = registry.read(rp);
+        assert.strictEqual(data.changes.length, 0);
+        const bak = JSON.parse(fs.readFileSync(result.backupPath, 'utf-8'));
+        assert.strictEqual(bak.changes.length, 1);
+        assert.strictEqual(bak.changes[0].name, 'demo');
+    });
+
+    test('backup defaults to true when omitted', () => {
+        const dir = tmpDir();
+        const rp = writeRegistry(dir, { changes: [{ name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: 'x' }] });
+        registry.reset(rp);
+        assert.ok(fs.existsSync(rp + '.bak'));
+        const data = registry.read(rp);
+        assert.strictEqual(data.changes.length, 0);
+    });
+
+    test('does not create .bak when backup=false', () => {
+        const dir = tmpDir();
+        const rp = writeRegistry(dir, { changes: [{ name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: 'x' }] });
+        const result = registry.reset(rp, false);
+        assert.strictEqual(result.backupPath, null);
+        assert.ok(!fs.existsSync(rp + '.bak'));
+        const data = registry.read(rp);
+        assert.strictEqual(data.changes.length, 0);
+    });
+
+    test('handles already empty registry', () => {
+        const dir = tmpDir();
+        const rp = writeRegistry(dir, { changes: [] });
+        const result = registry.reset(rp, true);
+        assert.strictEqual(result.changesCount, 0);
+        const data = registry.read(rp);
+        assert.strictEqual(data.changes.length, 0);
+    });
+
+    test('handles non-existent registry file gracefully', () => {
+        const dir = tmpDir();
+        const rp = path.join(dir, 'openspec', 'changes.json');
+        const result = registry.reset(rp, true);
+        assert.strictEqual(result.changesCount, 0);
+        assert.strictEqual(result.backupPath, null);
+        assert.ok(fs.existsSync(rp));
+        const data = registry.read(rp);
+        assert.strictEqual(data.changes.length, 0);
+    });
+
+    test('returns correct changesCount with multiple entries', () => {
+        const dir = tmpDir();
+        const rp = writeRegistry(dir, { changes: [
+            { name: 'a', status: 'created', worktree: '.worktrees/a', createdAt: 'x' },
+            { name: 'b', status: 'implementing', worktree: '.worktrees/b', createdAt: 'x' },
+            { name: 'c', status: 'done', worktree: '.worktrees/c', createdAt: 'x' }
+        ]});
+        const result = registry.reset(rp, false);
+        assert.strictEqual(result.changesCount, 3);
     });
 });

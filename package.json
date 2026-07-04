@@ -28,6 +28,8 @@
     "template/",
     "template/_gitignore",
     "template/.gitattributes",
+    "lib/",
+    "test/",
     "scripts/",
     "docs/QUICKSTART.md",
     "LICENSE"
