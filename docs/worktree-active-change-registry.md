@@ -181,6 +181,17 @@ openspec-superpowers-opencode registry update-status <name> <status>
 openspec-superpowers-opencode registry remove <name>
 ```
 
+## 重要设计决策：所有 registry 命令不做终端交互式提示
+
+registry 命令（`add`、`remove`、`update-status`、`list`、`verify`）设计为被 **AI agent 调用**（ opsx 命令中的步骤），而非用户直接运行。因此：
+
+- **不做** `readline`/`promptYesNo` 之类的终端交互
+- 输出**结构化文本报告** + 通过 **exit code**（0=正常，非0=有问题）指示结果
+- AI agent 读取输出后，**自行决定**是否向用户提问、如何提问
+- 例如 `registry add` 触发 verify 发现问题：CLI 输出错误信息 + exit 1 → AI agent 看到后向用户展示问题并询问"是否修复？" → 用户同意 → AI agent 执行 `--repair`
+
+> **这条规则在 T3 设计中有误，已于实现阶段纠正。** 原设计包含 `promptYesNo` 交互函数，但 registry 命令是在 opsx 命令中被 AI 调用的，终端的交互提示永远无法被 AI 看到。纠正后改为纯 exit code 模式。
+
 ## 注册表管理脚本
 
 路径：`<tool-install-dir>/scripts/registry.js`（工具安装目录内）
@@ -248,7 +259,7 @@ openspec-superpowers-opencode registry verify
 | `changes.json` 文件不存在 | 视为无注册表条目，不拦截，透传 `openspec-orig list`（等价于原生行为） |
 | worktree 目录已被手动删除 | 遍历注册表时检测目录是否存在，不存在的打印 `⚠ <name>: worktree not found at <path>`，跳过该条目但保留注册表记录 |
 | 更新/重装工具（`openspec-orig` 已存在） | 安装程序先检测 `openspec-orig` 是否存在，如已存在则跳过 copy，直接覆盖写入新版本包装脚本；`--repair` 模式要求 openspec-orig 必须已存在 |
-| 包装脚本被 npm update 覆盖 | `registry verify` 检测到 `openspec` 无特征标记但 `openspec-orig` 存在 → 提示用户 → 同意后自动调用 `--repair` |
+| 包装脚本被 npm update 覆盖 | `registry verify` 检测到 `openspec` 无特征标记但 `openspec-orig` 存在 → 输出报告 + exit 1 → AI agent 读取后向用户展示问题并引导修复 |
 | 注册表中同名变更已存在 | `registry.add()` 执行覆盖：用新条目替换旧条目（匹配键为 `name`） |
 | 多项目同时使用 | 每项目各自有 `openspec/changes.json`，`findProjectRoot` 向上查找到最近的那个，互不干扰 |
 
@@ -330,22 +341,20 @@ openspec-superpowers-opencode registry verify
 
 | 场景 | 触发者 | 失败时行为 |
 |------|--------|------------|
-| 用户手动运行 | `openspec-superpowers-opencode registry verify` | 输出报告，不修改 |
-| `registry add` 自动触发 | CLI 收到 add 子命令后自动执行全部 4 项 | 发现问题 → 询问是否修复 → 修复后继续 / 否则停止 |
-| opsx 中原 `openspec list` 替换为 `registry verify` + `openspec list` 占位脚本 | T4 替换后，先 verify 再占位脚本 list | 同上 |
+| 手动/诊断 | `openspec-superpowers-opencode registry verify` | 输出报告 + exit 1，不修改 |
+| opsx 流程中（add 前） | opsx 命令先跑 `registry verify`，再跑 `registry add` | 输出报告 + exit 1 → AI agent 读取后决定是否询问用户修复 |
+| opsx 流程中（list 前） | opsx 命令先跑 `registry verify`，再跑 `openspec list` | 同上 |
 
-第三项"包装脚本内触发"的逻辑：
+第三项"包装脚本内触发"的逻辑（注意：**包装脚本内不做交互式询问**，只输出结构化信息，AI agent 读取后决定下一步）：
 
 ```bash
-# 在包装脚本中
+# 在包装脚本中（被 AI 通过 shell 调用，非交互式终端）
 if args[0] == "list" && findProjectRoot(cwd) != null:
-    verify_result = `openspec-superpowers-opencode registry verify --quiet`
-    if verify_result.has_errors:
-        输出警告
-        if verify_result.wrapper_broken and openspec_orig_exists:
-            询问用户 → 同意 → `node <tool-dir>/installer.js --repair`
-    else:
-        合并 openspec-orig list 输出 + 注册表
+    # 透传 openspec-orig list 获取原生列表
+    native_list = exec("openspec-orig list")
+    读 registry 补充 worktree 条目
+    合并输出去重
+    print(合并后的完整列表)
 ```
 
 ### 3. 安装程序：包装脚本

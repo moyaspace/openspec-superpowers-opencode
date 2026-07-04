@@ -77,17 +77,19 @@
 4. 调用对应函数，传入项目根下的 `openspec/changes.json` 路径
 5. 非项目目录下 registry 命令报友好错误
 
-`verify` 子操作检查四项：① `openspec-orig` 是否存在（which/where 查 openspec 所在目录）② `openspec` 是否是包装脚本（读取首行特征标记）③ `changes.json` 是否合法 JSON ④ 注册表每条记录的 worktree 目录是否存在。前三项在 `registry add` 时也自动触发检查，有问题给用户提示。
+`verify` 子操作检查四项：① `openspec-orig` 是否存在（which/where 查 openspec 所在目录）② `openspec` 是否是包装脚本（读取首行特征标记）③ `changes.json` 是否合法 JSON ④ 注册表每条记录的 worktree 目录是否存在。
 
-如果 ①② 显示包装脚本缺失（openspec-orig 存在但 openspec 不是包装脚本），询问用户"openspec 占位脚本缺失，是否自动修复？[Y/n]"，同意则调用 `node <tool-dir>/scripts/installer.js --repair` 自动安装。
+**重要：registry 命令被 AI agent 调用，不做终端交互式提示。** 所有 registry 命令输出结构化文本 + exit code（0=正常，非0=有问题），由 AI agent 读取输出后自行决定是否向用户询问修复。
+
+`verify` 和 `add` 是分步执行的独立命令，add 内部不调 verify。
 
 **`verify` 执行时机**：
 
 | 场景 | 失败时行为 |
 |------|------------|
-| 用户手动运行 `registry verify` | 输出报告，不修改 |
-| `registry add` 自动触发 | 发现问题 → 询问是否修复 → 修复后继续 / 否则停止 |
-| opsx 命令中原 `openspec list` 替换为 `registry verify` + `openspec list` 占位脚本 | 同上 |
+| 手动/诊断 `registry verify` | 输出报告 + exit 1，不修改 |
+| opsx 流程中（add 前）先 verify 再 add | 输出报告 + exit 1 → AI agent 读取后决定是否询问用户修复 |
+| opsx 流程中（list 前）先 verify 再 list | 同上 |
 
 **HOW**：`openspec` 包装脚本检测方式——读取 openspec 文件的前几行找特征标记（如 `# openspec wrapper for oso registry`）。`openspec-orig` 检测——`which openspec` 拿到路径 → `dirname` 目录下找 `openspec-orig`。更新 help 文本。
 
@@ -106,6 +108,8 @@
 #### T4: 注册表与 opsx 命令集成
 
 **WHY**：注册表只在 opsx 命令执行时同步才有意义。创建变更时 add 条目，开始/完成实现时 update-status，归档清理时 remove 条目。同时，opsx 命令中所有调用 `openspec list` 的地方（共 7 个文件），需要在前面加一道 verify 检查，确保包装环境和注册表状态正常。
+
+registry 命令直接在 opsx 命令的 bash 代码块中调用（如 `openspec-superpowers-opencode registry add ...`）。调用模式：registry 命令输出结构化结果 + exit code → AI agent 读取输出 → 发现问题则自行决定是否向用户询问修复 → 用户同意则执行 `--repair`。registry 命令自身不做任何终端交互。
 
 **WHAT**：分两类修改：
 
@@ -132,7 +136,7 @@
 | `opsx-sync.md` | 同上 |
 | `opsx-verify.md` | 同上 |
 
-**HOW**：`registry add` / `update-status` / `remove` 放在生命周期对应步骤。`verify` 放在 `openspec list` 之前 1-2 行，使用独立 ```bash 代码块。所有调用通过 ```bash 代码块插入。
+**HOW**：`registry add` / `update-status` / `remove` 放在生命周期对应步骤。`verify` 放在 `openspec list` 之前 1-2 行，使用独立 ```bash 代码块插在对应步骤中。所有调用通过 ```bash 代码块直接执行。
 
 **验收标准**：
 - [ ] 6 个 opsx 命令文件均新增了 registry 生命周期调用
@@ -222,6 +226,9 @@
 
 | 约束 | 说明 |
 |------|------|
+| **registry 命令不做终端交互** | registry 命令（add/remove/update-status/list/verify）直接在 opsx 命令的 bash 代码块中调用。输出结构化文本 + exit code，不做 readline/promptYesNo。AI agent 读取输出后自行决定是否向用户询问。 |
+| **CommonJS** | registry.js 用 require/module.exports，不用 import |
+| **node:test** | 测试用内置 node:test，零依赖 |
 
 ---
 
