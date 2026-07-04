@@ -10,6 +10,8 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+const toolDir = path.resolve(__dirname, '..');          // 工具安装根目录
+
 const args = process.argv.slice(2);
 const isWin = process.platform === 'win32';
 
@@ -37,6 +39,11 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode reset             重置项目配置
     openspec-superpowers-opencode dry-run [--lang zh-CN|zh-TW|en]     预览变更
     openspec-superpowers-opencode ensure-worktree <name>    确保 worktree 已创建
+    openspec-superpowers-opencode registry add <name> <status> <worktree>  注册表添加变更
+    openspec-superpowers-opencode registry remove <name>    注册表删除变更
+    openspec-superpowers-opencode registry update-status <name> <status>  更新变更状态
+    openspec-superpowers-opencode registry list             列出所有活跃变更
+    openspec-superpowers-opencode registry verify           验证注册表和包装环境
 
  语言:
     --lang zh-CN    简体中文
@@ -65,8 +72,13 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode reset              Reset project config
     openspec-superpowers-opencode dry-run [--lang zh-CN|zh-TW|en]    Preview changes
     openspec-superpowers-opencode ensure-worktree <name>    Ensure worktree exists
+    openspec-superpowers-opencode registry add <name> <status> <worktree>  Add change to registry
+    openspec-superpowers-opencode registry remove <name>    Remove change from registry
+    openspec-superpowers-opencode registry update-status <name> <status>  Update change status
+    openspec-superpowers-opencode registry list             List active changes
+    openspec-superpowers-opencode registry verify           Verify registry and wrapper environment
 
- Language:
+  Language:
     --lang zh-CN    Simplified Chinese
     --lang zh-TW    Traditional Chinese
     --lang en       English (default)
@@ -109,9 +121,11 @@ if (subcommand === 'init') {
         process.exit(1);
     }
     runEnsureWorktree(subarg, process.cwd());
+} else if (subcommand === 'registry') {
+    handleRegistry(args.slice(1));
 } else {
     console.error(t(`未知子命令: ${subcommand}`, `Unknown subcommand: ${subcommand}`));
-    console.error(t('可用命令: init, reset, dry-run, ensure-worktree', 'Available commands: init, reset, dry-run, ensure-worktree'));
+    console.error(t('可用命令: init, reset, dry-run, ensure-worktree, registry', 'Available commands: init, reset, dry-run, ensure-worktree, registry'));
     process.exit(1);
 }
 
@@ -147,7 +161,17 @@ function runInit(targetDir, isWin, lang) {
         process.exit(1);
     }
 
-    // ---- 3. Git 初始化 + 提交 ----
+    // ---- 4. 创建注册表 ----
+    const registryPath = path.join(targetDir, 'openspec', 'changes.json');
+    if (!fs.existsSync(registryPath)) {
+        fs.mkdirSync(path.join(targetDir, 'openspec'), { recursive: true });
+        fs.writeFileSync(registryPath, JSON.stringify({ changes: [] }, null, 2) + '\n');
+        console.log(t('  ✓ 创建注册表: openspec/changes.json', '  ✓ Created registry: openspec/changes.json'));
+    } else {
+        console.log(t('  ∼ 注册表已存在，跳过', '  ∼ Registry exists, skipping'));
+    }
+
+    // ---- 5. Git 初始化 + 提交 ----
     console.log(t('\n--- Git 初始化和提交 ---', '\n--- Git Init & Commit ---'));
     if (!fs.existsSync(path.join(targetDir, '.git'))) {
         run('git init --initial-branch=main', targetDir);
@@ -166,7 +190,7 @@ function runInit(targetDir, isWin, lang) {
         run('git -c core.autocrlf=false -c core.safecrlf=false commit -m "oso: launch OpenSpec + Superpowers workflow"', targetDir);
     }
 
-    // ---- 5. 完成 ----
+    // ---- 6. 完成 ----
     console.log('');
     console.log('='.repeat(50));
     console.log(t('  🎉 初始化完成', '  🎉 Init complete'));
@@ -248,4 +272,192 @@ function runEnsureWorktree(name, cwd) {
 
     console.log(t(`  ✓ worktree 创建完成: .worktrees/${name}/`, `  ✓ Worktree created: .worktrees/${name}/`));
     process.exit(0);
+}
+
+// ---- findProjectRoot — 从当前目录向上查找 openspec/changes.json ----
+function findProjectRoot(dir) {
+    let current = path.resolve(dir);
+    while (true) {
+        if (fs.existsSync(path.join(current, 'openspec', 'changes.json'))) {
+            return current;
+        }
+        const parent = path.dirname(current);
+        if (parent === current) return null;
+        current = parent;
+    }
+}
+
+// ---- handleRegistry — registry 子命令处理 ----
+async function handleRegistry(registryArgs) {
+    const action = registryArgs[0];
+
+    if (!action || (action !== 'verify' && action !== 'list' && action !== 'add' && action !== 'remove' && action !== 'update-status')) {
+        console.error(t(
+            '用法: openspec-superpowers-opencode registry <add|remove|update-status|list|verify> [参数...]',
+            'Usage: openspec-superpowers-opencode registry <add|remove|update-status|list|verify> [args...]'
+        ));
+        process.exit(1);
+    }
+
+    const projectRoot = findProjectRoot(process.cwd());
+
+    if (action === 'verify') {
+        const ok = await runVerify(projectRoot);
+        process.exit(ok ? 0 : 1);
+    }
+
+    if (!projectRoot) {
+        console.error(t(
+            '错误: 不在 OpenSpec 项目中（未找到 openspec/changes.json）',
+            'Error: Not in an OpenSpec project (openspec/changes.json not found)'
+        ));
+        process.exit(1);
+    }
+
+    const registryPath = path.join(projectRoot, 'openspec', 'changes.json');
+    const registry = require(path.join(toolDir, 'scripts', 'registry'));
+
+    switch (action) {
+        case 'add': {
+            const name = registryArgs[1];
+            const status = registryArgs[2];
+            const worktree = registryArgs[3];
+            if (!name || !status || !worktree) {
+                console.error(t('用法: registry add <name> <status> <worktree>', 'Usage: registry add <name> <status> <worktree>'));
+                process.exit(1);
+            }
+            try {
+                registry.add(registryPath, name, status, worktree);
+                console.log(t(`  ✓ 注册表已更新: ${name} (${status})`, `  ✓ Registry updated: ${name} (${status})`));
+            } catch (e) {
+                console.error(t(`  ✗ 写入注册表失败: ${e.message}`, `  ✗ Registry write failed: ${e.message}`));
+                process.exit(1);
+            }
+            break;
+        }
+        case 'remove': {
+            const name = registryArgs[1];
+            if (!name) {
+                console.error(t('用法: registry remove <name>', 'Usage: registry remove <name>'));
+                process.exit(1);
+            }
+            try {
+                registry.remove(registryPath, name);
+                console.log(t(`  ✓ 已从注册表删除: ${name}`, `  ✓ Removed from registry: ${name}`));
+            } catch (e) {
+                console.error(t(`  ✗ 写入注册表失败: ${e.message}`, `  ✗ Registry write failed: ${e.message}`));
+                process.exit(1);
+            }
+            break;
+        }
+        case 'update-status': {
+            const name = registryArgs[1];
+            const status = registryArgs[2];
+            if (!name || !status) {
+                console.error(t('用法: registry update-status <name> <status>', 'Usage: registry update-status <name> <status>'));
+                process.exit(1);
+            }
+            try {
+                registry.updateStatus(registryPath, name, status);
+                console.log(t(`  ✓ 状态已更新: ${name} → ${status}`, `  ✓ Status updated: ${name} → ${status}`));
+            } catch (e) {
+                console.error(t(`  ✗ 写入注册表失败: ${e.message}`, `  ✗ Registry write failed: ${e.message}`));
+                process.exit(1);
+            }
+            break;
+        }
+        case 'list': {
+            const output = registry.list(registryPath);
+            console.log(output);
+            break;
+        }
+    }
+}
+
+// ---- runVerify — 检查注册表 + 包装环境四项 ----
+async function runVerify(projectRoot, silent) {
+    let allGood = true;
+
+    let openspecPath = null;
+    let openspecOrigPath = null;
+    try {
+        const whichCmd = isWin ? 'where openspec' : 'which openspec';
+        const whichOutput = execSync(whichCmd, { stdio: 'pipe' }).toString().trim().split('\n')[0];
+        if (whichOutput) {
+            openspecPath = whichOutput.trim();
+            const binDir = path.dirname(openspecPath);
+            for (const c of ['openspec-orig', 'openspec-orig.cmd', 'openspec-orig.ps1']) {
+                const p = path.join(binDir, c);
+                if (fs.existsSync(p)) { openspecOrigPath = p; break; }
+            }
+        }
+    } catch {}
+
+    if (openspecOrigPath) {
+        if (!silent) console.log(`  ✓ openspec-orig: ${openspecOrigPath}`);
+    } else {
+        if (openspecPath) {
+            if (!silent) console.log(`  ⚠ openspec-orig: not found`);
+        } else {
+            if (!silent) console.log(`  ⚠ openspec: not installed`);
+        }
+        allGood = false;
+    }
+
+    if (openspecPath) {
+        try {
+            const firstLine = fs.readFileSync(openspecPath, 'utf-8').split('\n')[0].trim();
+            if (firstLine.includes('openspec wrapper for oso registry')) {
+                if (!silent) console.log(`  ✓ openspec: wrapper intact`);
+            } else {
+                if (!silent) console.log(`  ⚠ openspec: not wrapper`);
+                allGood = false;
+            }
+        } catch {
+            allGood = false;
+        }
+    }
+
+    if (projectRoot) {
+        const registryPath = path.join(projectRoot, 'openspec', 'changes.json');
+        if (fs.existsSync(registryPath)) {
+            try {
+                const data = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+                const count = data.changes ? data.changes.length : 0;
+                if (!silent) console.log(`  ✓ changes.json: valid (${count} changes)`);
+            } catch {
+                if (!silent) console.log(`  ⚠ changes.json: corrupted`);
+                allGood = false;
+            }
+        } else {
+            if (!silent) console.log(`  ⚠ changes.json: not found`);
+            allGood = false;
+        }
+
+        if (!silent) {
+            const registry = require(path.join(toolDir, 'scripts', 'registry'));
+            const data = registry.read(registryPath);
+            let worktreeOk = true;
+            for (const c of data.changes) {
+                if (!fs.existsSync(path.join(projectRoot, c.worktree))) {
+                    console.log(`  ⚠ worktree ${c.name}: not found (${c.worktree})`);
+                    worktreeOk = false;
+                    allGood = false;
+                }
+            }
+            if (worktreeOk && data.changes.length > 0) {
+                console.log(`  ✓ worktrees: all present`);
+            } else if (data.changes.length === 0) {
+                console.log(`  ∼ worktrees: no active changes`);
+            }
+        }
+    } else {
+        if (!silent) console.log(`  ∼ changes.json: not in a project, skipped`);
+    }
+
+    if (!allGood && !silent) {
+        console.log(`\n⚠ Issues detected. Use --repair to fix wrapper issues.`);
+    }
+
+    return allGood;
 }
