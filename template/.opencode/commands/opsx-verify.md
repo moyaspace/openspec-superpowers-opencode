@@ -10,7 +10,16 @@ Verify that an implementation matches the change artifacts (specs, tasks, design
 
 1. **If no change name provided, prompt for selection**
 
-   Run `openspec list --json` to get available changes. Use the **AskUserQuestion tool** to let the user select.
+   ```bash
+   openspec-superpowers-opencode verify
+   ```
+
+   - **成功（exit 0）** → 执行 `openspec list --json` → 获取活动 changes → 使用 **AskUserQuestion** 工具让用户选择
+   - **失败（exit 1）** →
+     - 向用户展示 verify 的输出结果（诊断报告和修复建议）
+     - 用 `question` 工具询问用户：**修复** 或者 **停止**
+     - 用户选择**修复**，根据 verify 输出的修复命令执行修复 → 修复成功后重新执行本步骤
+     - 用户选择**停止**，中断流程
 
    Show changes that have implementation tasks (tasks artifact exists).
    Include the schema used for each change if available.

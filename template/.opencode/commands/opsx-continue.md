@@ -8,7 +8,18 @@ description: Continue working on a change - create the next artifact (Experiment
 
 ### Step 1: 选择变更
 
-如果提供了名称则直接用。否则运行 `openspec list --json` 显示最近变更，AskUserQuestion 让用户选择。
+如果提供了名称则直接用。否则运行：
+
+```bash
+openspec-superpowers-opencode verify
+```
+
+- **成功（exit 0）** → 执行 `openspec list --json` → 获取活动 changes → 使用 **AskUserQuestion** 工具让用户选择
+- **失败（exit 1）** →
+  - 向用户展示 verify 的输出结果（诊断报告和修复建议）
+  - 用 `question` 工具询问用户：**修复** 或者 **停止**
+  - 用户选择**修复**，根据 verify 输出的修复命令执行修复 → 修复成功后重新执行本步骤
+  - 用户选择**停止**，中断流程
 
 > 一个变更同时只应有一个 worktree。`openspec list --json` 显示的活跃变更通常都有对应的 worktree。
 

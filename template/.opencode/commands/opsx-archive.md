@@ -10,7 +10,16 @@ Archive a completed change in the experimental workflow.
 
 1. **If no change name provided, prompt for selection**
 
-   Run `openspec list --json` to get available changes. Use the **AskUserQuestion tool** to let the user select.
+   ```bash
+   openspec-superpowers-opencode verify
+   ```
+
+   - **成功（exit 0）** → 执行 `openspec list --json` → 获取活动 changes → 使用 **AskUserQuestion** 工具让用户选择
+   - **失败（exit 1）** →
+     - 向用户展示 verify 的输出结果（诊断报告和修复建议）
+     - 用 `question` 工具询问用户：**修复** 或者 **停止**
+     - 用户选择**修复**，根据 verify 输出的修复命令执行修复 → 修复成功后重新执行本步骤
+     - 用户选择**停止**，中断流程
 
    Show only active changes (not already archived).
    Include the schema used for each change if available.
@@ -61,6 +70,7 @@ Archive a completed change in the experimental workflow.
 5. **Perform the archive**
 
    Create the archive directory if it doesn't exist:
+
    ```bash
    mkdir -p openspec/changes/archive
    ```
@@ -145,6 +155,7 @@ Target archive directory already exists.
 ```
 
 **Guardrails**
+
 - Always prompt for change selection if not provided
 - Use artifact graph (openspec status --json) for completion checking
 - Don't block archive on warnings - just inform and confirm
