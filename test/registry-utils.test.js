@@ -7,19 +7,25 @@ const child_process = require('child_process');
 
 const registryUtils = require('../lib/registry-utils');
 
-/** 创建临时项目目录 */
+/** 创建临时项目目录（含 git init） */
 function tmpProject() {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'registry-utils-test-'));
     const regDir = path.join(dir, 'openspec');
     fs.mkdirSync(regDir, { recursive: true });
+    child_process.execSync('git init --initial-branch=main', { cwd: dir, stdio: 'pipe' });
     return dir;
 }
 
-/** 创建 openspec/changes.json */
+/** 创建 openspec/oso-change-registry.json */
 function writeRegistry(dir, data) {
-    const p = path.join(dir, 'openspec', 'changes.json');
+    const p = path.join(dir, 'openspec', 'oso-change-registry.json');
     fs.writeFileSync(p, JSON.stringify(data));
     return p;
+}
+
+/** 创建临时的非 git 目录 */
+function tmpNotGit() {
+    return fs.mkdtempSync(path.join(os.tmpdir(), 'no-git-'));
 }
 
 // ============================================================
@@ -28,43 +34,36 @@ function writeRegistry(dir, data) {
 describe('findProjectRoot()', () => {
     test('finds root when in project root', () => {
         const dir = tmpProject();
-        writeRegistry(dir, { changes: [] });
         assert.strictEqual(registryUtils.findProjectRoot(dir), dir);
     });
 
     test('finds root from subdirectory', () => {
         const dir = tmpProject();
-        writeRegistry(dir, { changes: [] });
         const subDir = path.join(dir, 'src', 'components');
         fs.mkdirSync(subDir, { recursive: true });
         assert.strictEqual(registryUtils.findProjectRoot(subDir), dir);
     });
 
-    test('returns null when outside project', () => {
-        const dir = tmpProject();
+    test('returns null when outside git repo', () => {
+        const dir = tmpNotGit();
         const result = registryUtils.findProjectRoot(dir);
         assert.strictEqual(result, null);
     });
+});
 
-    test('returns null when changes.json is in a parent that does not exist', () => {
+// ============================================================
+// getChangeRegistryPath()
+// ============================================================
+describe('getChangeRegistryPath()', () => {
+    test('returns registry path when in project root', () => {
         const dir = tmpProject();
-        const deepDir = path.join(dir, 'a', 'b', 'c');
-        fs.mkdirSync(deepDir, { recursive: true });
-        const result = registryUtils.findProjectRoot(deepDir);
-        assert.strictEqual(result, null);
+        const expected = path.join(dir, 'openspec', 'oso-change-registry.json');
+        assert.strictEqual(registryUtils.getChangeRegistryPath(dir), expected);
     });
 
-    test('stops at filesystem root boundary', () => {
-        const result = registryUtils.findProjectRoot(os.tmpdir());
-        assert.ok(result === null || typeof result === 'string');
-    });
-
-    test('finds root when changes.json only contains whitespace', () => {
-        const dir = tmpProject();
-        const regPath = path.join(dir, 'openspec', 'changes.json');
-        fs.writeFileSync(regPath, '   ');
-        const result = registryUtils.findProjectRoot(dir);
-        assert.strictEqual(result, dir);
+    test('returns null when outside git repo', () => {
+        const dir = tmpNotGit();
+        assert.strictEqual(registryUtils.getChangeRegistryPath(dir), null);
     });
 });
 
@@ -75,7 +74,7 @@ describe('readRegistry()', () => {
     test('returns changes array from valid registry', () => {
         const dir = tmpProject();
         writeRegistry(dir, { changes: [{ name: 'demo', worktree: '.worktrees/demo', createdAt: new Date().toISOString() }] });
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         const result = registryUtils.readRegistry(rp);
         assert.ok(Array.isArray(result.changes));
         assert.strictEqual(result.changes.length, 1);
@@ -84,7 +83,7 @@ describe('readRegistry()', () => {
 
     test('returns empty changes on file not found', () => {
         const dir = tmpProject();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         const result = registryUtils.readRegistry(rp);
         assert.ok(Array.isArray(result.changes));
         assert.strictEqual(result.changes.length, 0);
@@ -92,7 +91,7 @@ describe('readRegistry()', () => {
 
     test('returns empty changes on corrupted JSON', () => {
         const dir = tmpProject();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         fs.writeFileSync(rp, '{invalid json!!!');
         const result = registryUtils.readRegistry(rp);
         assert.ok(Array.isArray(result.changes));
@@ -101,7 +100,7 @@ describe('readRegistry()', () => {
 
     test('returns empty changes on empty file', () => {
         const dir = tmpProject();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         fs.writeFileSync(rp, '');
         const result = registryUtils.readRegistry(rp);
         assert.ok(Array.isArray(result.changes));
