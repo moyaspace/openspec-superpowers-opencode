@@ -6,6 +6,9 @@
 openspec/
 .opencode/
 
+# OpenCode session persistence
+.omo/
+
 # database
 data/
 
