@@ -82,9 +82,17 @@ You have full context of the OpenSpec system. Use it naturally, don't force it.
 ### Check for context
 
 At the start, quickly check what exists:
+
 ```bash
-openspec list --json
+openspec-superpowers-opencode verify
 ```
+
+- **成功（exit 0）** → 执行 `openspec list --json` → 获取上下文
+- **失败（exit 1）** →
+  - 向用户展示 verify 的输出结果（诊断报告和修复建议）
+  - 用 `question` 工具询问用户：**修复** 或者 **停止**
+  - 用户选择**修复**，根据 verify 输出的修复命令执行修复 → 修复成功后重新执行本步骤
+  - 用户选择**停止**，中断流程
 
 This tells you:
 - If there are active changes
