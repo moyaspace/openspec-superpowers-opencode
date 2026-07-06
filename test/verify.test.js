@@ -198,7 +198,7 @@ describe('checkWorktrees()', () => {
         const regDir = path.join(dir, 'openspec');
         fs.mkdirSync(regDir, { recursive: true });
         fs.writeFileSync(path.join(regDir, 'changes.json'), JSON.stringify({
-            changes: [{ name: 'nopath', status: 'created' }]
+            changes: [{ name: 'nopath' }]
         }));
         const r = verify.checkWorktrees(dir);
         assert.strictEqual(r.valid, true);

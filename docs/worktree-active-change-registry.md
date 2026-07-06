@@ -47,12 +47,13 @@ openspec list（在 main 上执行）
     {
       "name": "demo2",
       "worktree": ".worktrees/demo2",
-      "status": "proposed",
       "createdAt": "2026-07-04T00:00:00.000Z"
     }
   ]
 }
 ```
+
+注册表只存两样东西：**变更名** 和 **worktree 路径**。不存状态——状态由 worktree 内的 `openspec list` 实时获取。
 
 ### npm 全局安装文件处理
 
@@ -72,21 +73,21 @@ openspec list（在 main 上执行）
 
 这样无论系统从哪个入口（CMD、PowerShell、bash）解析 `openspec` 命令，都确保走包装脚本。
 
-### 包装脚本逻辑（伪代码）
+### 垫片脚本逻辑（伪代码）
 
-包装脚本位于 PATH 中，必须能从任意子目录定位到项目根目录。
+垫片脚本位于 PATH 中，必须能从任意子目录定位到项目根目录。
 采用**向上查找**策略：从当前目录逐级向父目录搜索，找到 `openspec/changes.json` 即视为项目根。
 
-每份包装脚本首行包含特征标记，供 `registry verify` 检测包装完整性：
+每份垫片脚本首行包含特征标记，供 `registry verify` 检测垫片完整性：
 
 | 平台 | 标记行 |
 |------|--------|
-| Unix shell | `# openspec wrapper for oso registry` |
-| Windows CMD | `@rem openspec wrapper for oso registry` |
-| Windows PS | `# openspec wrapper for oso registry` |
+| Unix shell | `# openspec shim for oso registry` |
+| Windows CMD | `@rem openspec shim for oso registry` |
+| Windows PS | `# openspec shim for oso registry` |
 
 ```
-# openspec wrapper for oso registry      # ← 检测标记
+# openspec shim for oso registry      # ← 检测标记
 
 function findProjectRoot(dir) {
   while (dir !== parent(dir)) {
@@ -100,25 +101,91 @@ function main(args) {
   root = findProjectRoot(process.cwd())
 
   if (args[0] === "list" && root) {
-    // 读注册表
+    // 读注册表获取活跃变更的 worktree 路径
     registry = readJSON(root + "/openspec/changes.json")
-    // 遍历每个 worktree 读 tasks.md 获取实时状态
-    for each change in registry {
-      tasksPath = root + "/" + change.worktree
-                  + "/openspec/changes/" + change.name + "/tasks.md"
-      status = parseTasksStatus(tasksPath)
+
+    // 遍历每个 worktree，在其中执行 openspec-orig list 获取实时状态
+    lines = []
+    seenNames = new Set()
+    for each change in registry.changes {
+      wtPath = root + "/" + change.worktree
+      if !exists(wtPath) continue               // worktree 被删则跳过
+      output = exec("openspec-orig list", { cwd: wtPath })
+      for each line in output {
+        if line matches "  <name>" pattern {
+          name = extractName(line)
+          if !seenNames.has(name) {              // 同名去重，first wins
+            seenNames.add(name)
+            lines.push(line)
+          }
+        }
+      }
     }
-    // 输出合并后的列表
-    printRegistry(registry)
-  } else if (!root) {
-    // 不在项目中，直接透传
-    exec("openspec-orig " + args.join(" "))
+
+    if (lines.length === 0) {
+      print("No active changes found.")
+    } else {
+      print("Changes:")
+      for each line in lines { print(line) }
+    }
   } else {
-    // 在项目中但非 list 命令，也透传
+    // 非 list 命令或不在项目中 → 透传
     exec("openspec-orig " + args.join(" "))
   }
 }
 ```
+
+## 拦截范围：哪些 openspec 命令需要拦截
+
+垫片脚本只拦截 `list`，其余全部透传 `openspec-orig`。以下逐一审查每个命令，论证为什么这个边界是正确的。
+
+### 全部 12 个 opsx 文件的 openspec 命令调用清单
+
+| openspec 命令 | 被哪些 opsx 文件调用 | 调用位置 |
+|---|---|---|
+| `openspec list --json` | apply, explore, archive, bulk-archive, continue, sync, verify | **根目录**（选择变更前） |
+| `openspec status --change <name> --json` | apply, ff, new, propose, continue, archive, bulk-archive, verify | **worktree 内** |
+| `openspec new change <name>` | ff, new, propose, onboard | worktree 内 |
+| `openspec instructions <id> ...` | apply, ff, new, propose, continue, verify, onboard, finish | worktree 内 |
+| `openspec archive -y` | finish | 根目录（透传即正确） |
+| `openspec --version` | onboard | 任意位置 |
+
+可见：**`list` 是唯一在根目录执行、且需要跨 worktree 聚合的命令。**
+
+### 逐命令决策
+
+| 命令 | 拦截？ | 理由 |
+|------|:----:|------|
+| `list` | **✅ 是** | 根目录执行，需要合并所有 worktree 的变更状态。每个 worktree 内 `openspec-orig list` 只看到自己的变更，垫片脚本负责遍历所有 worktree 汇总。 |
+| `status` | ❌ 否 | 所有 opsx 调用都在 worktree 内（cd 进去后再跑 `status --change <name>`），透传 `openspec-orig` 已能正确获取该变更的 artifact 状态。根目录跑 `status` 无 `--change` 时只报"未选择变更"，无害。 |
+| `new change` | ❌ 否 | 在 worktree 内创建变更，不需要跨 worktree。 |
+| `instructions` | ❌ 否 | 从 worktree 内的 artifact 生成模板，透传即正确。 |
+| `archive` | ❌ 否 | 纯文件操作（移动目录到 archive/），透传即正确。根目录执行也无影响。 |
+| `--version` / 其他 | ❌ 否 | 元操作，与 worktree 无关。 |
+
+### 为什么不拦截更多？
+
+**复杂度与收益不对等。** 拦截 `list` 以外命令会带来：
+
+1. **需要解析非 list 的结构化输出** — `status` 输出是嵌套 JSON，合并策略不明确（取平均值？全量展示？）
+2. **遍历所有 worktree 的成本** — 每个 `status --change` 只需查一个 worktree，垫片脚本却要遍历全部
+3. **垫片脚本膨胀** — 从"轻量拦截+透传"变成半个 openspec 重实现，增加维护成本和 bug 面
+4. **零实际收益** — opsx 工作流中所有非 list 命令都有 worktree context，透传已正确工作
+
+**如果将来有新的 opsx 命令在根目录调用 `openspec status`，也是先加 registry add 调用确保 worktree 目录存在（这是轻量的索引查表操作），而非扩展垫片的拦截范围。**
+
+### 状态来源对比
+
+| 维度 | 旧设计（registry 存 status） | 新设计（registry 只存 worktree 路径） |
+|------|---------------------------|--------------------------------------|
+| 状态数据位置 | `changes.json` 的 `status` 字段 | 各 worktree 内 `openspec list` 实时输出 |
+| 状态更新方式 | opsx 执行 `update-status` 子命令 | 自动——worktree 内无论做什么改变，list 输出自动反映 |
+| 状态时效性 | 可能过期（忘了 update 就 stale） | 永远是实时的 |
+| 垫片逻辑 | 捏造条目行（`formatWorktreeEntry`） | 原样透传 worktree 的 list 输出行 |
+| 合并方式 | 字符串拼接 + 去重（数据行由垫片生成） | 遍历 worktree + exec + 提取原行（数据行来自源） |
+| `status` 字段维护成本 | 每个生命周期事件都要手动 update | 零 |
+
+结论：**registry 降级为轻量索引，只回答一个问题——"活跃变更的 worktree 在哪？"。剩下的交给 openspec 自己的命令回答。**
 
 ## 注册表生命周期
 
@@ -126,12 +193,15 @@ function main(args) {
 
 | 命令                  | 事件         | 操作                                                                          |
 | --------------------- | ------------ | ----------------------------------------------------------------------------- |
-| `/opsx-new`           | 创建新变更   | `openspec-superpowers-opencode registry add <name> created .worktrees/<name>`  |
-| `/opsx-propose`       | 创建新变更   | `openspec-superpowers-opencode registry add <name> proposed .worktrees/<name>` |
-| `/opsx-ff` | 快速创建变更（scaffold 后） | `openspec-superpowers-opencode registry add <name> created .worktrees/<name>` |
-| `/opsx-continue` | 继续创建变更（创建 artifact 前） | `openspec-superpowers-opencode registry update-status <name> in-progress` |
-| `/opsx-apply`         | 开始实现     | `openspec-superpowers-opencode registry update-status <name> implementing`     |
-| `/opsx-apply`（完成） | 实现完成     | `openspec-superpowers-opencode registry update-status <name> implemented`      |
+| `/opsx-new`           | 创建新变更   | `openspec-superpowers-opencode registry add <name> .worktrees/<name>`          |
+| `/opsx-propose`       | 创建新变更   | `openspec-superpowers-opencode registry add <name> .worktrees/<name>`          |
+| `/opsx-ff` | 快速创建变更（scaffold 后） | `openspec-superpowers-opencode registry add <name> .worktrees/<name>` |
+| `/opsx-finish`         | 归档 + cleanup | `openspec-superpowers-opencode registry remove <name>`                       |
+
+#### 不拦截 update-status 的原因
+
+注册表不追踪变更状态。状态由各 worktree 内 `openspec list` 实时汇报。
+`/opsx-continue` 和 `/opsx-apply` 不再需要 registry update-status 步骤。
 
 ### 删除时机
 
@@ -166,24 +236,21 @@ proposed ↗                  ↘  abandoned → （删除）
 
 以下命令在创建或操作变更时，需要同步更新注册表：
 
-- `/opsx-new`           — add
-- `/opsx-propose`       — add
-- `/opsx-ff`            — add
-- `/opsx-continue`      — update-status
-- `/opsx-apply`         — update-status（开始 `implementing`，完成 `implemented`）
-- `/opsx-finish`        — remove（归档后执行）
+- `/opsx-new`       — add
+- `/opsx-propose`   — add
+- `/opsx-ff`        — add
+- `/opsx-finish`    — remove（归档后执行）
 
 修改方式：在对应步骤通过 CLI 子命令调用：
 
 ```bash
-openspec-superpowers-opencode registry add <name> <status> <worktree>
-openspec-superpowers-opencode registry update-status <name> <status>
+openspec-superpowers-opencode registry add <name> <worktree>
 openspec-superpowers-opencode registry remove <name>
 ```
 
 ## 重要设计决策：所有 registry 命令不做终端交互式提示
 
-registry 命令（`add`、`remove`、`update-status`、`list`、`verify`）设计为被 **AI agent 调用**（ opsx 命令中的步骤），而非用户直接运行。因此：
+registry 命令（`add`、`remove`、`list`、`verify`）设计为被 **AI agent 调用**（ opsx 命令中的步骤），而非用户直接运行。因此：
 
 - **不做** `readline`/`promptYesNo` 之类的终端交互
 - 输出**结构化文本报告** + 通过 **exit code**（0=正常，非0=有问题）指示结果
@@ -199,16 +266,15 @@ registry 命令（`add`、`remove`、`update-status`、`list`、`verify`）设�
 所有注册表操作集中在这个脚本中，通过 `openspec-superpowers-opencode` CLI 的子命令方式调用：
 
 ```bash
-openspec-superpowers-opencode registry add <name> <status> <worktree>
+openspec-superpowers-opencode registry add <name> <worktree>
 openspec-superpowers-opencode registry remove <name>
-openspec-superpowers-opencode registry update-status <name> <status>
 openspec-superpowers-opencode registry list
 openspec-superpowers-opencode registry verify
 ```
 
 `bin/cli.js` 收到 `registry` 子命令后，通过 `findProjectRoot(process.cwd())` 定位项目根目录，然后操作项目根下的 `openspec/changes.json`。
 
-只读操作（如包装脚本中的 `openspec list` 合并）直接读取 `changes.json`，不走 CLI 子命令。
+只读操作（如垫片脚本中的 `openspec list` 合并）直接读取 `changes.json`，不走 CLI 子命令。
 
 ## 安装程序
 
@@ -220,17 +286,17 @@ openspec-superpowers-opencode registry verify
 
 1. 找到原版 `openspec` CLI（`which openspec` / `where openspec` 路径的所在目录）
 2. **复制**原版文件为 `openspec-orig`（同名映射：`openspec` → `openspec-orig`、`openspec.cmd` → `openspec-orig.cmd`、`openspec.ps1` → `openspec-orig.ps1`）
-3. 在同目录写入包装脚本（同名 `openspec` / `openspec.cmd` / `openspec.ps1`）
+3. 在同目录写入垫片脚本（同名 `openspec` / `openspec.cmd` / `openspec.ps1`）
 4. 设置可执行权限（Unix `chmod +x`）
 
 安装程序不碰项目级别的任何文件。
 
 ### 重新安装 / `--repair` 模式
 
-`openspec-orig` 已存在时跳过复制步骤，直接覆盖写入包装脚本（幂等）。用于：
+`openspec-orig` 已存在时跳过复制步骤，直接覆盖写入垫片脚本（幂等）。用于：
 
 - 安装后重新执行
-- npm update 后恢复包装脚本（`node <tool-dir>/scripts/installer.js --repair`）
+- npm update 后恢复垫片脚本（`node <tool-dir>/scripts/installer.js --repair`）
 
 `--repair` 模式下如果 `openspec-orig` 不存在则报错退出，避免新环境误用。
 
@@ -241,11 +307,11 @@ openspec-superpowers-opencode registry verify
 { "changes": [] }
 ```
 
-后续所有注册表操作只改内容，不删除文件。即使注册表清空也保留 `{"changes":[]}`，确保包装脚本的 `findProjectRoot` 始终能找到项目根。
+后续所有注册表操作只改内容，不删除文件。即使注册表清空也保留 `{"changes":[]}`，确保垫片脚本的 `findProjectRoot` 始终能找到项目根。
 
 对应的入口文件对应关系：
 
-| 平台          | 包装脚本       | 原版重命名          |
+| 平台          | 垫片脚本       | 原版重命名          |
 | ------------- | -------------- | ------------------- |
 | Windows CMD   | `openspec.cmd` | `openspec-orig.cmd` |
 | Windows PS    | `openspec.ps1` | `openspec-orig.ps1` |
@@ -255,11 +321,11 @@ openspec-superpowers-opencode registry verify
 
 | 场景 | 处理方式 |
 |------|----------|
-| `changes.json` 格式损坏（非合法 JSON） | 包装脚本 catch 解析异常，打印 `⚠ registry corrupted, falling back to native list`，退化为调用 `openspec-orig list` |
+| `changes.json` 格式损坏（非合法 JSON） | 垫片脚本 catch 解析异常，打印 `⚠ registry corrupted, falling back to native list`，退化为调用 `openspec-orig list` |
 | `changes.json` 文件不存在 | 视为无注册表条目，不拦截，透传 `openspec-orig list`（等价于原生行为） |
 | worktree 目录已被手动删除 | 遍历注册表时检测目录是否存在，不存在的打印 `⚠ <name>: worktree not found at <path>`，跳过该条目但保留注册表记录 |
-| 更新/重装工具（`openspec-orig` 已存在） | 安装程序先检测 `openspec-orig` 是否存在，如已存在则跳过 copy，直接覆盖写入新版本包装脚本；`--repair` 模式要求 openspec-orig 必须已存在 |
-| 包装脚本被 npm update 覆盖 | `registry verify` 检测到 `openspec` 无特征标记但 `openspec-orig` 存在 → 输出报告 + exit 1 → AI agent 读取后向用户展示问题并引导修复 |
+| 更新/重装工具（`openspec-orig` 已存在） | 安装程序先检测 `openspec-orig` 是否存在，如已存在则跳过 copy，直接覆盖写入新版本垫片脚本；`--repair` 模式要求 openspec-orig 必须已存在 |
+| 垫片脚本被 npm update 覆盖 | `registry verify` 检测到 `openspec` 无特征标记但 `openspec-orig` 存在 → 输出报告 + exit 1 → AI agent 读取后向用户展示问题并引导修复 |
 | 注册表中同名变更已存在 | `registry.add()` 执行覆盖：用新条目替换旧条目（匹配键为 `name`） |
 | 多项目同时使用 | 每项目各自有 `openspec/changes.json`，`findProjectRoot` 向上查找到最近的那个，互不干扰 |
 
@@ -277,47 +343,64 @@ openspec-superpowers-opencode registry verify
 
 ### `openspec list` 输出格式
 
-包装脚本的输出尽量模仿 OpenSpec 原生格式，让用户和工具无感知：
+垫片脚本的输出直接来自 worktree 内 `openspec-orig list` 的原始输出，不做格式再加工：
 
 ```
-# 原生 openspec list 输出
-Changes:
-  demo     No tasks      27m ago
+# 垫片脚本执行流程：
+# 1. 读注册表获取 worktree 路径列表
+# 2. 逐个 cd 进 worktree → exec openspec-orig list
+# 3. 从各 worktree 的输出中提取数据行
+# 4. 同名去重（先到先得）
+# 5. 拼装输出
 
-# 包装脚本输出 — worktree 条目末尾追加路径
+# worktree-a 里的 openspec-orig list 输出：
 Changes:
-  demo     No tasks      27m ago
-  demo2    Proposed      worktree      .worktrees/demo2
-  demo3    Implementing  2/5 tasks     .worktrees/demo3
+  feature-login    Proposal    2 tasks    5m ago
 
-# 合并策略：
-#   1. 先调用 openspec-orig list 获取原生列表
-#   2. 读注册表，为每个 worktree 条目补充路径列
-#   3. 去重（同名以注册表为准）
-#   4. 合并排序输出
+# worktree-b 里的输出：
+Changes:
+  feature-search   Spec        1 task     2h ago
+
+# 合并输出：
+Changes:
+  feature-login    Proposal    2 tasks    5m ago
+  feature-search   Spec        1 task     2h ago
+
+# 每个变更的状态来自其 worktree 的实时数据，
+# 不是注册表里的缓存值。这就是 registry 不存 status 的原因。
 ```
+
+> **关键设计**：垫片脚本**不解析也不重新格式化** openspec list 的输出行。数据行原样从 worktree 提取并拼接。这意味着如果未来 openspec 更新了 list 的输出格式（追加列、改对齐等），垫片脚本自动适配——零维护。
+
+### 非项目目录 / 无注册表行为
+
+| 场景 | 行为 |
+|------|------|
+| 在项目内、有注册表、有 worktree | 遍历 worktree 合并输出 |
+| 在项目内、有注册表、但所有 worktree 目录被删 | 输出 `No active changes found.` |
+| 在项目内、注册表为空 | 输出空字符串（不显示任何变更） |
+| 在项目外 | 透传 `openspec-orig list`（原生行为） |
+| 注册表 JSON 损坏 | 垫片 catch 异常 → 打印警告 → 退化为透传 |
 
 ## 待实现
 
 以下为工具目录（`openspec-superpowers-opencode`）中需要实现的内容：
 
-### 1. `scripts/registry.js`
+### 1. `lib/registry.js`
 
 注册表读写逻辑，CommonJS，导出函数供 CLI 子命令调用：
 
 - `read(path)` — 读 `openspec/changes.json`，文件不存在或损坏时返回空注册表
 - `write(path, data)` — 写回文件，确保目录存在
-- `add(path, name, status, worktree)` — 同名覆盖写入，设置 `createdAt`
+- `add(path, name, worktree)` — 同名覆盖写入，设置 `createdAt`
 - `remove(path, name)` — 删除条目，保留空文件（不 unlink）
-- `updateStatus(path, name, status)` — 更新指定变更的状态
-- `list(path)` — 格式化输出所有活跃变更
+- `list(path)` — 格式化输出所有活跃变更（条目名 + worktree 路径 + 创建时间）
 
 ### 2. `bin/cli.js` 新增 `registry` 子命令
 
 ```bash
-openspec-superpowers-opencode registry add <name> <status> <worktree>
+openspec-superpowers-opencode registry add <name> <worktree>
 openspec-superpowers-opencode registry remove <name>
-openspec-superpowers-opencode registry update-status <name> <status>
 openspec-superpowers-opencode registry list
 openspec-superpowers-opencode registry verify
 ```
@@ -325,15 +408,15 @@ openspec-superpowers-opencode registry verify
 `cli.js` 处理逻辑：
 
 1. `findProjectRoot(process.cwd())` 定位项目根
-2. 加载 `<tool-install-dir>/scripts/registry.js`
+2. 加载 `<tool-install-dir>/lib/registry.js`
 3. 调用对应函数，传入项目根下的 `openspec/changes.json` 路径
 
-`verify` 子操作额外检测包装完整性：
+`verify` 子操作额外检测垫片完整性：
 
 | 检查项 | 检测方式 | 由谁触发 |
 |--------|----------|----------|
 | `openspec-orig` 存在 | `which openspec` → dirname → 查 openspec-orig | verify / add |
-| `openspec` 是否包装脚本 | 读取 openspec 文件首行，匹配特征标记 | verify / add |
+| `openspec` 是否垫片脚本 | 读取 openspec 文件首行，匹配特征标记 | verify / add |
 | `changes.json` 有效 | `JSON.parse()` | verify / add |
 | worktree 目录存在 | `fs.existsSync()` 逐条验证 | verify 仅 |
 
@@ -345,29 +428,43 @@ openspec-superpowers-opencode registry verify
 | opsx 流程中（add 前） | opsx 命令先跑 `registry verify`，再跑 `registry add` | 输出报告 + exit 1 → AI agent 读取后决定是否询问用户修复 |
 | opsx 流程中（list 前） | opsx 命令先跑 `registry verify`，再跑 `openspec list` | 同上 |
 
-第三项"包装脚本内触发"的逻辑（注意：**包装脚本内不做交互式询问**，只输出结构化信息，AI agent 读取后决定下一步）：
+第三项"垫片脚本内触发"的逻辑（注意：**垫片脚本内不做交互式询问**，只输出结构化信息，AI agent 读取后决定下一步）：
 
-```bash
-# 在包装脚本中（被 AI 通过 shell 调用，非交互式终端）
-if args[0] == "list" && findProjectRoot(cwd) != null:
-    # 透传 openspec-orig list 获取原生列表
-    native_list = exec("openspec-orig list")
-    读 registry 补充 worktree 条目
-    合并输出去重
-    print(合并后的完整列表)
+```python
+# 垫片脚本伪代码（被 AI 通过 shell 调用）
+if args[0] == "list":
+    root = findProjectRoot(cwd)
+    if root is None:
+        exec("openspec-orig list")          # 不在项目 → 透传
+    else:
+        registry = readJSON(root + "/openspec/changes.json")
+        lines = []
+        for each change in registry.changes:
+            worktree_path = root + "/" + change.worktree
+            if not exists(worktree_path): continue
+            output = exec("openspec-orig list", { cwd: worktree_path })
+            for each line in output:
+                if line matches data pattern and name not seen:
+                    lines.append(line)
+        if lines is empty:
+            print("No active changes found.")
+        else:
+            print("Changes:\n" + join(lines))
+else:
+    exec("openspec-orig " + args.join(" "))  # 非 list → 透传
 ```
 
-### 3. 安装程序：包装脚本
+### 3. 安装程序：垫片脚本
 
-安装程序部署三类包装脚本（不在 postinstall 中，由独立安装程序处理）：
+安装程序部署三类垫片脚本（不在 postinstall 中，由独立安装程序处理）：
 
 - `openspec` — Unix/macOS
 - `openspec.cmd` — Windows CMD
 - `openspec.ps1` — Windows PowerShell
 
-包装脚本逻辑参考本文档"包装脚本逻辑（伪代码）"节：执行 `findProjectRoot` 向上查找，拦截 `openspec list` 合并注册表，其余透传 `openspec-orig`。
+垫片脚本逻辑参考本文档"垫片脚本逻辑（伪代码）"节：执行 `findProjectRoot` 向上查找，拦截 `openspec list` 合并注册表，其余透传 `openspec-orig`。
 
-安装程序重新执行时：只覆盖包装脚本，`openspec/changes.json` 已存在则不动。
+安装程序重新执行时：只覆盖垫片脚本，`openspec/changes.json` 已存在则不动。
 
 ## 与其他设计文档的关联
 

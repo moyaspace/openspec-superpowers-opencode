@@ -32,11 +32,26 @@ openspec-superpowers-opencode ensure-worktree <name>
 cd .worktrees/<name>
 ```
 
-### Step 4: 在 worktree 内创建变更 scaffold
+### Step 4: 在 worktree 内创建变更
 
 ```bash
 openspec new change "<name>"
 ```
+
+#### Step 4a: 注册变更到 registry
+
+记录 change 到注册表，供后续 opsx 命令查找活动变更以及对应的 worktree：
+
+```bash
+openspec-superpowers-opencode registry add <name> .worktrees/<name>
+```
+
+- **成功（exit 0）** → 继续 Step 5
+- **失败（exit 1）** →
+  - 执行 `openspec-superpowers-opencode verify`，向用户展示输出结果
+  - 用 `question` 工具询问用户：**修复** 或者 **停止**
+  - 用户选择**修复**，根据 verify 输出的修复命令执行修复 → 修复成功后重新继续 Step 4a
+  - 用户选择**停止**，中断流程
 
 ### Step 5: 生成全部 artifacts
 

@@ -3,14 +3,13 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const child_process = require('child_process');
 
-// 测试前模块还不存在——RED
 const registryUtils = require('../lib/registry-utils');
 
 /** 创建临时项目目录 */
 function tmpProject() {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'registry-utils-test-'));
-    // 创建 openspec/changes.json
     const regDir = path.join(dir, 'openspec');
     fs.mkdirSync(regDir, { recursive: true });
     return dir;
@@ -20,13 +19,6 @@ function tmpProject() {
 function writeRegistry(dir, data) {
     const p = path.join(dir, 'openspec', 'changes.json');
     fs.writeFileSync(p, JSON.stringify(data));
-    return p;
-}
-
-/** 创建 openspec/changes 目录 + 子目录 */
-function writeChangeDir(dir, name) {
-    const p = path.join(dir, 'openspec', 'changes', name);
-    fs.mkdirSync(p, { recursive: true });
     return p;
 }
 
@@ -50,7 +42,6 @@ describe('findProjectRoot()', () => {
 
     test('returns null when outside project', () => {
         const dir = tmpProject();
-        // 不创建 changes.json
         const result = registryUtils.findProjectRoot(dir);
         assert.strictEqual(result, null);
     });
@@ -64,9 +55,7 @@ describe('findProjectRoot()', () => {
     });
 
     test('stops at filesystem root boundary', () => {
-        // 找不存在的文件，应该回 null 而不报错
         const result = registryUtils.findProjectRoot(os.tmpdir());
-        // tmpdir 一般不会有 openspec/changes.json
         assert.ok(result === null || typeof result === 'string');
     });
 
@@ -85,7 +74,7 @@ describe('findProjectRoot()', () => {
 describe('readRegistry()', () => {
     test('returns changes array from valid registry', () => {
         const dir = tmpProject();
-        writeRegistry(dir, { changes: [{ name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: new Date().toISOString() }] });
+        writeRegistry(dir, { changes: [{ name: 'demo', worktree: '.worktrees/demo', createdAt: new Date().toISOString() }] });
         const rp = path.join(dir, 'openspec', 'changes.json');
         const result = registryUtils.readRegistry(rp);
         assert.ok(Array.isArray(result.changes));
@@ -121,127 +110,107 @@ describe('readRegistry()', () => {
 });
 
 // ============================================================
-// formatWorktreeEntry()
-// ============================================================
-describe('formatWorktreeEntry()', () => {
-    test('formats a worktree entry in native list style', () => {
-        const now = new Date();
-        const entry = {
-            name: 'demo',
-            status: 'created',
-            worktree: '.worktrees/demo',
-            createdAt: now.toISOString()
-        };
-        const line = registryUtils.formatWorktreeEntry(entry);
-        // 应该包含变更名、状态、worktree 路径
-        assert.ok(line.includes('demo'));
-        assert.ok(line.includes('created'));
-        assert.ok(line.includes('.worktrees/demo'));
-    });
-
-    test('formats an implemented entry', () => {
-        const entry = {
-            name: 'feature-auth',
-            status: 'implemented',
-            worktree: '.worktrees/feature-auth',
-            createdAt: new Date().toISOString()
-        };
-        const line = registryUtils.formatWorktreeEntry(entry);
-        assert.ok(line.includes('feature-auth'));
-        assert.ok(line.includes('implemented'));
-    });
-
-    test('truncates long names to keep alignment', () => {
-        const entry = {
-            name: 'a-very-long-change-name-that-should-be-truncated',
-            status: 'created',
-            worktree: '.worktrees/a-very-long-change-name-that-should-be-truncated',
-            createdAt: new Date().toISOString()
-        };
-        const line = registryUtils.formatWorktreeEntry(entry);
-        assert.ok(line.includes('a-very-long'));
-    });
-});
-
-// ============================================================
 // mergeList()
 // ============================================================
 describe('mergeList()', () => {
-    test('appends worktree entries after native output', () => {
-        const nativeOutput = `Changes:
-  demo     No tasks      27m ago`;
-        const registry = {
-            changes: [
-                { name: 'demo2', status: 'proposed', worktree: '.worktrees/demo2', createdAt: new Date().toISOString() }
-            ]
-        };
-        const result = registryUtils.mergeList(nativeOutput, registry);
-        assert.ok(result.includes('demo'));      // 原生的还在
-        assert.ok(result.includes('demo2'));     // registry 的追加
-        assert.ok(result.includes('.worktrees/demo2'));
+    test('returns empty string when no entries', () => {
+        const result = registryUtils.mergeList([], '/some/project');
+        assert.strictEqual(result, '');
     });
 
-    test('deduplicates by name (registry wins)', () => {
-        const nativeOutput = `Changes:
-  demo     No tasks      27m ago`;
-        const registry = {
-            changes: [
-                { name: 'demo', status: 'implementing', worktree: '.worktrees/demo', createdAt: new Date().toISOString() }
-            ]
-        };
-        const result = registryUtils.mergeList(nativeOutput, registry);
-        // demo 应该只有一条（registry 版），且状态是 implementing 而非 No tasks
-        const demoLines = result.split('\n').filter(l => l.includes('demo'));
-        assert.strictEqual(demoLines.length, 1);
-        assert.ok(demoLines[0].includes('implementing'));
-    });
-
-    test('returns raw native output when registry is empty', () => {
-        const nativeOutput = `Changes:
-  demo     No tasks      27m ago`;
-        const registry = { changes: [] };
-        const result = registryUtils.mergeList(nativeOutput, registry);
-        assert.strictEqual(result, nativeOutput);
-    });
-
-    test('handles native output without Changes header', () => {
-        const nativeOutput = 'No active changes.';
-        const registry = {
-            changes: [
-                { name: 'demo2', status: 'proposed', worktree: '.worktrees/demo2', createdAt: new Date().toISOString() }
-            ]
-        };
-        const result = registryUtils.mergeList(nativeOutput, registry);
-        // 还是应该包含 registry 条目
-        assert.ok(result.includes('demo2'));
-    });
-
-    test('handles empty native output', () => {
-        const nativeOutput = '';
-        const registry = {
-            changes: [
-                { name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: new Date().toISOString() }
-            ]
-        };
-        const result = registryUtils.mergeList(nativeOutput, registry);
-        assert.ok(result.includes('demo'));
-    });
-
-    test('skips worktree entries whose directory is missing', () => {
-        const nativeOutput = `Changes:`;
+    test('returns "No active changes" when no worktrees exist', () => {
         const dir = tmpProject();
-        const registry = {
-            changes: [
-                { name: 'live', status: 'created', worktree: '.worktrees/live', createdAt: new Date().toISOString() },
-                { name: 'missing-wt', status: 'created', worktree: '.worktrees/missing-wt', createdAt: new Date().toISOString() }
-            ]
-        };
-        // 只创建 live 的目录
-        const wtDir = path.join(dir, '.worktrees', 'live');
-        fs.mkdirSync(wtDir, { recursive: true });
+        const result = registryUtils.mergeList([
+            { name: 'ghost', worktree: '.worktrees/ghost' }
+        ], dir);
+        assert.strictEqual(result, 'No active changes found.\n');
+    });
 
-        const result = registryUtils.mergeList(nativeOutput, registry, dir);
+    test('aggregates entries from each worktree', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-a'), { recursive: true });
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-b'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', (cmd, opts) => {
+            const cwd = opts.cwd;
+            if (cwd.endsWith('feature-a')) {
+                return 'Changes:\n  feature-a    Proposal    2 tasks    2m ago\n';
+            }
+            if (cwd.endsWith('feature-b')) {
+                return 'Changes:\n  feature-b    Proposal    1 task     1h ago\n';
+            }
+            return '';
+        });
+
+        const result = registryUtils.mergeList([
+            { name: 'feature-a', worktree: '.worktrees/feature-a' },
+            { name: 'feature-b', worktree: '.worktrees/feature-b' }
+        ], dir);
+
+        assert.ok(result.startsWith('Changes:'));
+        assert.ok(result.includes('feature-a'));
+        assert.ok(result.includes('feature-b'));
+        assert.ok(result.includes('Proposal'));  // 来自 worktree 的真实状态
+    });
+
+    test('deduplicates by name (first wins)', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-a'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', () => 'Changes:\n  feature-a    2 tasks   5m ago\n');
+
+        const result = registryUtils.mergeList([
+            { name: 'feature-a', worktree: '.worktrees/feature-a' },
+            { name: 'feature-a', worktree: '.worktrees/feature-a-dup' }
+        ], dir);
+
+        const featureLines = result.split('\n').filter(l => l.includes('feature-a') && !l.startsWith('Changes'));
+        assert.strictEqual(featureLines.length, 1);
+    });
+
+    test('skips worktree when directory missing', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'live'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', (cmd, opts) => {
+            if (opts.cwd.includes('live')) {
+                return 'Changes:\n  live    1 task    1m ago\n';
+            }
+            return '';
+        });
+
+        const result = registryUtils.mergeList([
+            { name: 'live', worktree: '.worktrees/live' },
+            { name: 'ghost', worktree: '.worktrees/ghost' }
+        ], dir);
+
         assert.ok(result.includes('live'));
-        assert.ok(!result.includes('missing-wt'));  // 目录不存在，跳过
+        assert.ok(!result.includes('ghost'));
+    });
+
+    test('handles worktree with no active changes output', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'empty'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', () => 'No active changes.\n');
+
+        const result = registryUtils.mergeList([
+            { name: 'empty', worktree: '.worktrees/empty' }
+        ], dir);
+
+        assert.strictEqual(result, 'No active changes found.\n');
+    });
+
+    test('handles execSync failure gracefully', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'broken'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', () => { throw { status: 1, stdout: '' }; });
+
+        const result = registryUtils.mergeList([
+            { name: 'broken', worktree: '.worktrees/broken' }
+        ], dir);
+
+        assert.strictEqual(result, 'No active changes found.\n');
     });
 });

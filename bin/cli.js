@@ -39,16 +39,16 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode reset             重置项目配置
     openspec-superpowers-opencode dry-run [--lang zh-CN|zh-TW|en]     预览变更
     openspec-superpowers-opencode ensure-worktree <name>    确保 worktree 已创建
-    openspec-superpowers-opencode registry add <name> <status> <worktree>  注册表添加变更
+    openspec-superpowers-opencode registry add <name> <worktree>  注册表添加变更
     openspec-superpowers-opencode registry remove <name>    注册表删除变更
-    openspec-superpowers-opencode registry update-status <name> <status>  更新变更状态
     openspec-superpowers-opencode registry list             列出所有活跃变更
     openspec-superpowers-opencode registry reset            重置注册表为空
     openspec-superpowers-opencode verify                   验证系统完整性（5 项检查）
     openspec-superpowers-opencode registry verify           轻量验证（仅 changes.json + worktree）
     openspec-superpowers-opencode install-shims             安装/修复垫片脚本
+    openspec-superpowers-opencode uninstall-shims           卸除垫片脚本，恢复原始 openspec
 
- 语言:
+  语言:
     --lang zh-CN    简体中文
     --lang zh-TW    繁体中文
     --lang en       英文（默认）
@@ -75,14 +75,14 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode reset              Reset project config
     openspec-superpowers-opencode dry-run [--lang zh-CN|zh-TW|en]    Preview changes
     openspec-superpowers-opencode ensure-worktree <name>    Ensure worktree exists
-    openspec-superpowers-opencode registry add <name> <status> <worktree>  Add change to registry
+    openspec-superpowers-opencode registry add <name> <worktree>  Add change to registry
     openspec-superpowers-opencode registry remove <name>    Remove change from registry
-    openspec-superpowers-opencode registry update-status <name> <status>  Update change status
     openspec-superpowers-opencode registry list             List active changes
     openspec-superpowers-opencode registry reset            Reset registry to empty
     openspec-superpowers-opencode verify                   Verify system integrity (5 checks)
     openspec-superpowers-opencode registry verify           Lightweight verify (only changes.json + worktree)
     openspec-superpowers-opencode install-shims             Install/repair shim scripts
+    openspec-superpowers-opencode uninstall-shims           Uninstall shim scripts, restore original openspec
 
   Language:
     --lang zh-CN    Simplified Chinese
@@ -133,9 +133,11 @@ if (subcommand === 'init') {
     runVerifyTop();
 } else if (subcommand === 'install-shims') {
     runInstallShims();
+} else if (subcommand === 'uninstall-shims') {
+    runUninstallShims();
 } else {
     console.error(t(`未知子命令: ${subcommand}`, `Unknown subcommand: ${subcommand}`));
-    console.error(t('可用命令: init, reset, dry-run, ensure-worktree, registry, verify, install-shims', 'Available commands: init, reset, dry-run, ensure-worktree, registry, verify, install-shims'));
+    console.error(t('可用命令: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims', 'Available commands: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims'));
     process.exit(1);
 }
 
@@ -301,10 +303,10 @@ function findProjectRoot(dir) {
 async function handleRegistry(registryArgs) {
     const action = registryArgs[0];
 
-    if (!action || (action !== 'verify' && action !== 'list' && action !== 'add' && action !== 'remove' && action !== 'update-status' && action !== 'reset')) {
+    if (!action || (action !== 'verify' && action !== 'list' && action !== 'add' && action !== 'remove' && action !== 'reset')) {
         console.error(t(
-            '用法: openspec-superpowers-opencode registry <add|remove|update-status|list|verify|reset> [参数...]',
-            'Usage: openspec-superpowers-opencode registry <add|remove|update-status|list|verify|reset> [args...]'
+            '用法: openspec-superpowers-opencode registry <add|remove|list|verify|reset> [参数...]',
+            'Usage: openspec-superpowers-opencode registry <add|remove|list|verify|reset> [args...]'
         ));
         process.exit(1);
     }
@@ -331,15 +333,14 @@ async function handleRegistry(registryArgs) {
     switch (action) {
         case 'add': {
             const name = registryArgs[1];
-            const status = registryArgs[2];
-            const worktree = registryArgs[3];
-            if (!name || !status || !worktree) {
-                console.error(t('用法: registry add <name> <status> <worktree>', 'Usage: registry add <name> <status> <worktree>'));
+            const worktree = registryArgs[2];
+            if (!name || !worktree) {
+                console.error(t('用法: registry add <name> <worktree>', 'Usage: registry add <name> <worktree>'));
                 process.exit(1);
             }
             try {
-                registry.add(registryPath, name, status, worktree);
-                console.log(t(`  ✓ 注册表已更新: ${name} (${status})`, `  ✓ Registry updated: ${name} (${status})`));
+                registry.add(registryPath, name, worktree);
+                console.log(t(`  ✓ 注册表已更新: ${name}`, `  ✓ Registry updated: ${name}`));
             } catch (e) {
                 console.error(t(`  ✗ 写入注册表失败: ${e.message}`, `  ✗ Registry write failed: ${e.message}`));
                 process.exit(1);
@@ -355,22 +356,6 @@ async function handleRegistry(registryArgs) {
             try {
                 registry.remove(registryPath, name);
                 console.log(t(`  ✓ 已从注册表删除: ${name}`, `  ✓ Removed from registry: ${name}`));
-            } catch (e) {
-                console.error(t(`  ✗ 写入注册表失败: ${e.message}`, `  ✗ Registry write failed: ${e.message}`));
-                process.exit(1);
-            }
-            break;
-        }
-        case 'update-status': {
-            const name = registryArgs[1];
-            const status = registryArgs[2];
-            if (!name || !status) {
-                console.error(t('用法: registry update-status <name> <status>', 'Usage: registry update-status <name> <status>'));
-                process.exit(1);
-            }
-            try {
-                registry.updateStatus(registryPath, name, status);
-                console.log(t(`  ✓ 状态已更新: ${name} → ${status}`, `  ✓ Status updated: ${name} → ${status}`));
             } catch (e) {
                 console.error(t(`  ✗ 写入注册表失败: ${e.message}`, `  ✗ Registry write failed: ${e.message}`));
                 process.exit(1);
@@ -458,13 +443,31 @@ function runVerifyTop() {
 
 // ---- runInstallShims — 安装/修复 openspec CLI 垫片脚本 ----
 function runInstallShims() {
-    const installer = require(path.join(toolDir, 'lib', 'install-shims'));
+    const installer = require(path.join(toolDir, 'lib', 'shims-installer'));
     const result = installer.installShims(toolDir, isWin);
 
     if (result.success) {
         console.log('  ✓ Shim scripts installed successfully');
     } else {
         console.log('  ⚠ Failed to install shim scripts');
+    }
+
+    for (const d of result.details) {
+        console.log(`    ${d}`);
+    }
+
+    process.exit(result.success ? 0 : 1);
+}
+
+// ---- runUninstallShims — 卸除 openspec CLI 垫片脚本 ----
+function runUninstallShims() {
+    const installer = require(path.join(toolDir, 'lib', 'shims-installer'));
+    const result = installer.uninstallShims(toolDir, isWin);
+
+    if (result.success) {
+        console.log('  ✓ Shim scripts uninstalled successfully');
+    } else {
+        console.log('  ⚠ Failed to uninstall shim scripts');
     }
 
     for (const d of result.details) {

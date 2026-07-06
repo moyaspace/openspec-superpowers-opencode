@@ -119,6 +119,7 @@ git checkout <base-branch>
 git merge <feature-branch>          # fast-forward
 git worktree remove .worktrees/<name>  # 先移除 worktree，分支才可删除
 git branch -d <feature-branch>
+openspec-superpowers-opencode registry remove <name>
 ```
 
 #### 选项 2: 推送并创建 PR
@@ -128,7 +129,11 @@ git push -u origin <feature-branch>
 gh pr create --title "<title>" --body "## Summary\n..."
 ```
 
-PR 创建后，worktree 保留供参考（但用户可手动删除）。
+PR 创建后，change 已推送但尚未合入。worktree 和注册表条目均保留。
+用户可在 PR 合入后手动清理：
+- 删除 worktree：`git worktree remove .worktrees/<name>`
+- 删除分支：`git branch -d <feature-branch>`
+- 清理注册表：`openspec-superpowers-opencode registry remove <name>`
 
 #### 选项 3: 保留分支
 
@@ -140,8 +145,9 @@ PR 创建后，worktree 保留供参考（但用户可手动删除）。
 
 ```bash
 git checkout <base-branch>
+git worktree remove .worktrees/<name>  # 先移除 worktree，分支才可删除
 git branch -D <feature-branch>
-git worktree remove .worktrees/<name>
+openspec-superpowers-opencode registry remove <name>
 ```
 
 ---

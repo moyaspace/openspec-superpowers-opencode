@@ -43,7 +43,7 @@ describe('read()', () => {
 
     test('returns parsed data when file is valid', () => {
         const dir = tmpDir();
-        const data = { changes: [{ name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: '2026-01-01T00:00:00.000Z' }] };
+        const data = { changes: [{ name: 'demo', worktree: '.worktrees/demo', createdAt: '2026-01-01T00:00:00.000Z' }] };
         const rp = writeRegistry(dir, data);
         const result = registry.read(rp);
         assert.deepStrictEqual(result, data);
@@ -88,13 +88,11 @@ describe('add()', () => {
     test('adds a new entry', () => {
         const dir = tmpDir();
         const rp = path.join(dir, 'openspec', 'changes.json');
-        // 先写入空注册表
         registry.write(rp, { changes: [] });
-        registry.add(rp, 'demo', 'created', '.worktrees/demo');
+        registry.add(rp, 'demo', '.worktrees/demo');
         const data = registry.read(rp);
         assert.strictEqual(data.changes.length, 1);
         assert.strictEqual(data.changes[0].name, 'demo');
-        assert.strictEqual(data.changes[0].status, 'created');
         assert.strictEqual(data.changes[0].worktree, '.worktrees/demo');
         assert.ok(data.changes[0].createdAt, 'should have createdAt timestamp');
     });
@@ -103,19 +101,19 @@ describe('add()', () => {
         const dir = tmpDir();
         const rp = path.join(dir, 'openspec', 'changes.json');
         registry.write(rp, { changes: [] });
-        registry.add(rp, 'demo', 'created', '.worktrees/demo');
-        registry.add(rp, 'demo', 'implementing', '.worktrees/demo');
+        registry.add(rp, 'demo', '.worktrees/demo');
+        registry.add(rp, 'demo', '.worktrees/demo-v2');
         const data = registry.read(rp);
         assert.strictEqual(data.changes.length, 1);
-        assert.strictEqual(data.changes[0].status, 'implementing');
+        assert.strictEqual(data.changes[0].worktree, '.worktrees/demo-v2');
     });
 
     test('adds multiple entries with different names', () => {
         const dir = tmpDir();
         const rp = path.join(dir, 'openspec', 'changes.json');
         registry.write(rp, { changes: [] });
-        registry.add(rp, 'a', 'created', '.worktrees/a');
-        registry.add(rp, 'b', 'created', '.worktrees/b');
+        registry.add(rp, 'a', '.worktrees/a');
+        registry.add(rp, 'b', '.worktrees/b');
         const data = registry.read(rp);
         assert.strictEqual(data.changes.length, 2);
     });
@@ -128,7 +126,7 @@ describe('remove()', () => {
     test('removes an entry by name', () => {
         const dir = tmpDir();
         const rp = path.join(dir, 'openspec', 'changes.json');
-        registry.write(rp, { changes: [{ name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: 'x' }] });
+        registry.write(rp, { changes: [{ name: 'demo', worktree: '.worktrees/demo', createdAt: 'x' }] });
         registry.remove(rp, 'demo');
         const data = registry.read(rp);
         assert.strictEqual(data.changes.length, 0);
@@ -137,7 +135,7 @@ describe('remove()', () => {
     test('keeps file after removing all entries', () => {
         const dir = tmpDir();
         const rp = path.join(dir, 'openspec', 'changes.json');
-        registry.write(rp, { changes: [{ name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: 'x' }] });
+        registry.write(rp, { changes: [{ name: 'demo', worktree: '.worktrees/demo', createdAt: 'x' }] });
         registry.remove(rp, 'demo');
         assert.ok(fs.existsSync(rp), 'file should still exist');
     });
@@ -145,35 +143,14 @@ describe('remove()', () => {
     test('does nothing when name not found', () => {
         const dir = tmpDir();
         const rp = path.join(dir, 'openspec', 'changes.json');
-        registry.write(rp, { changes: [{ name: 'a', status: 'created', worktree: '.worktrees/a', createdAt: 'x' }] });
+        registry.write(rp, { changes: [{ name: 'a', worktree: '.worktrees/a', createdAt: 'x' }] });
         registry.remove(rp, 'nonexistent');
         const data = registry.read(rp);
         assert.strictEqual(data.changes.length, 1);
     });
 });
 
-// ============================================================
-// updateStatus()
-// ============================================================
-describe('updateStatus()', () => {
-    test('updates status of existing entry', () => {
-        const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
-        registry.write(rp, { changes: [{ name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: 'x' }] });
-        registry.updateStatus(rp, 'demo', 'implementing');
-        const data = registry.read(rp);
-        assert.strictEqual(data.changes[0].status, 'implementing');
-    });
 
-    test('does nothing when name not found', () => {
-        const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
-        registry.write(rp, { changes: [{ name: 'a', status: 'created', worktree: '.worktrees/a', createdAt: 'x' }] });
-        registry.updateStatus(rp, 'nonexistent', 'implementing');
-        const data = registry.read(rp);
-        assert.strictEqual(data.changes[0].name, 'a');
-    });
-});
 
 // ============================================================
 // list()
@@ -187,16 +164,15 @@ describe('list()', () => {
         assert.ok(output.includes('No active changes found'));
     });
 
-    test('includes name, status, worktree, and time for each entry', () => {
+    test('includes name, worktree, and time for each entry', () => {
         const dir = tmpDir();
         const rp = path.join(dir, 'openspec', 'changes.json');
         registry.write(rp, { changes: [
-            { name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: new Date().toISOString() }
+            { name: 'demo', worktree: '.worktrees/demo', createdAt: new Date().toISOString() }
         ]});
         const output = registry.list(rp);
         assert.ok(output.startsWith('Changes:'));
         assert.ok(output.includes('demo'));
-        assert.ok(output.includes('created'));
         assert.ok(output.includes('.worktrees/demo'));
         assert.ok(output.includes('ago') || output.includes('just now'));
     });
@@ -205,14 +181,13 @@ describe('list()', () => {
         const dir = tmpDir();
         const rp = path.join(dir, 'openspec', 'changes.json');
         registry.write(rp, { changes: [
-            { name: 'a', status: 'created', worktree: '.worktrees/a', createdAt: '2026-01-01T00:00:00.000Z' },
-            { name: 'b', status: 'implementing', worktree: '.worktrees/b', createdAt: '2026-01-02T00:00:00.000Z' }
+            { name: 'a', worktree: '.worktrees/a', createdAt: '2026-01-01T00:00:00.000Z' },
+            { name: 'b', worktree: '.worktrees/b', createdAt: '2026-01-02T00:00:00.000Z' }
         ]});
         const output = registry.list(rp);
         assert.ok(output.startsWith('Changes:'));
         assert.ok(output.includes('a'));
         assert.ok(output.includes('b'));
-        assert.ok(output.includes('implementing'));
         assert.ok(output.includes('.worktrees/b'));
     });
 });
@@ -223,7 +198,7 @@ describe('list()', () => {
 describe('reset()', () => {
     test('clears changes and creates .bak when backup=true', () => {
         const dir = tmpDir();
-        const rp = writeRegistry(dir, { changes: [{ name: 'demo', status: 'created', worktree: '.worktrees/demo', createdAt: 'x' }] });
+        const rp = writeRegistry(dir, { changes: [{ name: 'demo', worktree: '.worktrees/demo', createdAt: 'x' }] });
         const result = registry.reset(rp, true);
         assert.strictEqual(result.changesCount, 1);
         assert.ok(result.backupPath.endsWith('.bak'));
