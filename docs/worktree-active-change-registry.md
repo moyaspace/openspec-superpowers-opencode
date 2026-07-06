@@ -390,7 +390,7 @@ openspec-superpowers-opencode registry verify
 |------|--------|------------|
 | 手动/诊断 | `openspec-superpowers-opencode registry verify` | 输出报告 + exit 1，不修改 |
 | opsx 流程中（add 前） | opsx 命令先跑 `registry verify`，再跑 `registry add` | 输出报告 + exit 1 → AI agent 读取后决定是否询问用户修复 |
-| opsx 流程中（list 前） | opsx 命令先跑 `registry verify`，再跑 `openspec list` | 同上 |
+| opsx 流程中（list 前） | opsx 命令先跑 `openspec-superpowers-opencode verify`，再跑 `openspec list` | 同上 |
 
 第三项"垫片脚本内触发"的逻辑（注意：**垫片脚本内不做交互式询问**，只输出结构化信息，AI agent 读取后决定下一步）：
 

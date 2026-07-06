@@ -17,7 +17,7 @@
 |  T7  | install-shims 命令        |  Verify/垫片脚本  |    T5    |   高   |  ✅  |  小  |
 |  T8  | verify 顶层命令           |    Verify/核心    |    T2    |   高   |  ✅  |  中  |
 |  T9  | registry reset 子命令     |   Registry/CLI    |    T2    |   低   |  ✅  |  小  |
-| T10  | opsx 命令 verify 引用统一 |    Verify/Opsx    |  T4+T8   |   中   |  🔲  |  中  |
+| T10  | opsx 命令 verify 引用统一 |    Verify/Opsx    |  T4+T8   |   中   |  ✅  |  中  |
 | T11  | /opsx-finish PR 感知与自动清理 |    Opsx/PR   |   T4    |   低   |  🔲  |  中  |
 
 ---
@@ -35,7 +35,7 @@
 |  T7  | install-shims 命令      |  Verify/垫片脚本  |   高   |  小  |  ✅  |
 |  T8  | verify 顶层命令           |    Verify/核心    |   高   |  中  |  ✅  |
 |  T9  | registry reset 子命令     |   Registry/CLI    |   低   |  小  |  ✅  |
-| T10  | opsx 命令 verify 引用统一 |    Verify/Opsx    |   中   |  中  |  🔲  |
+| T10  | opsx 命令 verify 引用统一 |    Verify/Opsx    |   中   |  中  |  ✅  |
 | T11  | /opsx-finish PR 感知与自动清理 |    Opsx/PR    |   低   |  中  |  🔲  |
 
 ### 任务卡片
@@ -382,6 +382,7 @@ exit 1 → 向用户展示诊断报告，按各检查项的修复建议执行
 | **registry 命令不做终端交互** | registry 命令（add/remove/list/verify）直接在 opsx 命令的 bash 代码块中调用。输出结构化文本 + exit code，不做 readline/promptYesNo。AI agent 读取输出后自行决定是否向用户询问。 |
 | **CommonJS**                  | registry.js 用 require/module.exports，不用 import                                                                                                                                            |
 | **node:test**                 | 测试用内置 node:test，零依赖                                                                                                                                                                  |
+| **opsx 命令文件位置**         | 模板文件在 `template/.opencode/commands/opsx-*.md`（12 个）。部署到项目后位于 `.opencode/commands/opsx-*.md`。AI agent 的 `opsx-*.md` 技能文件路径一律从 `template/.opencode/commands/` 下读取。 |
 
 ---
 
