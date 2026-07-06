@@ -99,11 +99,11 @@ describe('isShimScript()', () => {
 // checkRegistryFile()
 // ============================================================
 describe('checkRegistryFile()', () => {
-    test('returns valid with count when changes.json has entries', () => {
+    test('returns valid with count when oso-change-registry.json has entries', () => {
         const dir = tmpDir();
         const regDir = path.join(dir, 'openspec');
         fs.mkdirSync(regDir, { recursive: true });
-        fs.writeFileSync(path.join(regDir, 'changes.json'), JSON.stringify({ changes: [{ name: 'a' }, { name: 'b' }, { name: 'c' }] }));
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({ changes: [{ name: 'a' }, { name: 'b' }, { name: 'c' }] }));
         const r = verify.checkRegistryFile(dir);
         assert.strictEqual(r.valid, true);
         assert.strictEqual(r.count, 3);
@@ -114,13 +114,13 @@ describe('checkRegistryFile()', () => {
         const dir = tmpDir();
         const regDir = path.join(dir, 'openspec');
         fs.mkdirSync(regDir, { recursive: true });
-        fs.writeFileSync(path.join(regDir, 'changes.json'), JSON.stringify({ changes: [] }));
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({ changes: [] }));
         const r = verify.checkRegistryFile(dir);
         assert.strictEqual(r.valid, true);
         assert.strictEqual(r.count, 0);
     });
 
-    test('returns invalid when changes.json does not exist', () => {
+    test('returns invalid when oso-change-registry.json does not exist', () => {
         const dir = tmpDir();
         const r = verify.checkRegistryFile(dir);
         assert.strictEqual(r.valid, false);
@@ -132,7 +132,7 @@ describe('checkRegistryFile()', () => {
         const dir = tmpDir();
         const regDir = path.join(dir, 'openspec');
         fs.mkdirSync(regDir, { recursive: true });
-        fs.writeFileSync(path.join(regDir, 'changes.json'), 'not json {{{');
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), 'not json {{{');
         const r = verify.checkRegistryFile(dir);
         assert.strictEqual(r.valid, false);
         assert.strictEqual(r.count, 0);
@@ -149,7 +149,7 @@ describe('checkWorktrees()', () => {
         const regDir = path.join(dir, 'openspec');
         fs.mkdirSync(regDir, { recursive: true });
         fs.mkdirSync(path.join(dir, '.worktrees', 'demo'), { recursive: true });
-        fs.writeFileSync(path.join(regDir, 'changes.json'), JSON.stringify({
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({
             changes: [{ name: 'demo', worktree: '.worktrees/demo' }]
         }));
         const r = verify.checkWorktrees(dir);
@@ -161,7 +161,7 @@ describe('checkWorktrees()', () => {
         const dir = tmpDir();
         const regDir = path.join(dir, 'openspec');
         fs.mkdirSync(regDir, { recursive: true });
-        fs.writeFileSync(path.join(regDir, 'changes.json'), JSON.stringify({
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({
             changes: [
                 { name: 'existing', worktree: '.worktrees/existing' },
                 { name: 'missing', worktree: '.worktrees/missing' }
@@ -187,7 +187,7 @@ describe('checkWorktrees()', () => {
         const dir = tmpDir();
         const regDir = path.join(dir, 'openspec');
         fs.mkdirSync(regDir, { recursive: true });
-        fs.writeFileSync(path.join(regDir, 'changes.json'), '{broken json');
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), '{broken json');
         const r = verify.checkWorktrees(dir);
         assert.strictEqual(r.valid, false);
         assert.strictEqual(r.missing.length, 0);
@@ -197,7 +197,7 @@ describe('checkWorktrees()', () => {
         const dir = tmpDir();
         const regDir = path.join(dir, 'openspec');
         fs.mkdirSync(regDir, { recursive: true });
-        fs.writeFileSync(path.join(regDir, 'changes.json'), JSON.stringify({
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({
             changes: [{ name: 'nopath' }]
         }));
         const r = verify.checkWorktrees(dir);
@@ -222,10 +222,10 @@ describe('runAllChecks()', () => {
         fs.writeFileSync(fakeOpenspecPath, '#!/bin/sh\n# openspec shim for oso registry\n...');
         // Check 2 passes: openspec-orig
         fs.writeFileSync(path.join(binDir, 'openspec-orig'), '#!/bin/sh\n...');
-        // Check 4 passes: valid changes.json
+        // Check 4 passes: valid oso-change-registry.json
         const regDir = path.join(projectDir, 'openspec');
         fs.mkdirSync(regDir, { recursive: true });
-        fs.writeFileSync(path.join(regDir, 'changes.json'), JSON.stringify({ changes: [] }));
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({ changes: [] }));
         // Check 5 passes: no worktree entries to check
 
         const results = verify.runAllChecks(null, false, projectDir);
@@ -244,7 +244,7 @@ describe('runAllChecks()', () => {
         const results = verify.runAllChecks(null, false, null);
         const skipped = results.filter(r => r.status === 'skip');
         assert.strictEqual(skipped.length, 2);
-        assert.ok(skipped.every(r => r.check === 'changes.json' || r.check === 'worktrees'));
+        assert.ok(skipped.every(r => r.check === 'oso-change-registry.json' || r.check === 'worktrees'));
     });
 
     test('checks 2+3 are skipped when openspec not found', (t) => {
@@ -265,7 +265,7 @@ describe('runAllChecks()', () => {
 
         const regDir = path.join(projectDir, 'openspec');
         fs.mkdirSync(regDir, { recursive: true });
-        fs.writeFileSync(path.join(regDir, 'changes.json'), JSON.stringify({
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({
             changes: [{ name: 'ghost', worktree: '.worktrees/ghost' }]
         }));
         // Missing worktree causes check 5 to report failures

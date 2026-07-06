@@ -13,9 +13,9 @@ function tmpDir() {
     return dir;
 }
 
-/** 创建 openspec/changes.json 的辅助函数 */
+/** 创建 openspec/oso-change-registry.json 的辅助函数 */
 function writeRegistry(dir, data) {
-    const p = path.join(dir, 'openspec', 'changes.json');
+    const p = path.join(dir, 'openspec', 'oso-change-registry.json');
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, JSON.stringify(data));
     return p;
@@ -27,14 +27,14 @@ function writeRegistry(dir, data) {
 describe('read()', () => {
     test('returns empty registry when file does not exist', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         const result = registry.read(rp);
         assert.deepStrictEqual(result, { changes: [] });
     });
 
     test('returns empty registry when JSON is corrupted', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         fs.mkdirSync(path.dirname(rp), { recursive: true });
         fs.writeFileSync(rp, 'not json{{{');
         const result = registry.read(rp);
@@ -56,7 +56,7 @@ describe('read()', () => {
 describe('write()', () => {
     test('creates file with correct content', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         const data = { changes: [] };
         registry.write(rp, data);
         assert.ok(fs.existsSync(rp));
@@ -66,14 +66,14 @@ describe('write()', () => {
 
     test('creates parent directories if missing', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'a', 'b', 'changes.json');
+        const rp = path.join(dir, 'a', 'b', 'oso-change-registry.json');
         registry.write(rp, { changes: [] });
         assert.ok(fs.existsSync(rp));
     });
 
     test('overwrites existing file', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         registry.write(rp, { changes: [{ name: 'old' }] });
         registry.write(rp, { changes: [{ name: 'new' }] });
         const parsed = JSON.parse(fs.readFileSync(rp, 'utf-8'));
@@ -87,7 +87,7 @@ describe('write()', () => {
 describe('add()', () => {
     test('adds a new entry', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         registry.write(rp, { changes: [] });
         registry.add(rp, 'demo', '.worktrees/demo');
         const data = registry.read(rp);
@@ -99,7 +99,7 @@ describe('add()', () => {
 
     test('overwrites entry with same name', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         registry.write(rp, { changes: [] });
         registry.add(rp, 'demo', '.worktrees/demo');
         registry.add(rp, 'demo', '.worktrees/demo-v2');
@@ -110,7 +110,7 @@ describe('add()', () => {
 
     test('adds multiple entries with different names', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         registry.write(rp, { changes: [] });
         registry.add(rp, 'a', '.worktrees/a');
         registry.add(rp, 'b', '.worktrees/b');
@@ -125,7 +125,7 @@ describe('add()', () => {
 describe('remove()', () => {
     test('removes an entry by name', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         registry.write(rp, { changes: [{ name: 'demo', worktree: '.worktrees/demo', createdAt: 'x' }] });
         registry.remove(rp, 'demo');
         const data = registry.read(rp);
@@ -134,7 +134,7 @@ describe('remove()', () => {
 
     test('keeps file after removing all entries', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         registry.write(rp, { changes: [{ name: 'demo', worktree: '.worktrees/demo', createdAt: 'x' }] });
         registry.remove(rp, 'demo');
         assert.ok(fs.existsSync(rp), 'file should still exist');
@@ -142,7 +142,7 @@ describe('remove()', () => {
 
     test('does nothing when name not found', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         registry.write(rp, { changes: [{ name: 'a', worktree: '.worktrees/a', createdAt: 'x' }] });
         registry.remove(rp, 'nonexistent');
         const data = registry.read(rp);
@@ -158,7 +158,7 @@ describe('remove()', () => {
 describe('list()', () => {
     test('returns "No active changes." when empty', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         registry.write(rp, { changes: [] });
         const output = registry.list(rp);
         assert.ok(output.includes('No active changes found'));
@@ -166,7 +166,7 @@ describe('list()', () => {
 
     test('includes name, worktree, and time for each entry', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         registry.write(rp, { changes: [
             { name: 'demo', worktree: '.worktrees/demo', createdAt: new Date().toISOString() }
         ]});
@@ -179,7 +179,7 @@ describe('list()', () => {
 
     test('handles multiple entries', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         registry.write(rp, { changes: [
             { name: 'a', worktree: '.worktrees/a', createdAt: '2026-01-01T00:00:00.000Z' },
             { name: 'b', worktree: '.worktrees/b', createdAt: '2026-01-02T00:00:00.000Z' }
@@ -239,7 +239,7 @@ describe('reset()', () => {
 
     test('handles non-existent registry file gracefully', () => {
         const dir = tmpDir();
-        const rp = path.join(dir, 'openspec', 'changes.json');
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
         const result = registry.reset(rp, true);
         assert.strictEqual(result.changesCount, 0);
         assert.strictEqual(result.backupPath, null);
