@@ -39,7 +39,7 @@ openspec list（在 main 上执行）
 
 ### 注册表文件
 
-路径：`openspec/changes.json`
+路径：`openspec/oso-change-registry.json`
 
 ```json
 {
@@ -76,7 +76,7 @@ openspec list（在 main 上执行）
 ### 垫片脚本逻辑（伪代码）
 
 垫片脚本位于 PATH 中，必须能从任意子目录定位到项目根目录。
-采用**向上查找**策略：从当前目录逐级向父目录搜索，找到 `openspec/changes.json` 即视为项目根。
+采用 **git-based** 策略：执行 `git rev-parse --git-common-dir` 获取公共 git 目录，取其所在目录为项目根。这种方式在 main 或任意 worktree checkout 中都返回同一路径。
 
 每份垫片脚本首行包含特征标记，供 `registry verify` 检测垫片完整性：
 
@@ -89,49 +89,13 @@ openspec list（在 main 上执行）
 ```
 # openspec shim for oso registry      # ← 检测标记
 
-function findProjectRoot(dir) {
-  while (dir !== parent(dir)) {
-    if (exists(dir + "/openspec/changes.json")) return dir
-    dir = parent(dir)
-  }
-  return null  // 不在项目中
-}
-
-function main(args) {
-  root = findProjectRoot(process.cwd())
-
-  if (args[0] === "list" && root) {
-    // 读注册表获取活跃变更的 worktree 路径
-    registry = readJSON(root + "/openspec/changes.json")
-
-    // 遍历每个 worktree，在其中执行 openspec-orig list 获取实时状态
-    lines = []
-    seenNames = new Set()
-    for each change in registry.changes {
-      wtPath = root + "/" + change.worktree
-      if !exists(wtPath) continue               // worktree 被删则跳过
-      output = exec("openspec-orig list", { cwd: wtPath })
-      for each line in output {
-        if line matches "  <name>" pattern {
-          name = extractName(line)
-          if !seenNames.has(name) {              // 同名去重，first wins
-            seenNames.add(name)
-            lines.push(line)
-          }
-        }
-      }
-    }
-
-    if (lines.length === 0) {
-      print("No active changes found.")
-    } else {
-      print("Changes:")
-      for each line in lines { print(line) }
-    }
-  } else {
-    // 非 list 命令或不在项目中 → 透传
+if (args[0] === "list" && TOOL_DIR is set) {
+    # 全部委托给 registry-utils.js
+    # registry-utils 内部通过 git 定位项目根、读取注册表、遍历 worktree 合并输出
+    exec("node <TOOL_DIR>/lib/registry-utils.js list")
+} else {
+    # 非 list 命令或不在项目中 → 透传
     exec("openspec-orig " + args.join(" "))
-  }
 }
 ```
 
@@ -178,7 +142,7 @@ function main(args) {
 
 | 维度 | 旧设计（registry 存 status） | 新设计（registry 只存 worktree 路径） |
 |------|---------------------------|--------------------------------------|
-| 状态数据位置 | `changes.json` 的 `status` 字段 | 各 worktree 内 `openspec list` 实时输出 |
+| 状态数据位置 | `oso-change-registry.json` 的 `status` 字段 | 各 worktree 内 `openspec list` 实时输出 |
 | 状态更新方式 | opsx 执行 `update-status` 子命令 | 自动——worktree 内无论做什么改变，list 输出自动反映 |
 | 状态时效性 | 可能过期（忘了 update 就 stale） | 永远是实时的 |
 | 垫片逻辑 | 捏造条目行（`formatWorktreeEntry`） | 原样透传 worktree 的 list 输出行 |
@@ -272,9 +236,9 @@ openspec-superpowers-opencode registry list
 openspec-superpowers-opencode registry verify
 ```
 
-`bin/cli.js` 收到 `registry` 子命令后，通过 `findProjectRoot(process.cwd())` 定位项目根目录，然后操作项目根下的 `openspec/changes.json`。
+`bin/cli.js` 收到 `registry` 子命令后，通过 `findProjectRoot(process.cwd())` 定位项目根目录，然后操作项目根下的 `openspec/oso-change-registry.json`。
 
-只读操作（如垫片脚本中的 `openspec list` 合并）直接读取 `changes.json`，不走 CLI 子命令。
+只读操作（如垫片脚本中的 `openspec list` 合并）直接读取 `oso-change-registry.json`，不走 CLI 子命令。
 
 ## 安装程序
 
@@ -303,7 +267,7 @@ openspec-superpowers-opencode registry verify
 ## 项目初始化
 
 ```json
-// openspec/changes.json（首次提交）
+// openspec/oso-change-registry.json（首次提交）
 { "changes": [] }
 ```
 
@@ -321,13 +285,13 @@ openspec-superpowers-opencode registry verify
 
 | 场景 | 处理方式 |
 |------|----------|
-| `changes.json` 格式损坏（非合法 JSON） | 垫片脚本 catch 解析异常，打印 `⚠ registry corrupted, falling back to native list`，退化为调用 `openspec-orig list` |
-| `changes.json` 文件不存在 | 视为无注册表条目，不拦截，透传 `openspec-orig list`（等价于原生行为） |
+| `oso-change-registry.json` 格式损坏（非合法 JSON） | 垫片脚本 catch 解析异常，打印 `⚠ registry corrupted, falling back to native list`，退化为调用 `openspec-orig list` |
+| `oso-change-registry.json` 文件不存在 | 视为无注册表条目，不拦截，透传 `openspec-orig list`（等价于原生行为） |
 | worktree 目录已被手动删除 | 遍历注册表时检测目录是否存在，不存在的打印 `⚠ <name>: worktree not found at <path>`，跳过该条目但保留注册表记录 |
 | 更新/重装工具（`openspec-orig` 已存在） | 安装程序先检测 `openspec-orig` 是否存在，如已存在则跳过 copy，直接覆盖写入新版本垫片脚本；`--repair` 模式要求 openspec-orig 必须已存在 |
 | 垫片脚本被 npm update 覆盖 | `registry verify` 检测到 `openspec` 无特征标记但 `openspec-orig` 存在 → 输出报告 + exit 1 → AI agent 读取后向用户展示问题并引导修复 |
 | 注册表中同名变更已存在 | `registry.add()` 执行覆盖：用新条目替换旧条目（匹配键为 `name`） |
-| 多项目同时使用 | 每项目各自有 `openspec/changes.json`，`findProjectRoot` 向上查找到最近的那个，互不干扰 |
+| 多项目同时使用 | 每项目各自有 `openspec/oso-change-registry.json`，`findProjectRoot` 向上查找到最近的那个，互不干扰 |
 
 ## 跨平台注意事项
 
@@ -337,7 +301,7 @@ openspec-superpowers-opencode registry verify
 .worktrees/
 ```
 
-`openspec/changes.json` **不在** `.gitignore` 中，需要被追踪（它是项目元数据，每个开发者都需要看到同一份注册表）。
+`openspec/oso-change-registry.json` **不在** `.gitignore` 中，需要被追踪（它是项目元数据，每个开发者都需要看到同一份注册表）。
 
 `openspec/changes/` 目录（归档变更）按 OpenSpec 原生规则管理。
 
@@ -390,7 +354,7 @@ Changes:
 
 注册表读写逻辑，CommonJS，导出函数供 CLI 子命令调用：
 
-- `read(path)` — 读 `openspec/changes.json`，文件不存在或损坏时返回空注册表
+- `read(path)` — 读 `openspec/oso-change-registry.json`，文件不存在或损坏时返回空注册表
 - `write(path, data)` — 写回文件，确保目录存在
 - `add(path, name, worktree)` — 同名覆盖写入，设置 `createdAt`
 - `remove(path, name)` — 删除条目，保留空文件（不 unlink）
@@ -409,7 +373,7 @@ openspec-superpowers-opencode registry verify
 
 1. `findProjectRoot(process.cwd())` 定位项目根
 2. 加载 `<tool-install-dir>/lib/registry.js`
-3. 调用对应函数，传入项目根下的 `openspec/changes.json` 路径
+3. 调用对应函数，传入项目根下的 `openspec/oso-change-registry.json` 路径
 
 `verify` 子操作额外检测垫片完整性：
 
@@ -417,7 +381,7 @@ openspec-superpowers-opencode registry verify
 |--------|----------|----------|
 | `openspec-orig` 存在 | `which openspec` → dirname → 查 openspec-orig | verify / add |
 | `openspec` 是否垫片脚本 | 读取 openspec 文件首行，匹配特征标记 | verify / add |
-| `changes.json` 有效 | `JSON.parse()` | verify / add |
+| `oso-change-registry.json` 有效 | `JSON.parse()` | verify / add |
 | worktree 目录存在 | `fs.existsSync()` 逐条验证 | verify 仅 |
 
 ### `verify` 执行时机
@@ -437,7 +401,7 @@ if args[0] == "list":
     if root is None:
         exec("openspec-orig list")          # 不在项目 → 透传
     else:
-        registry = readJSON(root + "/openspec/changes.json")
+        registry = readJSON(root + "/openspec/oso-change-registry.json")
         lines = []
         for each change in registry.changes:
             worktree_path = root + "/" + change.worktree
@@ -462,11 +426,47 @@ else:
 - `openspec.cmd` — Windows CMD
 - `openspec.ps1` — Windows PowerShell
 
-垫片脚本逻辑参考本文档"垫片脚本逻辑（伪代码）"节：执行 `findProjectRoot` 向上查找，拦截 `openspec list` 合并注册表，其余透传 `openspec-orig`。
+垫片脚本逻辑参考本文档"垫片脚本逻辑（伪代码）"节：拦截 `openspec list` 后全部委托给 `registry-utils.js`，其余透传 `openspec-orig`。
 
-安装程序重新执行时：只覆盖垫片脚本，`openspec/changes.json` 已存在则不动。
+安装程序重新执行时：只覆盖垫片脚本，`openspec/oso-change-registry.json` 已存在则不动。
 
 ## 与其他设计文档的关联
 
 - `AGENTS.md` — 定义了 worktree 开发规则，本方案是其基础设施补充
 - OpenSpec 官方 `/opsx:*` 命令 — 本方案不修改其核心逻辑，仅在其入口处增加注册表同步步骤
+
+## 行为效果
+
+`openspec list` 在各场景下的实际表现：
+
+**正常场景**：在项目目录（main 或任意 worktree）跑 `openspec list`：
+
+```
+$ openspec list
+Changes:
+  feature-login      Proposal    2 tasks    5m ago
+  feature-search     Spec        1 task     2h ago
+```
+
+合并了所有 worktree 中的活跃变更。每个变更的状态从它自己的 worktree 实时获取。
+
+**无活跃变更**：
+
+```
+$ openspec list
+No active changes found.
+```
+
+**在项目外**：透传原生 `openspec-orig list`，等价于没装垫片。
+
+**非 list 命令**（如 `openspec status --change foo --json`）：全程透传，垫片不碰。
+
+**worktree 被删除**：注册表记录还在，但遍历时目录不存在 → 跳过该条目，不报错。下次 `registry remove` 清理即可。
+
+**JSON 损坏**：`readRegistry()` 返回 `{changes:[]}` → 输出 `No active changes found.`，不崩溃。
+
+**垫片未安装**：`openspec list` 走原版，只看到当前目录（main）的变更，看不到任何 worktree 里的变更。
+
+**从 main 看 vs 从 worktree 看**：`git rev-parse --git-common-dir` 都返回 `project/.git` → 同一项目根 → 行为一致。
+
+**性能**：每个 worktree 执行一次 `openspec-orig list`（约 100-200ms），3 个 worktree 约半秒。注册表读取和 JSON 解析在 1ms 内。

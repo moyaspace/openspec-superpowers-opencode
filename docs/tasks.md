@@ -42,16 +42,16 @@
 
 #### T1: 活动变更注册表初始化
 
-**WHY**：openspec/changes.json 是所有活跃变更的注册表。垫片脚本通过它感知 worktree 中的活跃变更，从而在 `openspec list` 中跨 worktree 展示。同时它也被 findProjectRoot 用作项目根标记文件。init 时预置是最佳时机，确保项目从一开始就有注册表。
+**WHY**：openspec/oso-change-registry.json 是所有活跃变更的注册表。垫片脚本通过它感知 worktree 中的活跃变更，从而在 `openspec list` 中跨 worktree 展示。同时它也被 findProjectRoot 用作项目根标记文件。init 时预置是最佳时机，确保项目从一开始就有注册表。
 
-**WHAT**：在 cli.js 的 runInit() 中，setup 脚本执行后、git add 前，创建 openspec/changes.json。仅不存在时创建，存在则跳过。不修改 setup 脚本。
+**WHAT**：在 cli.js 的 runInit() 中，setup 脚本执行后、git add 前，创建 openspec/oso-change-registry.json。仅不存在时创建，存在则跳过。不修改 setup 脚本。
 
-**HOW**：检查 path.join(targetDir, 'openspec/changes.json') → mkdirSync（如父目录不存在）→ writeFileSync → 内容 {"changes":[]}。约 5 行 JS。
+**HOW**：检查 path.join(targetDir, 'openspec/oso-change-registry.json') → mkdirSync（如父目录不存在）→ writeFileSync → 内容 {"changes":[]}。约 5 行 JS。
 
 **验收标准**：
 
-- [ ] init 新项目后 openspec/changes.json 存在，内容为 {"changes":[]}
-- [ ] 已有 changes.json 时 init 不修改内容
+- [ ] init 新项目后 openspec/oso-change-registry.json 存在，内容为 {"changes":[]}
+- [ ] 已有 oso-change-registry.json 时 init 不修改内容
 - [ ] git status 包含该文件，随首次提交入库
 
 #### T2: 注册表功能模块
@@ -60,7 +60,7 @@
 
 **WHAT**：创建 `scripts/registry.js`，CommonJS 模块，导出 6 个函数：
 
-- `read(path)` — 读 openspec/changes.json，文件不存在或损坏时返回 `{changes:[]}`，不抛异常
+- `read(path)` — 读 openspec/oso-change-registry.json，文件不存在或损坏时返回 `{changes:[]}`，不抛异常
 - `write(path, data)` — 写回文件，确保 `openspec/` 目录存在
 - `add(path, name, worktree)` — 同名覆盖写入，自动设置 `createdAt` 时间戳
 - `remove(path, name)` — 按 name 删除条目，保留空文件（不 unlink）
@@ -84,13 +84,13 @@
 
 **WHAT**：在 `bin/cli.js` 中：
 
-1. 实现 `findProjectRoot(dir)` — 从给定目录向上逐级查找 `openspec/changes.json`，找到返回该目录路径，未找到返回 null
+1. `findProjectRoot` 从 `lib/registry-utils.js` 引入，git-based（`git rev-parse --git-common-dir`），在任何 checkout 中都返回同一项目根
 2. 新增 `registry` 子命令处理分支，解析 `add/remove/list/verify` 五个子操作
-3. 加载 `<tool-dir>/scripts/registry.js`（通过 `path.dirname(__dirname)` 定位）
-4. 调用对应函数，传入项目根下的 `openspec/changes.json` 路径
+3. 加载 `<tool-dir>/lib/registry.js`，通过 `findProjectRoot` + `getChangeRegistryPath` 定位注册表
+4. 调用对应函数
 5. 非项目目录下 registry 命令报友好错误
 
-`registry verify` 为轻量版本，只检查两项：① `changes.json` 是否合法 JSON ② 注册表每条记录的 worktree 目录是否存在。
+`registry verify` 为轻量版本，只检查两项：① `oso-change-registry.json` 是否合法 JSON ② 注册表每条记录的 worktree 目录是否存在。
 顶层验证（openspec 安装状态、包装脚本完整性）由 T8 `verify` 命令负责。
 
 **重要：registry 命令被 AI agent 调用，不做终端交互式提示。** 所有 registry 命令输出结构化文本 + exit code（0=正常，非0=有问题），由 AI agent 读取输出后自行决定是否向用户询问修复。
@@ -104,7 +104,7 @@
 - [ ] `registry add` 在项目内写入注册表
 - [ ] `registry remove` 删除条目保留空文件
 - [ ] `registry list` 打印格式化列表
-- [ ] `registry verify` 只检查 changes.json + worktree 目录（轻量）
+- [ ] `registry verify` 只检查 oso-change-registry.json + worktree 目录（轻量）
 - [ ] 在项目子目录运行也能找到项目根
 - [ ] 在非项目中运行提示错误
 - [ ] help 文本包含 registry 用法
@@ -159,12 +159,12 @@
 
 每份脚本逻辑：
 
-1. 从 CWD 向上查找 `openspec/changes.json`（findProjectRoot）
-2. 如果 `$args[0] == "list"` 且在项目内 → 调用 `openspec-orig list` + 读注册表 → 合并输出
-3. 否则 → `exec openspec-orig $args` 透传
-4. 边界处理：JSON 损坏 → 打印警告 + 回退到原生 list；worktree 目录不存在 → 跳过但保留注册表记录
+1. 拦截 `openspec list` 调用，全部委托给 `<tool-dir>/lib/registry-utils.js list`
+2. registry-utils 内部通过 git 定位项目根、读取注册表、遍历 worktree 合并输出
+3. 非 list 命令 → `exec openspec-orig $args` 透传
+4. 边界处理（JSON 损坏、worktree 目录不存在等）由 registry-utils.js 统一负责
 
-合并输出策略：先调用 `openspec-orig list` 获取原生列表 → 读注册表追加工 worktree path 列 → 同名条目以注册表为准 → 排序输出。
+**合并输出策略**：registry-utils.js 调用 `openspec-orig list` 获取各 worktree 的原生列表 → 去重（同名 first wins）→ 拼接输出。
 
 **HOW**：T5 只产生脚本源文件（存在 `lib/shims/` 下），不含安装/部署逻辑。安装程序是后续独立任务。三种脚本从同一逻辑翻译为各自语法。注意 `openspec` 文件名不带后缀应放在 Unix 脚本中。
 
@@ -252,13 +252,13 @@
 
 #### T8: verify 顶层命令
 
-**WHY**：`registry verify` 语义太窄，只检查注册表相关的 items。完整检查涉及 openspec 安装、垫片脚本、changes.json、worktree 目录等系统级问题。需要一个顶层 `verify` 命令，输出结构化结果+每项的修复建议。
+**WHY**：`registry verify` 语义太窄，只检查注册表相关的 items。完整检查涉及 openspec 安装、垫片脚本、oso-change-registry.json、worktree 目录等系统级问题。需要一个顶层 `verify` 命令，输出结构化结果+每项的修复建议。
 
 **WHAT**：
 
 - 创建 `scripts/verify.js`，实现 5 项检查
 - 在 `bin/cli.js` 中新增顶层 `verify` 命令
-- `registry verify` 降级为轻量版本（只查 changes.json + worktree 目录）
+- `registry verify` 降级为轻量版本（只查 oso-change-registry.json + worktree 目录）
 
 5 项检查 + 修复建议：
 
@@ -267,7 +267,7 @@
 | 1   | openspec 存在       | `⚠ openspec: not found`        | `请确保 openspec CLI 已安装（npm install -g @fission-ai/openspec）` |
 | 2   | openspec-orig 存在  | `⚠ openspec-orig: not found`   | `openspec-superpowers-opencode install-shims`                       |
 | 3   | openspec 是垫片脚本 | `⚠ openspec (shim): not shim script` | `openspec-superpowers-opencode install-shims`                       |
-| 4   | changes.json 有效   | `⚠ changes.json: parse error`  | `openspec-superpowers-opencode registry reset`                      |
+| 4   | oso-change-registry.json 有效   | `⚠ oso-change-registry.json: parse error`  | `openspec-superpowers-opencode registry reset`                      |
 | 5   | worktree 目录存在   | `⚠ worktree <name>: not found` | `openspec-superpowers-opencode registry remove <name>`              |
 
 输出格式示例：
@@ -277,7 +277,7 @@
 ⚠ openspec-orig: not found
   修复：openspec-superpowers-opencode install-shims
 ✓ openspec (shim): is shim script
-✓ changes.json: valid (2 changes)
+✓ oso-change-registry.json: valid (2 changes)
 ⚠ worktree feature-b: not found at .worktrees/feature-b
   修复：openspec-superpowers-opencode registry remove feature-b
 ```
@@ -294,20 +294,20 @@ exit code：全 ✓ → 0，有 ⚠ → 1。
 
 #### T9: registry reset 子命令
 
-**WHY**：当 `changes.json` 损坏时，`verify` 会建议 `registry reset` 来重置。需要一个轻量子命令处理这个场景。
+**WHY**：当 `oso-change-registry.json` 损坏时，`verify` 会建议 `registry reset` 来重置。需要一个轻量子命令处理这个场景。
 
 **WHAT**：在 `scripts/registry.js` 中新增 `reset(path)` 函数，在 `bin/cli.js` 的 `registry` 子命令中新增 `reset` 子操作。
 
 功能：
 
-- 将 `openspec/changes.json` 重置为 `{"changes":[]}`
-- 可选备份原文件为 `changes.json.bak`
+- 将 `openspec/oso-change-registry.json` 重置为 `{"changes":[]}`
+- 可选备份原文件为 `oso-change-registry.json.bak`
 - 输出操作结果
 
 **验收标准**：
 
-- [ ] `registry reset` 将 changes.json 重置为空注册表
-- [ ] 原文件备份为 changes.json.bak（可选）
+- [ ] `registry reset` 将 oso-change-registry.json 重置为空注册表
+- [ ] 原文件备份为 oso-change-registry.json.bak（可选）
 - [ ] `lsp_diagnostics` 无报错
 
 #### T10: opsx 命令 verify 引用统一
