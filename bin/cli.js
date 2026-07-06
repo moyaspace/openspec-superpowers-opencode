@@ -11,6 +11,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const toolDir = path.resolve(__dirname, '..');          // 工具安装根目录
+const { findProjectRoot, getChangeRegistryPath } = require(path.join(toolDir, 'lib', 'registry-utils'));
 
 const args = process.argv.slice(2);
 const isWin = process.platform === 'win32';
@@ -44,7 +45,7 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode registry list             列出所有活跃变更
     openspec-superpowers-opencode registry reset            重置注册表为空
     openspec-superpowers-opencode verify                   验证系统完整性（5 项检查）
-    openspec-superpowers-opencode registry verify           轻量验证（仅 changes.json + worktree）
+    openspec-superpowers-opencode registry verify           轻量验证（仅 oso-change-registry.json + worktree）
     openspec-superpowers-opencode install-shims             安装/修复垫片脚本
     openspec-superpowers-opencode uninstall-shims           卸除垫片脚本，恢复原始 openspec
 
@@ -80,7 +81,7 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode registry list             List active changes
     openspec-superpowers-opencode registry reset            Reset registry to empty
     openspec-superpowers-opencode verify                   Verify system integrity (5 checks)
-    openspec-superpowers-opencode registry verify           Lightweight verify (only changes.json + worktree)
+    openspec-superpowers-opencode registry verify           Lightweight verify (only oso-change-registry.json + worktree)
     openspec-superpowers-opencode install-shims             Install/repair shim scripts
     openspec-superpowers-opencode uninstall-shims           Uninstall shim scripts, restore original openspec
 
@@ -174,11 +175,12 @@ function runInit(targetDir, isWin, lang) {
     }
 
     // ---- 4. 创建注册表 ----
-    const registryPath = path.join(targetDir, 'openspec', 'changes.json');
+    const registryDir = path.join(targetDir, 'openspec');
+    const registryPath = path.join(registryDir, 'oso-change-registry.json');
     if (!fs.existsSync(registryPath)) {
-        fs.mkdirSync(path.join(targetDir, 'openspec'), { recursive: true });
+        fs.mkdirSync(registryDir, { recursive: true });
         fs.writeFileSync(registryPath, JSON.stringify({ changes: [] }, null, 2) + '\n');
-        console.log(t('  ✓ 创建注册表: openspec/changes.json', '  ✓ Created registry: openspec/changes.json'));
+        console.log(t('  ✓ 创建注册表: openspec/oso-change-registry.json', '  ✓ Created registry: openspec/oso-change-registry.json'));
     } else {
         console.log(t('  ∼ 注册表已存在，跳过', '  ∼ Registry exists, skipping'));
     }
@@ -286,19 +288,6 @@ function runEnsureWorktree(name, cwd) {
     process.exit(0);
 }
 
-// ---- findProjectRoot — 从当前目录向上查找 openspec/changes.json ----
-function findProjectRoot(dir) {
-    let current = path.resolve(dir);
-    while (true) {
-        if (fs.existsSync(path.join(current, 'openspec', 'changes.json'))) {
-            return current;
-        }
-        const parent = path.dirname(current);
-        if (parent === current) return null;
-        current = parent;
-    }
-}
-
 // ---- handleRegistry — registry 子命令处理 ----
 async function handleRegistry(registryArgs) {
     const action = registryArgs[0];
@@ -314,20 +303,20 @@ async function handleRegistry(registryArgs) {
     const projectRoot = findProjectRoot(process.cwd());
 
     if (action === 'verify') {
-        // registry verify 为轻量版：只检查 changes.json + worktree 目录
+        // registry verify 为轻量版：只检查 oso-change-registry.json + worktree 目录
         const ok = runRegistryVerifyLight(projectRoot);
         process.exit(ok ? 0 : 1);
     }
 
     if (!projectRoot) {
         console.error(t(
-            '错误: 不在 OpenSpec 项目中（未找到 openspec/changes.json）',
-            'Error: Not in an OpenSpec project (openspec/changes.json not found)'
+            '错误: 不在 OpenSpec 项目中（不在 git 仓库或项目未初始化，请先执行 openspec-superpowers-opencode init）',
+            'Error: Not in an OpenSpec project (not in a git repo or project not initialized, run openspec-superpowers-opencode init first)'
         ));
         process.exit(1);
     }
 
-    const registryPath = path.join(projectRoot, 'openspec', 'changes.json');
+    const registryPath = getChangeRegistryPath(process.cwd());
         const registry = require(path.join(toolDir, 'lib', 'registry'));
 
     switch (action) {
@@ -383,27 +372,27 @@ async function handleRegistry(registryArgs) {
     }
 }
 
-// ---- runRegistryVerifyLight — registry verify 轻量版（只检查 changes.json + worktree 目录）----
+// ---- runRegistryVerifyLight — registry verify 轻量版（只检查 oso-change-registry.json + worktree 目录）----
 function runRegistryVerifyLight(projectRoot) {
     let allGood = true;
 
     if (!projectRoot) {
-        console.log('  ∼ changes.json: not in a project, skipped');
+        console.log('  ∼ oso-change-registry.json: not in a project, skipped');
         return true;
     }
 
-    const registryPath = path.join(projectRoot, 'openspec', 'changes.json');
+    const registryPath = path.join(projectRoot, 'openspec', 'oso-change-registry.json');
     if (fs.existsSync(registryPath)) {
         try {
             const data = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
             const count = data && Array.isArray(data.changes) ? data.changes.length : 0;
-            console.log(`  ${count > 0 ? '✓' : '∼'} changes.json: ${count} change(s)`);
+            console.log(`  ${count > 0 ? '✓' : '∼'} oso-change-registry.json: ${count} change(s)`);
         } catch {
-            console.log('  ⚠ changes.json: corrupted');
+            console.log('  ⚠ oso-change-registry.json: corrupted');
             allGood = false;
         }
     } else {
-        console.log('  ⚠ changes.json: not found');
+        console.log('  ⚠ oso-change-registry.json: not found');
         allGood = false;
     }
 
