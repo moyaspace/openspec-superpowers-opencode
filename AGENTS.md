@@ -43,7 +43,7 @@ openspec schemas                      # 列出可用 schema
 
 本 schema 使用自定义 workflow，通过 `Read` 替代 `skill()` 来载入 Superpowers skills。
 
-### 基底路径
+### Superpowers 路径
 
 Superpowers 通过 `opencode.json` 的 `plugin` 数组或 `npm install -g superpowers@git+https://github.com/obra/superpowers.git` 安装后，skills 目录路径因平台而异：
 
@@ -57,7 +57,7 @@ setup 脚本通过 `find ~/.cache/opencode/packages/superpowers@* -type d -path 
 ### skill() 不可用时
 
 如果 `skill()` 工具不可用或报错，改用手动 `Read` 对应 skill 文件：
-- `Read <基底路径>/<技能名称>/SKILL.md`
+- `Read <Superpowers 路径>/<技能名称>/SKILL.md`
 - 按 Read 到的内容执行
 
 ### 子 Agent 调度
