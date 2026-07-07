@@ -38,7 +38,7 @@ openspec new change "<name>"
 
 #### Step 4a: 注册变更到 registry
 
-记录 change 到注册表，供后续 opsx 命令查找活动变更以及对应的 worktree：
+记录 change 到注册表，供后续 opsx 命令查找活跃变更以及对应的 worktree：
 
 ```bash
 openspec-superpowers-opencode registry add <name> .worktrees/<name>

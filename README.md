@@ -34,11 +34,7 @@ And even if you do wire them up, you're still stuck with a **single working tree
 
 ## The oso Solution
 
-oso is a CLI scaffold that does two things:
-
-**① Bridges OpenSpec + Superpowers** — one command deploys the complete integration: schema, AGENTS.md, skill lock verification, 12 OPSX commands, all pre-configured and tested together.
-
-**② Enforces worktree isolation** — every change gets its own git worktree. Parallel changes, zero conflicts.
+oso is a developer CLI toolset that integrates OpenSpec and Superpowers workflows into OpenCode: one-command init, enforced worktree isolation, active change registry tracking, native command interception with passthrough, and system health verification.
 
 ```
           ┌─ .worktrees/feature-a/  (feature/feature-a branch)
@@ -94,6 +90,7 @@ openspec-superpowers-opencode init
 | 6 | **Cross-platform + i18n** | Windows `setup.ps1` / Linux `setup.sh`, `--lang zh-CN \| zh-TW \| en` |
 | 7 | **SHA-256 lock** | Skill file integrity verified on deploy |
 | 8 | **Layered architecture** | Superpowers (HOW) → OpenSpec (WHAT) → Worktree (WHERE) → Commands (WHEN) |
+| 9 | **Full worktree + openspec change support** | Auto-register on change creation, smart `openspec list` interception, `verify` one-click health check |
 
 > Detailed features → [docs/FEATURES.md](docs/FEATURES.md)
 
@@ -105,7 +102,7 @@ openspec-superpowers-opencode init
 | [How it works](docs/HOW-IT-WORKS.md) | Command execution chain explained |
 | [Worktree creation](docs/WORKTREE-CREATION.md) | Three-layer code-level guarantees |
 | [Design decisions](docs/DESIGN.md) | ADRs: architecture tradeoffs |
-| [Testing](docs/TESTING.md) | 12-phase test suite |
+| [Testing](docs/TESTING.md) | 17-phase test suite |
 | [Why oso](docs/WHY-OSO.md) | Deep dive: 6 gaps between OpenSpec and Superpowers |
 
 ## Prerequisites

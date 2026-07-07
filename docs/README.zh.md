@@ -32,11 +32,7 @@ Superpowers 提供久经考验的方法论——brainstorming、writing-plans、
 
 ## oso 的解法
 
-oso 是一个 CLI 脚手架，做两件事：
-
-**① 桥接 OpenSpec + Superpowers** — 一条命令部署完整的集成：schema、AGENTS.md、skill 锁校验、12 个 OPSX 命令，全部预配置并经过测试。
-
-**② 强制执行 worktree 隔离** — 每个变更拥有独立的 git worktree，并行变更零冲突。
+oso 是一个开发者 CLI 工具集，为 OpenCode 集成 OpenSpec 与 Superpowers 工作流：init 自动部署、worktree 强制隔离、注册表追踪活跃变更、原生命令拦截与透传、系统健康验证。
 
 ```
           ┌─ .worktrees/feature-a/  (feature/feature-a 分支)
@@ -92,6 +88,7 @@ openspec-superpowers-opencode init
 | 6 | **跨平台 + 多语言** | Windows `setup.ps1` / Linux `setup.sh`，`--lang zh-CN \| zh-TW \| en` |
 | 7 | **SHA-256 锁** | 部署时自动校验 skill 文件完整性 |
 | 8 | **多层架构** | Superpowers（HOW）→ OpenSpec（WHAT）→ Worktree（WHERE）→ 命令（WHEN） |
+| 9 | **worktree + openspec change 全面支持** | 创建变更自动注册、`openspec list` 智能拦截、`verify` 一键健康检查 |
 
 > 详细功能说明 → [docs/FEATURES.md](docs/FEATURES.md)
 
@@ -103,7 +100,7 @@ openspec-superpowers-opencode init
 | [工作原理](HOW-IT-WORKS.md) | 命令执行链路详解 |
 | [Worktree 创建机制](WORKTREE-CREATION.md) | 三层代码级保障 |
 | [设计决策](DESIGN.md) | ADR：架构权衡记录 |
-| [测试说明](TESTING.md) | 12 阶段测试套件 |
+| [测试说明](TESTING.md) | 17 阶段测试套件 |
 | [为什么用 oso](WHY-OSO.md) | 深度分析：OpenSpec 和 Superpowers 之间的 6 道鸿沟 |
 
 ## 前置条件
