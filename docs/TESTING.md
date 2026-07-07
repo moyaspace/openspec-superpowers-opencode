@@ -1074,6 +1074,219 @@ cat "$mergeDir/.opencode/install-manifest.json" | grep "AGENTS.md" || echo "✅ 
 
 ---
 
+### 6.10 AGENTS.md 棕地有标记 — 替换（BROWN_OVERRIDE_AGENTS=yes）
+
+> 验证棕地已有完整 bridge 标记（≥2 个 `<!-- openspec-superpowers-opencode_instructions -->`）时，BROWN_OVERRIDE_AGENTS=yes 走替换分支。
+
+**Windows:**
+```powershell
+$agentsDir = "$env:TEMP\ops-agents-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $agentsDir -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsDir\openspec" -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsDir\.opencode" -Force | Out-Null
+Set-Content -Path "$agentsDir\openspec\config.yaml" -Value 'schema: spec-driven' -Encoding utf8
+# 创建带旧 bridge 标记的 AGENTS.md
+$marker = '<!-- openspec-superpowers-opencode_instructions -->'
+$oldBridge = "$marker`n旧 bridge 内容`n$marker"
+Set-Content -Path "$agentsDir\AGENTS.md" -Value "# 用户内容`n`n$oldBridge" -Encoding utf8
+
+$env:BROWN_OVERRIDE_OPENSPEC = "yes"
+$env:BROWN_OVERRIDE_AGENTS = "yes"
+node "$pkgRoot\bin\cli.js" init "$agentsDir"
+Remove-Item Env:\BROWN_OVERRIDE_OPENSPEC, BROWN_OVERRIDE_AGENTS -ErrorAction SilentlyContinue
+```
+
+**Linux:**
+```bash
+agentsDir=$(mktemp -d /tmp/ops-agents-XXXXXX)
+mkdir -p "$agentsDir/openspec" "$agentsDir/.opencode"
+echo 'schema: spec-driven' > "$agentsDir/openspec/config.yaml"
+marker='<!-- openspec-superpowers-opencode_instructions -->'
+printf "# 用户内容\n${marker}\n旧 bridge 内容\n${marker}\n" > "$agentsDir/AGENTS.md"
+BROWN_OVERRIDE_OPENSPEC=yes BROWN_OVERRIDE_AGENTS=yes \
+  node "$pkgRoot/bin/cli.js" init "$agentsDir"
+```
+
+**📝 预期结果**：
+- 自动应答 openspec YES + AGENTS 替换 YES（不阻塞）
+- AGENTS.md 中用户内容 `# 用户内容` 保留
+- 标记间旧内容 `旧 bridge 内容` 被替换为新 bridge 内容
+- AGENTS.md 包含 `Superpowers Skill 载入`（新 bridge 内容）
+
+---
+
+### 6.11 AGENTS.md 棕地有标记 — 跳过（BROWN_OVERRIDE_AGENTS=no）
+
+> 验证棕地已有完整 bridge 标记时，BROWN_OVERRIDE_AGENTS=no 走跳过分支，AGENTS.md 完全不变。
+
+**Windows:**
+```powershell
+$agentsSkipDir = "$env:TEMP\ops-agents-skip-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $agentsSkipDir -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsSkipDir\openspec" -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsSkipDir\.opencode" -Force | Out-Null
+Set-Content -Path "$agentsSkipDir\openspec\config.yaml" -Value 'schema: spec-driven' -Encoding utf8
+$marker = '<!-- openspec-superpowers-opencode_instructions -->'
+$originalContent = "# 用户指令`n`n${marker}`n旧 bridge`n${marker}`n`n## 更多用户内容"
+Set-Content -Path "$agentsSkipDir\AGENTS.md" -Value $originalContent -Encoding utf8
+
+$env:BROWN_OVERRIDE_OPENSPEC = "yes"
+$env:BROWN_OVERRIDE_AGENTS = "no"
+node "$pkgRoot\bin\cli.js" init "$agentsSkipDir"
+Remove-Item Env:\BROWN_OVERRIDE_OPENSPEC, BROWN_OVERRIDE_AGENTS -ErrorAction SilentlyContinue
+```
+
+**Linux:**
+```bash
+agentsSkipDir=$(mktemp -d /tmp/ops-agents-skip-XXXXXX)
+mkdir -p "$agentsSkipDir/openspec" "$agentsSkipDir/.opencode"
+echo 'schema: spec-driven' > "$agentsSkipDir/openspec/config.yaml"
+originalContent="# 用户指令\n<!-- openspec-superpowers-opencode_instructions -->\n旧 bridge\n<!-- openspec-superpowers-opencode_instructions -->\n\n## 更多用户内容"
+printf "$originalContent\n" > "$agentsSkipDir/AGENTS.md"
+BROWN_OVERRIDE_OPENSPEC=yes BROWN_OVERRIDE_AGENTS=no \
+  node "$pkgRoot/bin/cli.js" init "$agentsSkipDir"
+```
+
+**🔍 预期结果**：
+```bash
+cat "$agentsSkipDir/AGENTS.md"
+```
+- 内容完全保持为 `$originalContent`，无任何变化
+- 仍包含 `旧 bridge`
+- 不包含 `Superpowers Skill 载入`
+
+---
+
+### 6.12 AGENTS.md 棕地无标记 — 静默追加
+
+> 验证棕地 AGENTS.md 没有 bridge 标记时，静默追加 bridge 内容到文件末尾。
+
+**Windows:**
+```powershell
+$agentsAppendDir = "$env:TEMP\ops-agents-append-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $agentsAppendDir -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsAppendDir\openspec" -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsAppendDir\.opencode" -Force | Out-Null
+Set-Content -Path "$agentsAppendDir\openspec\config.yaml" -Value 'schema: spec-driven' -Encoding utf8
+Set-Content -Path "$agentsAppendDir\AGENTS.md" -Value "# 用户自己的 AGENTS.md`n`n## 规则`n- 规则一" -Encoding utf8
+
+$env:BROWN_OVERRIDE_OPENSPEC = "yes"
+node "$pkgRoot\bin\cli.js" init "$agentsAppendDir"
+Remove-Item Env:\BROWN_OVERRIDE_OPENSPEC -ErrorAction SilentlyContinue
+```
+
+**Linux:**
+```bash
+agentsAppendDir=$(mktemp -d /tmp/ops-agents-append-XXXXXX)
+mkdir -p "$agentsAppendDir/openspec" "$agentsAppendDir/.opencode"
+echo 'schema: spec-driven' > "$agentsAppendDir/openspec/config.yaml"
+printf "# 用户自己的 AGENTS.md\n\n## 规则\n- 规则一\n" > "$agentsAppendDir/AGENTS.md"
+BROWN_OVERRIDE_OPENSPEC=yes \
+  node "$pkgRoot/bin/cli.js" init "$agentsAppendDir"
+```
+
+**🔍 预期结果**：
+```bash
+cat "$agentsAppendDir/AGENTS.md"
+```
+- 文件以 `# 用户自己的 AGENTS.md` 开头（用户内容保留）
+- 文件末尾包含 `Superpowers Skill 载入`（bridge 内容已追加）
+- 用户内容和 bridge 内容之间的分隔自然
+
+---
+
+### 6.13 AGENTS.md 棕地有标记 — 替换后用户内容保留
+
+> 验证替换分支后，标记外的用户内容（前后均有）被完整保留。
+
+**Windows:**
+```powershell
+$agentsPreDir = "$env:TEMP\ops-agents-pre-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $agentsPreDir -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsPreDir\openspec" -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsPreDir\.opencode" -Force | Out-Null
+Set-Content -Path "$agentsPreDir\openspec\config.yaml" -Value 'schema: spec-driven' -Encoding utf8
+$marker = '<!-- openspec-superpowers-opencode_instructions -->'
+Set-Content -Path "$agentsPreDir\AGENTS.md" -Value "# 上方用户内容`n`n${marker}`n旧 bridge 内容`n${marker}`n`n# 下方用户内容" -Encoding utf8
+
+$env:BROWN_OVERRIDE_OPENSPEC = "yes"
+$env:BROWN_OVERRIDE_AGENTS = "yes"
+node "$pkgRoot\bin\cli.js" init "$agentsPreDir"
+Remove-Item Env:\BROWN_OVERRIDE_OPENSPEC, BROWN_OVERRIDE_AGENTS -ErrorAction SilentlyContinue
+```
+
+**🔍 预期结果**：
+```bash
+$content = Get-Content "$agentsPreDir\AGENTS.md" -Raw
+$content -match '# 上方用户内容' -and $content -match '# 下方用户内容'
+```
+- `# 上方用户内容` 和 `# 下方用户内容` 均保留
+- 标记间内容已更新为 template 版本
+
+---
+
+### 6.14 AGENTS.md 棕地仅 1 标记（不完整）— 追加
+
+> 验证 AGENTS.md 只有一个 `<!-- openspec-superpowers-opencode_instructions -->` 标记（缺少闭标记）时，走追加分支而非替换分支。
+
+**Windows:**
+```powershell
+$agentsOneDir = "$env:TEMP\ops-agents-one-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $agentsOneDir -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsOneDir\openspec" -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsOneDir\.opencode" -Force | Out-Null
+Set-Content -Path "$agentsOneDir\openspec\config.yaml" -Value 'schema: spec-driven' -Encoding utf8
+# 仅一个标记（缺失闭标记）
+$marker = '<!-- openspec-superpowers-opencode_instructions -->'
+Set-Content -Path "$agentsOneDir\AGENTS.md" -Value "# 用户`n`n${marker}`n不完整" -Encoding utf8
+
+$env:BROWN_OVERRIDE_OPENSPEC = "yes"
+node "$pkgRoot\bin\cli.js" init "$agentsOneDir"
+Remove-Item Env:\BROWN_OVERRIDE_OPENSPEC -ErrorAction SilentlyContinue
+```
+
+**🔍 预期结果**：
+```bash
+$content = Get-Content "$agentsOneDir\AGENTS.md" -Raw
+# 应包含 3 个标记（原 1 个 + bridge 中的 2 个）
+$markerCount = ([regex]::Matches($content, $marker)).Count
+$markerCount -eq 3
+```
+- 原 1 个标记保留
+- bridge 内容追加到文件末尾
+- 用户内容保留在文件开头
+
+---
+
+### 6.15 AGENTS.md 棕地空文件 — 写入 bridge
+
+> 验证 AGENTS.md 为空文件时，走绿地分支（直接写入 bridge 内容），而不是追加。
+
+```bash
+$agentsEmptyDir = "$env:TEMP\ops-agents-empty-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $agentsEmptyDir -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsEmptyDir\openspec" -Force | Out-Null
+New-Item -ItemType Directory -Path "$agentsEmptyDir\.opencode" -Force | Out-Null
+Set-Content -Path "$agentsEmptyDir\openspec\config.yaml" -Value 'schema: spec-driven' -Encoding utf8
+# 创建空文件
+"" | Set-Content -Path "$agentsEmptyDir\AGENTS.md" -NoNewline -Encoding utf8
+
+$env:BROWN_OVERRIDE_OPENSPEC = "yes"
+node "$pkgRoot\bin\cli.js" init "$agentsEmptyDir"
+Remove-Item Env:\BROWN_OVERRIDE_OPENSPEC -ErrorAction SilentlyContinue
+```
+
+**📝 预期结果**：
+- AGENTS.md 不为空，包含 template bridge 完整内容
+- 包含 `Superpowers Skill 载入` 等 bridge 内容
+
+清理（可选，所有 agents 测试目录在一次 Phase 10 批量清理）：
+```bash
+Remove-Item -Recurse -Force "$agentsDir","$agentsSkipDir","$agentsAppendDir","$agentsPreDir","$agentsOneDir","$agentsEmptyDir"
+```
+
+---
+
 ## Phase 7 — Reset 测试
 
 ### 7.1 执行 reset

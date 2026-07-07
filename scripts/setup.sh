@@ -82,6 +82,7 @@ run_cmd() {
 BROWN_OVERRIDE_OPENSPEC="${BROWN_OVERRIDE_OPENSPEC:-}"
 BROWN_OVERRIDE_COMMANDS="${BROWN_OVERRIDE_COMMANDS:-}"
 BROWN_OVERRIDE_SKILLS="${BROWN_OVERRIDE_SKILLS:-}"
+BROWN_OVERRIDE_AGENTS="${BROWN_OVERRIDE_AGENTS:-}"
 
 # 用于记录 commands/skills 覆盖决策的临时文件
 DECISIONS_FILE=$(mktemp 2>/dev/null || mktemp -t "opencode-decisions.XXXXXX")
@@ -646,21 +647,52 @@ echo ""
 # ---- 5. Git + AGENTS.md ----
 echo "$(t "[5/7] 部署 Git 配置 + AGENTS.md..." "[5/7] Deploying git config + AGENTS.md...")"
 
-# AGENTS.md（已有则追加 bridge 内容，不记入 manifest）
+# AGENTS.md（检测标记替换/追加，不记入 manifest — 设计决策维度 4）
 AGENTS_SRC="$TEMPLATE_DIR/AGENTS.md"
 if [ -f "$AGENTS_SRC" ]; then
     AGENTS_DST="$PROJECT_ROOT/AGENTS.md"
+    BRIDGE_CONTENT=$(cat "$AGENTS_SRC")
+    MARKER='<!-- openspec-superpowers-opencode_instructions -->'
     if [ -f "$AGENTS_DST" ]; then
-        if grep -q 'Superpowers Skill 载入' "$AGENTS_DST" 2>/dev/null; then
-            echo "$(t "  - AGENTS.md（已有 bridge 内容，跳过）" "  - AGENTS.md (bridge content exists, skipping)")"
-        else
-            if [ "$DRY_RUN" = false ]; then
-                cat "$AGENTS_SRC" >> "$AGENTS_DST"
+        # 计算标记出现次数（必须同时存在开始和结束标记，即 ≥2 次）
+        MARKER_COUNT=$(grep -c "$MARKER" "$AGENTS_DST" 2>/dev/null || echo 0)
+        if [ "$MARKER_COUNT" -ge 2 ]; then
+            # 已有完整桥接标记 → Prompt-YesNo 替换/跳过
+            ANSWER=$(prompt_yes_no "$(t "  AGENTS.md 已有 bridge 内容。替换？" "  AGENTS.md already has bridge content. Replace?")" "$BROWN_OVERRIDE_AGENTS")
+            if [ "$ANSWER" = "yes" ]; then
+                if [ "$DRY_RUN" = false ]; then
+                    export AGENTS_DST_BAK="$AGENTS_DST"
+                    export AGENTS_SRC_BAK="$AGENTS_SRC"
+                    python3 << 'PYEOF'
+import re, os
+agents_dst = os.environ['AGENTS_DST_BAK']
+agents_src = os.environ['AGENTS_SRC_BAK']
+with open(agents_dst) as f: existing = f.read()
+with open(agents_src) as f: bridge = f.read()
+marker = '<!-- openspec-superpowers-opencode_instructions -->'
+escaped = re.escape(marker)
+pattern = escaped + '.*?' + escaped
+result = re.sub(pattern, bridge.strip(), existing, count=1, flags=re.DOTALL)
+with open(agents_dst, 'w', encoding='utf-8') as f:
+    f.write(result)
+PYEOF
+                fi
+                echo "$(t "  ✓ AGENTS.md（bridge 内容已替换）" "  ✓ AGENTS.md (bridge content replaced)")"
+            else
+                echo "$(t "  - AGENTS.md（用户选择跳过）" "  - AGENTS.md (user skipped)")"
             fi
-            echo "$(t "  ✓ AGENTS.md（已追加 bridge 内容，不记入 manifest）" "  ✓ AGENTS.md (bridge content appended, NOT recorded in manifest)")"
+        else
+            # 无标记或仅有一个不完整标记 → 静默追加
+            if [ "$DRY_RUN" = false ]; then
+                echo "$BRIDGE_CONTENT" >> "$AGENTS_DST"
+            fi
+            echo "$(t "  ✓ AGENTS.md（已追加 bridge 内容）" "  ✓ AGENTS.md (bridge content appended)")"
         fi
     else
-        run_cmd cp "$AGENTS_SRC" "$AGENTS_DST"
+        # 绿地：直接写入
+        if [ "$DRY_RUN" = false ]; then
+            echo "$BRIDGE_CONTENT" > "$AGENTS_DST"
+        fi
         echo "$(t "  ✓ AGENTS.md（不记入 manifest）" "  ✓ AGENTS.md (NOT recorded in manifest)")"
     fi
 fi
