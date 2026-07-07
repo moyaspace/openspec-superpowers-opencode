@@ -247,7 +247,67 @@ describe('runAllChecks()', () => {
         assert.ok(skipped.every(r => r.check === 'oso-change-registry.json' || r.check === 'worktrees'));
     });
 
-    test('checks 2+3 are skipped when openspec not found', (t) => {
+    test('check 3 passes on Windows when openspec.cmd is shim (original openspec is not)', (t) => {
+        const projectDir = tmpDir();
+        const binDir = path.join(projectDir, 'fake-bin');
+        fs.mkdirSync(binDir, { recursive: true });
+        // findOpenspec returns extensionless openspec (original, NOT shim)
+        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+        // Check 2 passes: openspec-orig.cmd exists
+        fs.writeFileSync(path.join(binDir, 'openspec-orig.cmd'), '@echo off\n...');
+        // Original openspec lacks shim marker
+        fs.writeFileSync(path.join(binDir, 'openspec'), '#!/usr/bin/env node\n// real openspec CLI');
+        // openspec.cmd IS the shim
+        fs.writeFileSync(path.join(binDir, 'openspec.cmd'), '@echo off\nrem openspec shim for oso registry');
+        // Check 4+5 pass
+        const regDir = path.join(projectDir, 'openspec');
+        fs.mkdirSync(regDir, { recursive: true });
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({ changes: [] }));
+
+        const results = verify.runAllChecks(null, true, projectDir); // isWin=true
+        const shimCheck = results.find(r => r.check === 'openspec (shim)');
+        assert.strictEqual(shimCheck.status, 'pass', 'openspec.cmd shim should be detected on Windows');
+    });
+
+    test('check 3 passes on Windows when openspec.ps1 is shim (original openspec is not)', (t) => {
+        const projectDir = tmpDir();
+        const binDir = path.join(projectDir, 'fake-bin');
+        fs.mkdirSync(binDir, { recursive: true });
+        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+        fs.writeFileSync(path.join(binDir, 'openspec-orig.cmd'), '@echo off\n...');
+        // Original openspec lacks shim marker, .cmd also lacks, but .ps1 IS the shim
+        fs.writeFileSync(path.join(binDir, 'openspec'), '#!/usr/bin/env node\n// real openspec CLI');
+        fs.writeFileSync(path.join(binDir, 'openspec.cmd'), '@echo off\necho real openspec');
+        fs.writeFileSync(path.join(binDir, 'openspec.ps1'), '# openspec shim for oso registry\n...');
+        const regDir = path.join(projectDir, 'openspec');
+        fs.mkdirSync(regDir, { recursive: true });
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({ changes: [] }));
+
+        const results = verify.runAllChecks(null, true, projectDir);
+        const shimCheck = results.find(r => r.check === 'openspec (shim)');
+        assert.strictEqual(shimCheck.status, 'pass', 'openspec.ps1 shim should be detected on Windows');
+    });
+
+    test('check 3 fails on Windows when neither openspec nor .cmd/.ps1 have shim marker', (t) => {
+        const projectDir = tmpDir();
+        const binDir = path.join(projectDir, 'fake-bin');
+        fs.mkdirSync(binDir, { recursive: true });
+        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+        fs.writeFileSync(path.join(binDir, 'openspec-orig.cmd'), '@echo off\n...');
+        // None of the files have shim marker
+        fs.writeFileSync(path.join(binDir, 'openspec'), '#!/usr/bin/env node');
+        fs.writeFileSync(path.join(binDir, 'openspec.cmd'), '@echo off\necho real openspec');
+        fs.writeFileSync(path.join(binDir, 'openspec.ps1'), '# real openspec');
+        const regDir = path.join(projectDir, 'openspec');
+        fs.mkdirSync(regDir, { recursive: true });
+        fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({ changes: [] }));
+
+        const results = verify.runAllChecks(null, true, projectDir);
+        const shimCheck = results.find(r => r.check === 'openspec (shim)');
+        assert.strictEqual(shimCheck.status, 'fail', 'should fail when no shim found');
+    });
+
+    test('check 2+3 are skipped when openspec not found', (t) => {
         t.mock.method(child_process, 'execSync', () => { throw new Error('not found'); });
         const results = verify.runAllChecks(null, false, null);
         const skipped = results.filter(r => r.status === 'skip');
