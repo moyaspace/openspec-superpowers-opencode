@@ -24,6 +24,7 @@ $overwriteDecisions = @{}  # 记录 commands/skills 的覆盖决策
 $envOverrideOpenspec = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_OPENSPEC")
 $envOverrideCommands = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_COMMANDS")
 $envOverrideSkills = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_SKILLS")
+$envOverrideAgents = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_AGENTS")
 
 # ---- 多语言辅助函数 ----
 function t($zh, $en) {
@@ -570,24 +571,39 @@ Write-Host ""
 # ---- 5. Git 文件 + AGENTS.md ----
 Write-Host (t "[5/7] 部署 Git 配置 + AGENTS.md..." "[5/7] Deploying git config + AGENTS.md...") -ForegroundColor Yellow
 
-    # AGENTS.md（已有则追加 bridge 内容，不记入 manifest — 设计决策维度 4）
+    # AGENTS.md（检测标记替换/追加，不记入 manifest — 设计决策维度 4）
     $agentsSrc = Join-Path $templateDir "AGENTS.md"
     if (Test-Path $agentsSrc) {
         $agentsDst = Join-Path $projectRoot "AGENTS.md"
         $bridgeContent = Get-Content $agentsSrc -Raw
         if (Test-Path $agentsDst) {
             $existingContent = Get-Content $agentsDst -Raw
-            if ($existingContent -match 'Superpowers Skill 载入') {
-                Write-Host (t "  - AGENTS.md（已有 bridge 内容，跳过）" "  - AGENTS.md (bridge content exists, skipping)") -ForegroundColor Gray
+            $marker = '<!-- openspec-superpowers-opencode_instructions -->'
+            # 必须同时存在开始和结束标记（至少 2 次出现）
+            $markerCount = ([regex]::Matches($existingContent, $marker)).Count
+            if ($markerCount -ge 2) {
+                $answer = Prompt-YesNo -prompt (t "  AGENTS.md 已有 bridge 内容。替换？" "  AGENTS.md already has bridge content. Replace?") -envOverride $envOverrideAgents
+                if ($answer -eq 'yes') {
+                    $escaped = [regex]::Escape($marker)
+                    $pattern = "$escaped[\s\S]*?$escaped"
+                    $newContent = $existingContent -replace $pattern, $bridgeContent.TrimEnd()
+                    if (-not $DryRun) {
+                        Set-Content -Path $agentsDst -Value $newContent -NoNewline -Encoding utf8 -ErrorAction Stop
+                    }
+                    Write-Host (t "  ✓ AGENTS.md（bridge 内容已替换）" "  ✓ AGENTS.md (bridge content replaced)") -ForegroundColor Green
+                } else {
+                    Write-Host (t "  - AGENTS.md（用户选择跳过）" "  - AGENTS.md (user skipped)") -ForegroundColor Gray
+                }
             } else {
+                # 无标记或仅有一个不完整标记 → 静默追加
                 if (-not $DryRun) {
                     Add-Content -Path $agentsDst -Value "`n$bridgeContent" -NoNewline -Encoding utf8
                 }
-                Write-Host (t "  ✓ AGENTS.md（已追加 bridge 内容，不记入 manifest）" "  ✓ AGENTS.md (bridge content appended, NOT recorded in manifest)") -ForegroundColor Green
+                Write-Host (t "  ✓ AGENTS.md（已追加 bridge 内容）" "  ✓ AGENTS.md (bridge content appended)") -ForegroundColor Green
             }
         } else {
             run -block { Set-Content -Path $agentsDst -Value $bridgeContent -NoNewline -Encoding utf8 } -description "创建 AGENTS.md"
-            if (-not $DryRun) { Write-Host (t "  ✓ AGENTS.md（不记入 manifest）" "  ✓ AGENTS.md (NOT recorded in manifest)") -ForegroundColor Green }
+            if (-not $DryRun) { Write-Host (t "  ✓ AGENTS.md" "  ✓ AGENTS.md") -ForegroundColor Green }
         }
     }
 
