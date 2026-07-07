@@ -213,3 +213,55 @@ describe('mergeList()', () => {
         assert.strictEqual(result, 'No active changes found.\n');
     });
 });
+
+// ============================================================
+// handleList()
+// ============================================================
+describe('handleList()', () => {
+    test('returns passthrough when registry path is null', () => {
+        const result = registryUtils.handleList(null, '/some/dir');
+        assert.deepStrictEqual(result, { action: 'passthrough' });
+    });
+
+    test('returns passthrough when project root is null', () => {
+        const result = registryUtils.handleList('/some/registry.json', null);
+        assert.deepStrictEqual(result, { action: 'passthrough' });
+    });
+
+    test('returns passthrough when project root is null and path is null', () => {
+        const result = registryUtils.handleList(null, null);
+        assert.deepStrictEqual(result, { action: 'passthrough' });
+    });
+
+    test('returns passthrough when registry file does not exist on disk', () => {
+        const dir = tmpProject();
+        const regPath = path.join(dir, 'openspec', 'oso-change-registry.json');
+        // Ensure it doesn't exist
+        if (fs.existsSync(regPath)) fs.unlinkSync(regPath);
+        assert.strictEqual(fs.existsSync(regPath), false);
+
+        const result = registryUtils.handleList(regPath, dir);
+        assert.deepStrictEqual(result, { action: 'passthrough' });
+    });
+
+    test('returns merge when registry exists and has entries', () => {
+        const dir = tmpProject();
+        writeRegistry(dir, { changes: [{ name: 'demo', worktree: '.worktrees/demo', createdAt: new Date().toISOString() }] });
+        const regPath = path.join(dir, 'openspec', 'oso-change-registry.json');
+
+        const result = registryUtils.handleList(regPath, dir);
+        assert.strictEqual(result.action, 'merge');
+        assert.ok(Array.isArray(result.data.changes));
+        assert.strictEqual(result.data.changes.length, 1);
+    });
+
+    test('returns merge when registry exists and is empty', () => {
+        const dir = tmpProject();
+        writeRegistry(dir, { changes: [] });
+        const regPath = path.join(dir, 'openspec', 'oso-change-registry.json');
+
+        const result = registryUtils.handleList(regPath, dir);
+        assert.strictEqual(result.action, 'merge');
+        assert.strictEqual(result.data.changes.length, 0);
+    });
+});
