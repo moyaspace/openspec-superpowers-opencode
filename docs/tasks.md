@@ -8,7 +8,7 @@
 
 | 编号 | 任务                      |       标签        |   依赖   | 优先级 | 状态 | 预估 |
 | :--: | ------------------------- | :---------------: | :------: | :----: | :--: | :--: |
-|  T1  | 活动变更注册表初始化      |   Registry/Init   |          |   中   |  ✅  |  中  |
+|  T1  | 活跃变更注册表初始化      |   Registry/Init   |          |   中   |  ✅  |  中  |
 |  T2  | 注册表功能模块            |   Registry/核心   |    T1    |   高   |  ✅  |  中  |
 |  T3  | 注册表子命令              |   Registry/CLI    |    T2    |   高   |  ✅  |  中  |
 |  T4  | 注册表与opsx命令集成      |   Registry/Opsx   | T3+T7+T8 |   中   |  ✅  |  中  |
@@ -26,7 +26,7 @@
 
 | 编号 | 任务                      |       标签        | 优先级 | 预估 | 状态 |
 | :--: | ------------------------- | :---------------: | :----: | :--: | :--: |
-|  T1  | 活动变更注册表初始化      |   Registry/Init   |   中   |  中  |  ✅  |
+|  T1  | 活跃变更注册表初始化      |   Registry/Init   |   中   |  中  |  ✅  |
 |  T2  | 注册表功能模块            |   Registry/核心   |   高   |  中  |  ✅  |
 |  T3  | 注册表子命令              |   Registry/CLI    |   高   |  中  |  ✅  |
 |  T4  | 注册表与opsx命令集成      |   Registry/Opsx   |   中   |  中  |  ✅  |
@@ -40,7 +40,7 @@
 
 ### 任务卡片
 
-#### T1: 活动变更注册表初始化
+#### T1: 活跃变更注册表初始化
 
 **WHY**：openspec/oso-change-registry.json 是所有活跃变更的注册表。垫片脚本通过它感知 worktree 中的活跃变更，从而在 `openspec list` 中跨 worktree 展示。同时它也被 findProjectRoot 用作项目根标记文件。init 时预置是最佳时机，确保项目从一开始就有注册表。
 
@@ -173,10 +173,12 @@
 - [ ] `lib/shims/openspec`（Unix shell）脚本完成
 - [ ] `lib/shims/openspec.cmd`（Windows CMD）脚本完成
 - [ ] `lib/shims/openspec.ps1`（PowerShell）脚本完成
-- [ ] 在项目内执行 openspec list 时调用 findProjectRoot 并合并注册表
-- [ ] 在项目外执行 openspec list 时透传 openspec-orig list
+- [ ] 拦截条件：TOOL_DIR 有效 && 参数[0] == "list"，其他全部透传
+- [ ] `registry-utils.js list` 在注册表不存在时透传 `openspec-orig list`（不是我们的项目）
+- [ ] `registry-utils.js list` 在非 git 项目时透传 `openspec-orig list`
+- [ ] `registry-utils.js list` 在注册表存在时正常合并
 - [ ] 非 list 命令始终透传
-- [ ] JSON 损坏时打印警告 "⚠ registry corrupted, falling back to native list" 并回退
+- [ ] JSON 损坏时 `readRegistry()` 返回 `{changes:[]}`，不降级透传（`registry verify` 可检测）
 - [ ] `lsp_diagnostics` 无报错
 
 #### T6: 安装程序

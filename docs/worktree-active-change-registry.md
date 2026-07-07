@@ -285,8 +285,9 @@ openspec-superpowers-opencode registry verify
 
 | 场景 | 处理方式 |
 |------|----------|
-| `oso-change-registry.json` 格式损坏（非合法 JSON） | 垫片脚本 catch 解析异常，打印 `⚠ registry corrupted, falling back to native list`，退化为调用 `openspec-orig list` |
-| `oso-change-registry.json` 文件不存在 | 视为无注册表条目，不拦截，透传 `openspec-orig list`（等价于原生行为） |
+| `oso-change-registry.json` 格式损坏（非合法 JSON） | `registry-utils.js` 中 `readRegistry()` 解析失败返回 `{changes:[]}`，退化为空列表输出。不降级透传——因为注册表损坏说明已安装垫片，应提示修复 |
+| `oso-change-registry.json` 文件不存在 | **在项目内** → `registry-utils.js list` 检测文件不存在，调用 `execOpenspecOrig(['list'])` 透传原版（不是我们的项目） |
+| | **在项目外** → `registry-utils.js list` 检测 `findProjectRoot` 返回 null，调用 `execOpenspecOrig(['list'])` 透传原版 |
 | worktree 目录已被手动删除 | 遍历注册表时检测目录是否存在，不存在的打印 `⚠ <name>: worktree not found at <path>`，跳过该条目但保留注册表记录 |
 | 更新/重装工具（`openspec-orig` 已存在） | 安装程序先检测 `openspec-orig` 是否存在，如已存在则跳过 copy，直接覆盖写入新版本垫片脚本；`--repair` 模式要求 openspec-orig 必须已存在 |
 | 垫片脚本被 npm update 覆盖 | `registry verify` 检测到 `openspec` 无特征标记但 `openspec-orig` 存在 → 输出报告 + exit 1 → AI agent 读取后向用户展示问题并引导修复 |
@@ -342,9 +343,10 @@ Changes:
 |------|------|
 | 在项目内、有注册表、有 worktree | 遍历 worktree 合并输出 |
 | 在项目内、有注册表、但所有 worktree 目录被删 | 输出 `No active changes found.` |
-| 在项目内、注册表为空 | 输出空字符串（不显示任何变更） |
+| 在项目内、注册表存在但为空（`changes:[]`） | 输出 `No active changes found.`（我们的项目，无活跃变更） |
+| 在项目内、注册表不存在 | 透传 `openspec-orig list`（不是我们的项目，不走合并） |
 | 在项目外 | 透传 `openspec-orig list`（原生行为） |
-| 注册表 JSON 损坏 | 垫片 catch 异常 → 打印警告 → 退化为透传 |
+| 注册表 JSON 损坏 | `readRegistry()` 返回 `{changes:[]}` → 空输出。`registry verify` 可检测并提示修复 |
 
 ## 待实现
 

@@ -1339,7 +1339,7 @@ node <npm-package-root-path>/bin/cli.js blah
 **🔍 预期结果**：
 ```
 Unknown subcommand: blah
-Available commands: init, reset, dry-run, ensure-worktree
+Available commands: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims
 ```
 
 ---
@@ -1353,7 +1353,7 @@ node <npm-package-root-path>/bin/cli.js --lang zh-CN blah
 **🔍 预期结果**：
 ```
 未知子命令: blah
-可用命令: init, reset, dry-run, ensure-worktree
+可用命令: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims
 ```
 
 ---
@@ -1860,6 +1860,595 @@ rm -rf "$phase13Dir"
 ```
 
 **📝 预期结果**：目录已不存在。全局安装不受影响。
+
+---
+
+## Phase 14 — 注册表 CLI 测试
+
+> **覆盖命令**：`registry add`、`registry remove`、`registry list`、`registry verify`（轻量）、`registry reset`
+
+### 14.1 创建临时目录并 init
+
+**Windows (PowerShell):**
+```powershell
+$p14Dir = "$env:TEMP\ops-p14-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $p14Dir -Force | Out-Null
+$pkgRoot = "<npm-package-root-path>"
+node "$pkgRoot\bin\cli.js" init "$p14Dir"
+```
+
+**Linux (bash):**
+```bash
+p14Dir=$(mktemp -d /tmp/ops-p14-XXXXXX)
+node "$pkgRoot/bin/cli.js" init "$p14Dir"
+```
+
+**📝 预期结果**：
+- init 完成，exit code 0
+- 输出包含 `注册表: openspec/oso-change-registry.json`
+
+---
+
+### 14.2 验证注册表初始状态
+
+**Windows / Linux:**
+```bash
+cat "$p14Dir/openspec/oso-change-registry.json"
+```
+
+**🔍 预期结果**：
+```json
+{
+  "changes": []
+}
+```
+
+---
+
+### 14.3 registry add — 添加变更
+
+**Windows / Linux:**
+```bash
+cd "$p14Dir"
+node "$pkgRoot/bin/cli.js" registry add my-feature .worktrees/my-feature
+```
+
+**📝 预期结果**：
+- 输出 `✓ Registry updated: my-feature`
+- exit code 0
+
+---
+
+### 14.4 验证添加后注册表内容
+
+```bash
+cat openspec/oso-change-registry.json
+```
+
+**🔍 预期结果**：
+```json
+{
+  "changes": [
+    {
+      "name": "my-feature",
+      "worktree": ".worktrees/my-feature",
+      "createdAt": "..."
+    }
+  ]
+}
+```
+
+---
+
+### 14.5 registry list — 列出活跃变更
+
+```bash
+node "$pkgRoot/bin/cli.js" registry list
+```
+
+**🔍 预期结果**：
+```
+Changes:
+  my-feature  .worktrees/my-feature  just now
+```
+
+---
+
+### 14.6 registry add — 同名覆盖
+
+```bash
+node "$pkgRoot/bin/cli.js" registry add my-feature .worktrees/my-feature-v2
+```
+
+**📝 预期结果**：exit code 0，注册表中 my-feature 的 worktree 路径已更新为 `.worktrees/my-feature-v2`。
+
+验证：
+```bash
+cat openspec/oso-change-registry.json | grep "my-feature-v2"
+```
+
+---
+
+### 14.7 registry verify — 轻量验证（注册表 + worktree 目录）
+
+**Windows / Linux:**
+```bash
+node "$pkgRoot/bin/cli.js" registry verify
+```
+
+当前 worktree 目录不存在，预期：
+```
+  ✓ oso-change-registry.json: 1 change(s)
+  ⚠ worktree my-feature: not found (.worktrees/my-feature-v2)
+```
+exit code 1。
+
+---
+
+### 14.8 创建 worktree 目录后 verify 应通过
+
+```bash
+mkdir -p .worktrees/my-feature-v2
+node "$pkgRoot/bin/cli.js" registry verify
+```
+
+**🔍 预期结果**：
+```
+  ✓ oso-change-registry.json: 1 change(s)
+  ✓ worktrees: all present
+```
+exit code 0。
+
+---
+
+### 14.9 registry remove — 删除变更
+
+```bash
+node "$pkgRoot/bin/cli.js" registry remove my-feature
+```
+
+**📝 预期结果**：
+- 输出 `✓ Removed from registry: my-feature`
+- exit code 0
+
+验证已删除：
+```bash
+cat openspec/oso-change-registry.json
+```
+
+**🔍 预期结果**：`{"changes":[]}`
+
+---
+
+### 14.10 registry reset — 重置注册表（带备份）
+
+```bash
+node "$pkgRoot/bin/cli.js" registry add feature-a .worktrees/feature-a
+node "$pkgRoot/bin/cli.js" registry add feature-b .worktrees/feature-b
+node "$pkgRoot/bin/cli.js" registry reset
+```
+
+**📝 预期结果**：
+- reset 输出包含 `backup` 和 `previous entries: 2`
+- exit code 0
+
+验证：
+```bash
+cat openspec/oso-change-registry.json
+ls openspec/oso-change-registry.json.bak
+```
+
+**🔍 预期结果**：
+- `oso-change-registry.json` → `{"changes":[]}`
+- `oso-change-registry.json.bak` → 存在，包含 2 条条目的备份
+
+---
+
+### 14.11 非项目目录下 registry 命令行为
+
+```bash
+cd "$env:TEMP"
+node "$pkgRoot/bin/cli.js" registry list
+```
+
+**🔍 预期结果**：报错提示不在 OpenSpec 项目中，exit code 1。
+
+---
+
+## Phase 15 — verify 顶层命令测试
+
+> **覆盖**：`openspec-superpowers-opencode verify`（5 项系统完整性检查）
+
+### 15.1 创建临时目录并 init
+
+```powershell
+$p15Dir = "$env:TEMP\ops-p15-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $p15Dir -Force | Out-Null
+node "$pkgRoot\bin\cli.js" init "$p15Dir"
+```
+
+---
+
+### 15.2 在项目内执行 verify
+
+```bash
+cd "$p15Dir"
+node "$pkgRoot/bin/cli.js" verify
+```
+
+**🔍 预期输出格式**（5 项检查，每行一图标 + 检查名 + 描述）：
+
+```
+✓ openspec: installed at ...
+✓ openspec-orig: ...
+✓ openspec (shim): ...
+✓ oso-change-registry.json: valid (0 changes)
+✓ worktrees: no active changes
+```
+
+每个检查项输出包含三项之一：
+- `✓` — 通过
+- `∼` — 跳过（如非项目目录中）
+- `⚠` — 失败，含 `修复：` 提示行
+
+---
+
+### 15.3 verify exit code 验证
+
+```bash
+node "$pkgRoot/bin/cli.js" verify
+echo "Exit code: $LASTEXITCODE"
+```
+
+**🔍 预期结果**：
+- 所有检查 ✓ → exit code 0
+- 任意检查 ⚠ → exit code 1
+- 全部 ∼（非项目目录）→ exit code 0
+
+---
+
+### 15.4 非项目目录下 verify
+
+```bash
+cd "$env:TEMP"
+node "$pkgRoot/bin/cli.js" verify
+```
+
+**🔍 预期结果**：
+- openspec / openspec-orig / openspec (shim) 正常检查
+- oso-change-registry.json → `∼ not in a project`
+- worktrees → `∼ not in a project`
+- exit code 0
+
+---
+
+### 15.5 注册表损坏时 verify 报错
+
+**Windows:**
+```powershell
+echo "broken json" > "$p15Dir\openspec\oso-change-registry.json"
+node "$pkgRoot\bin\cli.js" verify
+```
+**Linux:**
+```bash
+echo "broken json" > "$p15Dir/openspec/oso-change-registry.json"
+node "$pkgRoot/bin/cli.js" verify
+```
+
+**🔍 预期结果**：
+```
+⚠ oso-change-registry.json: parse error
+  修复：openspec-superpowers-opencode registry reset
+```
+exit code 1。
+
+恢复：
+```bash
+node "$pkgRoot/bin/cli.js" registry reset
+```
+
+---
+
+## Phase 16 — 垫片脚本测试
+
+> **覆盖命令**：`install-shims`、`uninstall-shims`
+>
+> **注意**：本 Phase 会修改全局 PATH 中的 `openspec` 文件。使用结束后应通过 `uninstall-shims` 恢复。
+>
+> **执行前确认**：系统已安装原版 `openspec` CLI（`npm install -g @fission-ai/openspec`），且可通过 `which openspec` / `where openspec` 定位。
+
+### 16.1 验证原版 openspec 可用
+
+```bash
+openspec --version
+```
+
+**📝 预期结果**：输出 openspec CLI 版本号（如 `1.3.x`），exit code 0。
+
+---
+
+### 16.2 install-shims — 安装垫片脚本
+
+**Windows:**
+```powershell
+node "<npm-package-root-path>\bin\cli.js" install-shims
+```
+
+**Linux:**
+```bash
+node "<npm-package-root-path>/bin/cli.js" install-shims
+```
+
+**📝 预期结果**：
+```
+  ✓ Shim scripts installed successfully
+    found openspec at: <bin-dir>
+    created: openspec-orig.cmd（或 openspec-orig）
+    installed shim scripts: openspec.cmd, openspec.ps1（或 openspec）
+```
+
+---
+
+### 16.3 验证垫片脚本已替换 openspec
+
+**Windows:**
+```powershell
+Get-Content "$(where openspec | Select-Object -First 1)" -TotalCount 1
+```
+
+**Linux:**
+```bash
+head -1 "$(which openspec)"
+```
+
+**🔍 预期结果**：垫片标记行 `# openspec shim for oso registry`（Unix）或 `@rem openspec shim for oso registry`（CMD）或 `# openspec shim for oso registry`（PowerShell）。
+
+---
+
+### 16.4 验证 openspec-orig 存在
+
+**Unix:**
+```bash
+which openspec-orig
+```
+
+**Windows:**
+```powershell
+where openspec-orig
+```
+
+**🔍 预期结果**：输出 openspec-orig 路径，exit code 0。
+
+---
+
+### 16.5 验证垫片脚本在项目内合并 list
+
+```bash
+cd "$p14Dir"   # 使用 phase 14 的测试目录（已有注册表条目）
+mkdir -p .worktrees/my-feature-v2
+openspec list
+```
+
+**🔍 预期结果**：输出包含各 worktree 的合并变更列表，格式同原版 openspec list。
+
+---
+
+### 16.6 在项目外垫片透传
+
+```bash
+cd "$env:TEMP"
+openspec list
+```
+
+**🔍 预期结果**：输出原生 openspec list 行为，无垫片拦截。
+
+---
+
+### 16.7 uninstall-shims — 卸除垫片脚本
+
+**Windows:**
+```powershell
+node "<npm-package-root-path>\bin\cli.js" uninstall-shims
+```
+
+**Linux:**
+```bash
+node "<npm-package-root-path>/bin/cli.js" uninstall-shims
+```
+
+**📝 预期结果**：
+```
+  ✓ Shim scripts uninstalled successfully
+    found openspec at: <bin-dir>
+    found backup: openspec-orig.cmd
+    deleted shim files: openspec.cmd, openspec.ps1
+    restored: openspec-orig.cmd → openspec.cmd
+```
+
+---
+
+### 16.8 验证已恢复原版 openspec
+
+```bash
+head -1 "$(which openspec)"
+```
+
+**🔍 预期结果**：第一行不含 `openspec shim` 标记（已恢复为原版 openspec 文件）。
+
+---
+
+### 16.9 幂等性 — 重复 install-shims
+
+```bash
+node "<npm-package-root-path>/bin/cli.js" install-shims
+node "<npm-package-root-path>/bin/cli.js" install-shims
+```
+
+**🔍 预期结果**：第二次安装输出 `openspec-orig already exists, skipped`，exit code 0。
+
+清理：
+```bash
+node "<npm-package-root-path>/bin/cli.js" uninstall-shims
+```
+
+### 16.10 注册表不存在时垫片透传
+
+使用一个纯 openspec 项目（没有 oso-change-registry.json）验证 `openspec list` 透传行为：
+
+```bash
+# 确保垫片已安装
+node "<npm-package-root-path>/bin/cli.js" install-shims
+
+# 创建临时目录并 init 一个普通 openspec 项目
+$passthruDir = "$env:TEMP\ops-passthru-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $passthruDir -Force | Out-Null
+cd "$passthruDir"
+openspec new change "passthru-test"
+
+# 验证 openspec list 仍然能正常显示变更（垫片未因无注册表而拦截阻断）
+# 说明：注册表不存在 → registry-utils 内部透传 openspec-orig list → 原生输出
+openspec list
+```
+
+**🔍 预期结果**：`openspec list` 正常输出变更列表（不是"No active changes found."），因为垫片检测到无注册表后透传给了原版 openspec。
+
+清理：
+```bash
+node "<npm-package-root-path>/bin/cli.js" uninstall-shims
+Remove-Item -Recurse -Force "$passthruDir"
+```
+
+---
+
+## Phase 17 — Registry + Opsx 集成测试
+
+> **覆盖**：注册表与 opsx 命令的联动，包括 add→list→verify 完整链路
+
+### 17.1 创建临时目录并 init
+
+```powershell
+$p17Dir = "$env:TEMP\ops-p17-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $p17Dir -Force | Out-Null
+node "$pkgRoot\bin\cli.js" init "$p17Dir"
+```
+
+---
+
+### 17.2 simulate: 创建 worktree 并 add 注册表
+
+```bash
+cd "$p17Dir"
+git worktree add .worktrees/feature-login -b feature/feature-login
+node "$pkgRoot/bin/cli.js" registry add feature-login .worktrees/feature-login
+
+git worktree add .worktrees/feature-auth -b feature/feature-auth
+node "$pkgRoot/bin/cli.js" registry add feature-auth .worktrees/feature-auth
+```
+
+**🔍 预期结果**：两个 worktree 创建成功，两个 registry add 均 exit code 0。
+
+---
+
+### 17.3 验证 registry list 展示所有活跃变更
+
+```bash
+node "$pkgRoot/bin/cli.js" registry list
+```
+
+**🔍 预期结果**：
+```
+Changes:
+  feature-login  .worktrees/feature-login  just now
+  feature-auth   .worktrees/feature-auth   just now
+```
+
+---
+
+### 17.4 verify 命令在集成状态下运行
+
+```bash
+node "$pkgRoot/bin/cli.js" verify
+```
+
+**🔍 预期结果**：
+```
+✓ openspec: installed at ...
+✓ openspec-orig: ...
+✓ openspec (shim): ...
+✓ oso-change-registry.json: valid (2 changes)
+✓ worktrees: all present
+```
+exit code 0。
+
+---
+
+### 17.5 registry remove + registry list 验证删除
+
+```bash
+node "$pkgRoot/bin/cli.js" registry remove feature-login
+node "$pkgRoot/bin/cli.js" registry list
+```
+
+**🔍 预期结果**：list 输出只包含 `feature-auth`，不包含 `feature-login`。
+
+---
+
+### 17.6 registry reset + verify 验证重置
+
+```bash
+node "$pkgRoot/bin/cli.js" registry reset
+node "$pkgRoot/bin/cli.js" verify
+```
+
+**🔍 预期结果**：
+- reset 输出包含备份信息
+- verify 输出 `oso-change-registry.json: valid (0 changes)`
+- exit code 0
+
+---
+
+### 17.7 opsx 命令流程模拟 — 创建→add→remove 完整生命周期
+
+```bash
+cd "$p17Dir"
+
+# 模拟 /opsx-new: 创建变更 + registry add
+openspec new change "test-flow"  2>&1 | tail -1
+# 注意：此时变更在 main 上创建，正常流程应在 worktree 内
+# 这里仅测试 registry add 的联动
+node "$pkgRoot/bin/cli.js" registry add test-flow .worktrees/test-flow
+
+# 模拟 add 前 verify（opsx 命令中会在 add 前自动跑 registry verify）
+# 当前 worktree 不存在，verify 应报 ⚠
+node "$pkgRoot/bin/cli.js" registry verify
+# exit code 1（预期：worktree 不存在）
+
+# 创建 worktree 后 verify 通过
+git worktree add .worktrees/test-flow -b feature/test-flow
+node "$pkgRoot/bin/cli.js" registry verify
+# exit code 0
+
+# 模拟 /opsx-finish: remove 注册表
+node "$pkgRoot/bin/cli.js" registry remove test-flow
+
+# 清理 worktree
+git worktree remove .worktrees/test-flow
+git branch -d feature/test-flow
+```
+
+**🔍 预期结果**：
+- 完整生命周期中每一步 exit code 符合标注
+- verify 在 worktree 存在时为 0，不存在时为 1
+
+---
+
+### 17.8 清理
+
+```powershell
+Remove-Item -Recurse -Force "$p14Dir"
+Remove-Item -Recurse -Force "$p15Dir"
+Remove-Item -Recurse -Force "$p17Dir"
+```
 
 ---
 

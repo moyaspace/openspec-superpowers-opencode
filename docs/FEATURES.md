@@ -176,3 +176,165 @@ setup 脚本执行 **6 项端到端验证**：
 | **语言文件清理** | 安装后自动清理非首选语言的多余文件 |
 | **幂等性** | 重复运行 safe，已有文件按决策规则处理 |
 | **npm 可发布** | 包名 `openspec-superpowers-opencode`，支持全局安装和 npx 使用 |
+
+---
+
+## 八、活跃变更注册表与系统验证 [⭐ 核心特性]
+
+### 问题
+
+本项目所有变更在 **git worktree** 中隔离开发（`main` 不直接产生变更）。这带来了一个**可见性鸿沟**：
+
+```
+openspec list（在 main 上执行）
+  → 扫描 openspec/changes/           ← main 上只有归档变更
+  → 看不到 .worktrees/<name>/ 里的活跃变更
+```
+
+AI agent 通过 `openspec list` 了解当前有哪些活跃变更，但如果看不到 worktree 中的变更，就无法切换上下文、无法感知并行进度。注册表系统填补了这个鸿沟——它在 main 上维护一份轻量索引，让 `openspec list` 能跨所有 worktree 聚合展示活跃变更。
+
+配套的 **verify 命令**和**垫片脚本系统**进一步保障这个机制的可靠性：verify 检查垫片是否就位、注册表是否完好；垫片脚本拦截 `openspec list` 自动完成合并，用户和 AI 无感。
+
+```
+main（干净）
+  ├── openspec/oso-change-registry.json   ← 索引：所有 worktree 中的活跃变更
+  └── .worktrees/
+        ├── feature-login/                ← worktree 内的 openspec list 实时数据
+        └── feature-auth/
+
+openspec list（经垫片拦截）
+  → 读注册表获知 worktree 路径列表
+  → 遍历每个 worktree 执行 openspec-orig list
+  → 合并输出 → 用户/AI 看到完整视图
+```
+
+### 8.1 活跃变更注册表 (`oso-change-registry.json`)
+
+项目根 `openspec/oso-change-registry.json` 维护一个轻量**索引**，记录所有 worktree 中的活跃变更：
+
+```json
+{
+  "changes": [
+    { "name": "feature-login", "worktree": ".worktrees/feature-login", "createdAt": "2026-07-04T00:00:00.000Z" }
+  ]
+}
+```
+
+注册表只存**变更名 + worktree 路径**，不存状态——状态由各 worktree 内 `openspec list` 实时获取。
+
+#### 生命周期
+
+| 事件 | 操作 | 触发命令 |
+|------|------|---------|
+| 创建变更 | `registry add <name> <worktree>` | `/opsx-new`, `/opsx-propose`, `/opsx-ff` |
+| 归档/完成 | `registry remove <name>` | `/opsx-finish` |
+| 人工诊断 | `registry list` / `registry verify` | 手动调用 |
+
+### 8.2 Registry CLI 子命令
+
+| 命令 | 功能 | 交互 |
+|------|------|------|
+| `registry add <name> <worktree>` | 添加/覆盖变更条目 | 无终端交互，exit code 指示结果 |
+| `registry remove <name>` | 删除变更条目 | 同上 |
+| `registry list` | 格式化输出所有活跃变更 | 只读 |
+| `registry verify` | 轻量验证（注册表 JSON + worktree 目录存在性） | 只读 |
+| `registry reset` | 重置注册表为空（可选备份原文件为 `.bak`） | 无交互 |
+
+所有 registry 子命令专为 AI agent 调用设计——输出结构化文本 + exit code，不请求终端输入。
+
+### 8.3 垫片脚本系统
+
+为解决跨 worktree 变更可见性问题，安装程序（`install-shims`）在系统 PATH 中替换原版 `openspec` 为垫片脚本：
+
+```
+安装前：openspec → openspec（原版 CLI）
+安装后：openspec → 垫片脚本（拦截 list），openspec-orig → openspec（重命名保留）
+```
+
+#### 平台对应
+
+| 平台 | 垫片脚本 | 原版备份 |
+|------|---------|---------|
+| Unix/macOS | `openspec` | `openspec-orig` |
+| Windows CMD | `openspec.cmd` | `openspec-orig.cmd` |
+| Windows PS | `openspec.ps1` | `openspec-orig.ps1` |
+
+#### 拦截规则
+
+垫片**只拦截** `openspec list`，其余全部透传 `openspec-orig`。
+
+| 命令 | 拦截？ | 理由 |
+|------|:----:|------|
+| `list` | ✅ | 根目录执行，需合并所有 worktree 变更 |
+| `status`, `new`, `instructions`, `archive` | ❌ | 在 worktree 内执行，透传即正确 |
+
+垫片拦截后全部委托 `registry-utils.js`，后者内部有双重透传决策：
+
+```
+openspec list → 垫片拦截（条件：TOOL_DIR 有效 && 参数是 list）
+  → registry-utils.js list
+    → 非 git 项目？           → 透传 openspec-orig list
+    → 不在项目/无注册表？        → 透传 openspec-orig list
+    → 注册表存在且有 worktree？ → 遍历合并输出
+```
+
+这样就保证了：**装了垫片但没用 oso 的项目**（如纯 openspec 项目），`openspec list` 行为与原版完全一致。
+
+#### 垫片检测标记
+
+每份垫片脚本首行包含唯一特征标记，供 `registry verify` 检测垫片完整性：
+
+| 平台 | 标记行 |
+|------|--------|
+| Unix shell | `# openspec shim for oso registry` |
+| Windows CMD | `@rem openspec shim for oso registry` |
+| Windows PS | `# openspec shim for oso registry` |
+
+### 8.4 verify 顶层命令（5 项系统完整性检查）
+
+```bash
+openspec-superpowers-opencode verify
+```
+
+| # | 检查项 | 失败修复 |
+|---|--------|---------|
+| 1 | `openspec` — CLI 是否在 PATH 中 | 安装 `@fission-ai/openspec` |
+| 2 | `openspec-orig` — 原版 CLI 备份是否存在 | `install-shims` |
+| 3 | `openspec (shim)` — 当前 `openspec` 是否为垫片脚本 | `install-shims` |
+| 4 | `oso-change-registry.json` — JSON 有效且可解析 | `registry reset` 或 `init` |
+| 5 | `worktrees` — 注册表中所有 worktree 目录存在 | `registry remove` 清理孤立条目 |
+
+输出格式：
+```
+✓ openspec: installed at /usr/local/bin/openspec
+✓ openspec-orig: found at /usr/local/bin/openspec-orig
+✓ openspec (shim): is shim script
+✓ oso-change-registry.json: valid (2 changes)
+✓ worktrees: all present
+```
+
+- 全 ✓ → exit code 0
+- 有 ⚠ → exit code 1（AI agent 读取输出后决定是否询问用户修复）
+- 非项目目录中检查 4+5 → ∼ skip
+
+### 8.5 安装/卸除垫片
+
+```bash
+# 安装垫片脚本
+openspec-superpowers-opencode install-shims
+
+# 卸除垫片脚本，恢复原版 openspec
+openspec-superpowers-opencode uninstall-shims
+```
+
+安装采用 **copy + write** 策略，规避文件锁：先复制原版为 openspec-orig，然后写入垫片脚本到同名文件。
+卸除则反过来：删除垫片文件，将 openspec-orig 重命名回 openspec。
+
+### 8.6 Opsx 集成
+
+| opsx 命令 | 注册表操作 | 集成方式 |
+|-----------|-----------|---------|
+| `/opsx-apply` | 执行前先跑 `verify` | 7 个 opsx 命令在 listing 前插入 verify 步骤 |
+| `/opsx-ff` / `/opsx-new` / `/opsx-propose` | `registry add` | 创建变更后自动注册 |
+| `/opsx-finish` | `registry remove` | 归档后移除注册表条目 |
+| `/opsx-verify` / `/opsx-explore` / `/opsx-continue` / `/opsx-archive` / `/opsx-bulk-archive` / `/opsx-sync` | 执行前先跑 `verify` | 系统闸门，确保垫片和注册表正常 |
