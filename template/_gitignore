@@ -8,6 +8,12 @@
 # CodeGraph index cache
 .codegraph/
 
+# OpenSpec Schema — do not track
+openspec/schemas/
+
+# OpenSpec config — do not track
+openspec/config.yaml
+
 # Local test run logs
 docs/test-runs/
 # <!-- openspec-superpowers-opencode_gitignore -->
