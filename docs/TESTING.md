@@ -1394,7 +1394,7 @@ Remove-Item -Recurse -Force "$gitDir"
 
 ### 8.3 Git Deploy 单元测试（marker 部署逻辑）
 
-测试文件 `test/git-deploy.test.js` 覆盖 `.gitignore` / `.gitattributes` 的 marker 检测/替换/追加逻辑，与 `AGENTS.md` 部署逻辑一致：
+测试文件 `test/git-deploy.test.js` 覆盖 `.gitignore` / `.gitattributes` / `.editorconfig` 的 marker 检测/替换/追加逻辑，与 `AGENTS.md` 部署逻辑一致：
 
 - **绿地**：文件不存在时直接写入 template 内容
 - **棕地已有标记**：≥ 2 marker → 替换标记间内容（保留用户内容）或跳过
@@ -1403,13 +1403,239 @@ Remove-Item -Recurse -Force "$gitDir"
 - **re.sub 语义**：count=1 仅替换第一个标记对；`.trimEnd()` 去除尾部换行
 - **跨平台**：CRLF 换行中标记识别
 - **边缘**：仅有标记对无用户内容、空文件
-- **Template 一致性**：template 文件包含恰好 2 个 marker
+- **Template 一致性**：每个 template 文件包含恰好 2 个 marker，均在 `#` 注释行中
+
+每个场景对三个文件分别执行，共 **39 个测试**。
 
 ```bash
 # 运行
 node --test test/git-deploy.test.js
 
-# 预期输出：全部 26 个测试通过 ✓
+# 预期输出：全部 39 个测试通过 ✓
+```
+
+### 8.4 .editorconfig 棕地部署验证
+
+> 验证 `init` 在棕地场景下对 `.editorconfig` 的三路分支行为：绿地创建、棕地无标记追加、棕地已有标记替换/跳过。
+
+#### 8.4.1 绿地部署 — .editorconfig 创建
+
+**Windows:**
+```powershell
+$ecGreenDir = "$env:TEMP\ops-ec-green-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $ecGreenDir -Force | Out-Null
+$env:BROWN_OVERRIDE_OPENSPEC = "yes"
+node "$pkgRoot\bin\cli.js" init "$ecGreenDir"
+Remove-Item Env:\BROWN_OVERRIDE_OPENSPEC -ErrorAction SilentlyContinue
+```
+
+**Linux:**
+```bash
+ecGreenDir=$(mktemp -d /tmp/ops-ec-green-XXXXXX)
+BROWN_OVERRIDE_OPENSPEC=yes node "$pkgRoot/bin/cli.js" init "$ecGreenDir"
+```
+
+**🔍 预期结果：**
+```bash
+cat "$ecGreenDir/.editorconfig"
+```
+- `.editorconfig` 存在
+- 包含 `# <!-- openspec-superpowers-opencode_editorconfig -->` marker 对
+- 包含 `root = true`、`end_of_line = lf` 等规则
+
+清理：
+```bash
+Remove-Item -Recurse -Force "$ecGreenDir"
+```
+
+---
+
+#### 8.4.2 棕地无标记 — .editorconfig 追加
+
+> 验证已有 `.editorconfig` 但无 marker 时，静默追加 bridge 内容。
+
+**Windows:**
+```powershell
+$ecAppendDir = "$env:TEMP\ops-ec-append-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $ecAppendDir -Force | Out-Null
+New-Item -ItemType Directory -Path "$ecAppendDir\openspec" -Force | Out-Null
+New-Item -ItemType Directory -Path "$ecAppendDir\.opencode" -Force | Out-Null
+Set-Content -Path "$ecAppendDir\openspec\config.yaml" -Value 'schema: spec-driven' -Encoding utf8
+# 创建不含 marker 的用户 .editorconfig
+@"
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+charset = utf-8
+"@ | Set-Content -Path "$ecAppendDir\.editorconfig" -Encoding utf8
+
+$env:BROWN_OVERRIDE_OPENSPEC = "yes"
+$env:BROWN_OVERRIDE_COMMANDS = "y"
+$env:BROWN_OVERRIDE_SKILLS = "y"
+node "$pkgRoot\bin\cli.js" init "$ecAppendDir"
+Remove-Item Env:\BROWN_OVERRIDE_OPENSPEC, BROWN_OVERRIDE_COMMANDS, BROWN_OVERRIDE_SKILLS -ErrorAction SilentlyContinue
+```
+
+**Linux:**
+```bash
+ecAppendDir=$(mktemp -d /tmp/ops-ec-append-XXXXXX)
+mkdir -p "$ecAppendDir/openspec" "$ecAppendDir/.opencode"
+echo 'schema: spec-driven' > "$ecAppendDir/openspec/config.yaml"
+cat > "$ecAppendDir/.editorconfig" << 'EOF'
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+charset = utf-8
+EOF
+BROWN_OVERRIDE_OPENSPEC=yes BROWN_OVERRIDE_COMMANDS=y BROWN_OVERRIDE_SKILLS=y \
+  node "$pkgRoot/bin/cli.js" init "$ecAppendDir"
+```
+
+**🔍 预期结果：**
+```bash
+$content = Get-Content "$ecAppendDir\.editorconfig" -Raw
+Write-Host "文件开头: $($content.Substring(0, 30))"
+# 用户原始内容在文件开头
+$content.StartsWith('root = true') -and $content.Contains('openspec-superpowers-opencode_editorconfig')
+```
+- `.editorconfig` 以用户原始内容（`root = true`, `indent_style = space` 等）开头
+- 文件末尾包含 bridge 内容 + `# <!-- openspec-superpowers-opencode_editorconfig -->` marker
+- `end_of_line = lf` 等模板规则存在
+
+清理：
+```bash
+Remove-Item -Recurse -Force "$ecAppendDir"
+```
+
+---
+
+#### 8.4.3 棕地已有标记 — .editorconfig 替换
+
+> 验证已有完整 marker 对时，`BROWN_OVERRIDE_EDITORCONFIG=yes` 替换标记间内容。
+
+**Windows:**
+```powershell
+$ecReplaceDir = "$env:TEMP\ops-ec-replace-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $ecReplaceDir -Force | Out-Null
+New-Item -ItemType Directory -Path "$ecReplaceDir\openspec" -Force | Out-Null
+New-Item -ItemType Directory -Path "$ecReplaceDir\.opencode" -Force | Out-Null
+Set-Content -Path "$ecReplaceDir\openspec\config.yaml" -Value 'schema: spec-driven' -Encoding utf8
+$marker = '# <!-- openspec-superpowers-opencode_editorconfig -->'
+@"
+# 用户自定义规则
+$marker
+旧 bridge 内容
+end_of_line = crlf
+$marker
+# 用户尾部规则
+"@ | Set-Content -Path "$ecReplaceDir\.editorconfig" -Encoding utf8
+
+$env:BROWN_OVERRIDE_OPENSPEC = "yes"
+$env:BROWN_OVERRIDE_COMMANDS = "y"
+$env:BROWN_OVERRIDE_SKILLS = "y"
+$env:BROWN_OVERRIDE_EDITORCONFIG = "yes"
+node "$pkgRoot\bin\cli.js" init "$ecReplaceDir"
+Remove-Item Env:\BROWN_OVERRIDE_OPENSPEC, BROWN_OVERRIDE_COMMANDS, BROWN_OVERRIDE_SKILLS, BROWN_OVERRIDE_EDITORCONFIG -ErrorAction SilentlyContinue
+```
+
+**Linux:**
+```bash
+ecReplaceDir=$(mktemp -d /tmp/ops-ec-replace-XXXXXX)
+mkdir -p "$ecReplaceDir/openspec" "$ecReplaceDir/.opencode"
+echo 'schema: spec-driven' > "$ecReplaceDir/openspec/config.yaml"
+marker='# <!-- openspec-superpowers-opencode_editorconfig -->'
+cat > "$ecReplaceDir/.editorconfig" << EOF
+# 用户自定义规则
+$marker
+旧 bridge 内容
+end_of_line = crlf
+$marker
+# 用户尾部规则
+EOF
+BROWN_OVERRIDE_OPENSPEC=yes BROWN_OVERRIDE_COMMANDS=y BROWN_OVERRIDE_SKILLS=y \
+BROWN_OVERRIDE_EDITORCONFIG=yes \
+  node "$pkgRoot/bin/cli.js" init "$ecReplaceDir"
+```
+
+**🔍 预期结果：**
+```bash
+$content = Get-Content "$ecReplaceDir\.editorconfig" -Raw
+$content -match '# 用户自定义规则' -and $content -match '# 用户尾部规则' -and -not ($content -match '旧 bridge 内容')
+```
+- `# 用户自定义规则` 保留
+- `# 用户尾部规则` 保留
+- `旧 bridge 内容` 和 `end_of_line = crlf` 被替换为模板规则（`end_of_line = lf`）
+- marker 对仍存在
+
+清理：
+```bash
+Remove-Item -Recurse -Force "$ecReplaceDir"
+```
+
+---
+
+#### 8.4.4 棕地已有标记 — .editorconfig 跳过
+
+> 验证 `BROWN_OVERRIDE_EDITORCONFIG=no` 跳过替换，内容完全不变。
+
+**Windows:**
+```powershell
+$ecSkipDir = "$env:TEMP\ops-ec-skip-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $ecSkipDir -Force | Out-Null
+New-Item -ItemType Directory -Path "$ecSkipDir\openspec" -Force | Out-Null
+New-Item -ItemType Directory -Path "$ecSkipDir\.opencode" -Force | Out-Null
+Set-Content -Path "$ecSkipDir\openspec\config.yaml" -Value 'schema: spec-driven' -Encoding utf8
+$marker = '# <!-- openspec-superpowers-opencode_editorconfig -->'
+@"
+# 我的配置
+$marker
+自定义内容
+$marker
+# 结尾
+"@ | Set-Content -Path "$ecSkipDir\.editorconfig" -Encoding utf8
+$originalContent = Get-Content "$ecSkipDir\.editorconfig" -Raw
+
+$env:BROWN_OVERRIDE_OPENSPEC = "yes"
+$env:BROWN_OVERRIDE_COMMANDS = "y"
+$env:BROWN_OVERRIDE_SKILLS = "y"
+$env:BROWN_OVERRIDE_EDITORCONFIG = "no"
+node "$pkgRoot\bin\cli.js" init "$ecSkipDir"
+Remove-Item Env:\BROWN_OVERRIDE_OPENSPEC, BROWN_OVERRIDE_COMMANDS, BROWN_OVERRIDE_SKILLS, BROWN_OVERRIDE_EDITORCONFIG -ErrorAction SilentlyContinue
+```
+
+**Linux:**
+```bash
+ecSkipDir=$(mktemp -d /tmp/ops-ec-skip-XXXXXX)
+mkdir -p "$ecSkipDir/openspec" "$ecSkipDir/.opencode"
+echo 'schema: spec-driven' > "$ecSkipDir/openspec/config.yaml"
+marker='# <!-- openspec-superpowers-opencode_editorconfig -->'
+cat > "$ecSkipDir/.editorconfig" << EOF
+# 我的配置
+$marker
+自定义内容
+$marker
+# 结尾
+EOF
+originalContent=$(cat "$ecSkipDir/.editorconfig")
+BROWN_OVERRIDE_OPENSPEC=yes BROWN_OVERRIDE_COMMANDS=y BROWN_OVERRIDE_SKILLS=y \
+BROWN_OVERRIDE_EDITORCONFIG=no \
+  node "$pkgRoot/bin/cli.js" init "$ecSkipDir"
+```
+
+**🔍 预期结果：**
+```bash
+$newContent = Get-Content "$ecSkipDir\.editorconfig" -Raw
+$newContent -eq $originalContent
+```
+- `.editorconfig` 内容完全不变（`# 我的配置`、`自定义内容`、`# 结尾` 均保留）
+
+清理：
+```bash
+Remove-Item -Recurse -Force "$ecSkipDir"
 ```
 
 ---
