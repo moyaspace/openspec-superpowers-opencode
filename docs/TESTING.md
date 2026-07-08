@@ -1392,6 +1392,26 @@ BROWN_OVERRIDE_OPENSPEC=yes BROWN_OVERRIDE_COMMANDS=y BROWN_OVERRIDE_SKILLS=y \
 Remove-Item -Recurse -Force "$gitDir"
 ```
 
+### 8.3 Git Deploy 单元测试（marker 部署逻辑）
+
+测试文件 `test/git-deploy.test.js` 覆盖 `.gitignore` / `.gitattributes` 的 marker 检测/替换/追加逻辑，与 `AGENTS.md` 部署逻辑一致：
+
+- **绿地**：文件不存在时直接写入 template 内容
+- **棕地已有标记**：≥ 2 marker → 替换标记间内容（保留用户内容）或跳过
+- **棕地无标记**：0-1 marker → 静默追加到文件末尾
+- **标记计数判定**：grep -c 风格，< 2 走追加，≥ 2 走替换
+- **re.sub 语义**：count=1 仅替换第一个标记对；`.trimEnd()` 去除尾部换行
+- **跨平台**：CRLF 换行中标记识别
+- **边缘**：仅有标记对无用户内容、空文件
+- **Template 一致性**：template 文件包含恰好 2 个 marker
+
+```bash
+# 运行
+node --test test/git-deploy.test.js
+
+# 预期输出：全部 26 个测试通过 ✓
+```
+
 ---
 
 ## Phase 9 — Skill / 命令定义验证

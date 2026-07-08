@@ -83,6 +83,8 @@ BROWN_OVERRIDE_OPENSPEC="${BROWN_OVERRIDE_OPENSPEC:-}"
 BROWN_OVERRIDE_COMMANDS="${BROWN_OVERRIDE_COMMANDS:-}"
 BROWN_OVERRIDE_SKILLS="${BROWN_OVERRIDE_SKILLS:-}"
 BROWN_OVERRIDE_AGENTS="${BROWN_OVERRIDE_AGENTS:-}"
+BROWN_OVERRIDE_GITIGNORE="${BROWN_OVERRIDE_GITIGNORE:-}"
+BROWN_OVERRIDE_GITATTR="${BROWN_OVERRIDE_GITATTR:-}"
 
 # 用于记录 commands/skills 覆盖决策的临时文件
 DECISIONS_FILE=$(mktemp 2>/dev/null || mktemp -t "opencode-decisions.XXXXXX")
@@ -161,35 +163,28 @@ if [ "$UNINSTALL" = true ]; then
     FAILED_COUNT=0
     SKIPPED_COUNT=0
 
-    # 用 node 或 python3 解析 JSON
-    if command -v node &>/dev/null; then
-        MANIFEST_JSON=$(node -e "const m=JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8')); console.log(JSON.stringify(m))" 2>/dev/null)
-    elif command -v python3 &>/dev/null; then
-        MANIFEST_JSON=$(python3 -c "import json; print(json.dumps(json.load(open('$MANIFEST_FILE'))))" 2>/dev/null)
-    else
-        echo "✗ 需要 node 或 python3 解析安装清单"
+    # 用 node 解析 JSON
+    if ! command -v node &>/dev/null; then
+        echo "✗ 需要 node 解析安装清单"
         exit 1
     fi
+    MANIFEST_JSON=$(node -e "const m=JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8')); console.log(JSON.stringify(m))")
 
     # 受保护文件列表（reset 不碰）
     PROTECTED_FILES=("opencode.json" "AGENTS.md" ".gitignore" ".gitattributes" ".editorconfig")
 
     # 解析 overwriteDecisions
-    OVERWRITE_DECISIONS_MANIFEST=$(echo "$MANIFEST_JSON" | python3 -c "
-import json,sys
-m=json.load(sys.stdin)
-d=m.get('overwriteDecisions',{})
-for k,v in d.items():
-    print(f'{k}|{v}')
-" 2>/dev/null)
+    OVERWRITE_DECISIONS_MANIFEST=$(node -e "
+const m=JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8'));
+const d=m.overwriteDecisions||{};
+for(const[k,v]of Object.entries(d)) console.log(k+'|'+v);
+")
 
     # 解析文件列表
-    FILES=$(echo "$MANIFEST_JSON" | python3 -c "
-import json,sys
-m=json.load(sys.stdin)
-for f in m.get('files',[]):
-    print(f)
-" 2>/dev/null)
+    FILES=$(node -e "
+const m=JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8'));
+(m.files||[]).forEach(f=>console.log(f));
+")
 
     while IFS= read -r file; do
         [ -z "$file" ] && continue
@@ -320,7 +315,9 @@ echo "$(t "[1.5/7] 校验 Skill 文件完整性..." "[1.5/7] Verifying skill fil
 LOCK_FILE="$TEMPLATE_DIR/skills.lock.json"
 if [ -f "$LOCK_FILE" ]; then
     ALL_MATCH=true
-    if command -v node &>/dev/null; then
+    if ! command -v node &>/dev/null; then
+        echo "  - 需要 node 解析 lock 文件，跳过校验"
+    else
         SKILL_KEYS=$(node -e "const l=JSON.parse(require('fs').readFileSync('$LOCK_FILE','utf8')); Object.keys(l.skills).forEach(k=>console.log(k))")
         while IFS= read -r key; do
             [ -z "$key" ] && continue
@@ -339,28 +336,6 @@ if [ -f "$LOCK_FILE" ]; then
                 ALL_MATCH=false
             fi
         done <<< "$SKILL_KEYS"
-    elif command -v python3 &>/dev/null; then
-        python3 -c "
-import json, hashlib, os
-with open('$LOCK_FILE') as f: lock = json.load(f)
-all_ok = True
-for key, info in lock['skills'].items():
-    path = '$SUPERPOWERS_BASE/' + key.replace('\\\\', '/')
-    if os.path.exists(path):
-        h = hashlib.sha256(open(path,'rb').read()).hexdigest().upper()
-        if h == info['sha256']:
-            print(f'  ✓ {key}')
-        else:
-            print(f'  ⚠ {key} (hash mismatch)')
-            all_ok = False
-    else:
-        print(f'  ✗ {key} (not found)')
-        all_ok = False
-if all_ok: print('✓ Skill integrity check passed')
-else: print('⚠ Skill 校验有差异（WARNING）')
-"
-    else
-        echo "  - 需要 node 或 python3 解析 lock 文件，跳过校验"
     fi
 
     if [ "$ALL_MATCH" = true ]; then
@@ -454,52 +429,24 @@ if [ -d "$OPENCODE_SRC" ]; then
     OC_JSON_SRC="$OPENCODE_SRC/opencode.json"
     OC_JSON_DST="$OPENCODE_DST/opencode.json"
     if [ -f "$OC_JSON_SRC" ] && [ -f "$OC_JSON_DST" ]; then
-        # 棕地：用 python3 做联合合并
+        # 棕地：用 node 做联合合并
         if [ "$DRY_RUN" = false ]; then
-            export OC_JSON_SRC_BC="$OC_JSON_SRC"
-            export OC_JSON_DST_BC="$OC_JSON_DST"
-            python3 << 'PYEOF' || true
-import json, os
-
-oc_json_src = os.environ.get('OC_JSON_SRC_BC', '')
-oc_json_dst = os.environ.get('OC_JSON_DST_BC', '')
-
-with open(oc_json_src) as f: tmpl = json.load(f)
-with open(oc_json_dst) as f: user = json.load(f)
-
-merged = {'permission': dict(user.get('permission', {}))}
-
-# 补充模板中用户没有的权限键
-for key, val in tmpl.get('permission', {}).items():
-    if key not in merged['permission']:
-        merged['permission'][key] = val
-
-# 对 write/edit：强制插入 required 路径和 deny 规则
-required_paths = ['.worktrees/**', 'openspec/changes/**', 'openspec/specs/**', '.opencode/**']
-deny_paths = ['openspec/schemas/**', 'openspec/config.yaml']
-for action in ('write', 'edit'):
-    action_obj = merged['permission'].get(action)
-    if isinstance(action_obj, dict):
-        for rp in required_paths:
-            action_obj[rp] = 'allow'
-        # 强制插入 deny 规则（保护基础设施文件不被 AI 修改）
-        for dp in deny_paths:
-            action_obj[dp] = 'deny'
-
-# 对 bash：补充模板中有但用户没有的条目
-tmpl_bash = tmpl.get('permission', {}).get('bash')
-if isinstance(merged['permission'].get('bash'), dict) and isinstance(tmpl_bash, dict):
-    for k, v in tmpl_bash.items():
-        if k not in merged['permission']['bash']:
-            merged['permission']['bash'][k] = v
-
-with open(oc_json_dst, 'w') as f:
-    json.dump(merged, f, indent=2, ensure_ascii=False)
-PYEOF
+            node -e "
+const tmpl=JSON.parse(require('fs').readFileSync('$OC_JSON_SRC','utf8'));
+const user=JSON.parse(require('fs').readFileSync('$OC_JSON_DST','utf8'));
+const merged={permission:{...(user.permission||{})}};
+for(const[k,v]of Object.entries(tmpl.permission||{})){if(!(k in merged.permission))merged.permission[k]=v;}
+const required=['.worktrees/**','openspec/changes/**','openspec/specs/**','.opencode/**'];
+const denied=['openspec/schemas/**','openspec/config.yaml'];
+for(const action of['write','edit']){const obj=merged.permission[action];if(obj&&typeof obj==='object'){for(const r of required)obj[r]='allow';for(const d of denied)obj[d]='deny';}}
+const tbash=tmpl.permission?.bash;const ubash=merged.permission.bash;
+if(ubash&&typeof ubash==='object'&&tbash&&typeof tbash==='object'){for(const[k,v]of Object.entries(tbash)){if(!(k in ubash))ubash[k]=v;}}
+require('fs').writeFileSync('$OC_JSON_DST',JSON.stringify(merged,null,2)+'\n','utf8');
+" || true
             echo "$(t "  ✓ .opencode/opencode.json（已合并：required 路径已强制 allow）" "  ✓ .opencode/opencode.json (merged: required paths force-allowed)")"
             echo "$(t "    （用户原有权限保留，模板 required 路径已补入）" "    (User permissions preserved, template required paths added)")"
         else
-            echo "  [DRY-RUN] python3 union merge opencode.json"
+            echo "  [DRY-RUN] node union merge opencode.json"
         fi
     elif [ -f "$OC_JSON_SRC" ]; then
         # 绿地：直接复制
@@ -661,21 +608,16 @@ if [ -f "$AGENTS_SRC" ]; then
             ANSWER=$(prompt_yes_no "$(t "  AGENTS.md 已有 bridge 内容。替换？" "  AGENTS.md already has bridge content. Replace?")" "$BROWN_OVERRIDE_AGENTS")
             if [ "$ANSWER" = "yes" ]; then
                 if [ "$DRY_RUN" = false ]; then
-                    export AGENTS_DST_BAK="$AGENTS_DST"
-                    export AGENTS_SRC_BAK="$AGENTS_SRC"
-                    python3 << 'PYEOF'
-import re, os
-agents_dst = os.environ['AGENTS_DST_BAK']
-agents_src = os.environ['AGENTS_SRC_BAK']
-with open(agents_dst) as f: existing = f.read()
-with open(agents_src) as f: bridge = f.read()
-marker = '<!-- openspec-superpowers-opencode_instructions -->'
-escaped = re.escape(marker)
-pattern = escaped + '.*?' + escaped
-result = re.sub(pattern, bridge.strip(), existing, count=1, flags=re.DOTALL)
-with open(agents_dst, 'w', encoding='utf-8') as f:
-    f.write(result)
-PYEOF
+                    node -e "
+const fs=require('fs');
+const existing=fs.readFileSync('$AGENTS_DST','utf8');
+const bridge=fs.readFileSync('$AGENTS_SRC','utf8');
+const marker='<!-- openspec-superpowers-opencode_instructions -->';
+const esc=marker.replace(/[.*+?^\${}()|[\\]\\\\]/g,'\\\\\\$&');
+const pat=new RegExp(esc+'[\\\\s\\\\S]*?'+esc);
+const result=existing.replace(pat,bridge.trimEnd());
+fs.writeFileSync('$AGENTS_DST',result,'utf8');
+" || true
                 fi
                 echo "$(t "  ✓ AGENTS.md（bridge 内容已替换）" "  ✓ AGENTS.md (bridge content replaced)")"
             else
@@ -697,75 +639,112 @@ PYEOF
     fi
 fi
 
-# .gitignore（追加基础设施排除规则，不覆盖已有内容）
+# .gitignore（marker 判定，同 AGENTS.md 模式）
 GITIGNORE_SRC="$TEMPLATE_DIR/_gitignore"
 GITIGNORE_DST="$PROJECT_ROOT/.gitignore"
-GITIGNORE_ENTRIES=(
-    ".opencode/"
-    "openspec/schemas/"
-    "openspec/config.yaml"
-    ".worktrees/"
-)
-GITIGNORE_COMMENTS=(
-    "OpenCode config — do not track"
-    "OpenSpec Schema — do not track"
-    "OpenSpec config — do not track"
-    "Worktree isolation directory — do not track"
-)
+GITIGNORE_MARKER='# <!-- openspec-superpowers-opencode_gitignore -->'
+
 # 注意：不依赖 $GITIGNORE_SRC 是否存在 — 绕过 npm 11.x 下 .npmignore 对嵌套 .gitignore 的异常排除
 if [ ! -f "$GITIGNORE_DST" ]; then
     # 绿地：优先从模板复制
     if [ -f "$GITIGNORE_SRC" ]; then
         run_cmd cp "$GITIGNORE_SRC" "$GITIGNORE_DST"
-    fi
-    # Fallback: 模板不存在或拷贝失败时直接用 echo 创建
-    if [ ! -f "$GITIGNORE_DST" ]; then
-        echo "# Worktree isolation" > "$GITIGNORE_DST"
-        echo ".worktrees/" >> "$GITIGNORE_DST"
-        log "$(t "  ✓ .gitignore（fallback 创建）" "  ✓ .gitignore (fallback created)")"
-    else
         log "$(t "  ✓ .gitignore" "  ✓ .gitignore")"
+    else
+        # Fallback: 模板不存在时用 marker 包裹的基础规则创建
+        if [ "$DRY_RUN" = false ]; then
+            echo "$GITIGNORE_MARKER" > "$GITIGNORE_DST"
+            echo "# Worktree isolation" >> "$GITIGNORE_DST"
+            echo ".worktrees/" >> "$GITIGNORE_DST"
+            echo "$GITIGNORE_MARKER" >> "$GITIGNORE_DST"
+        fi
+        log "$(t "  ✓ .gitignore（fallback 创建）" "  ✓ .gitignore (fallback created)")"
     fi
     INSTALLED_FILES+=(".gitignore")
-    # 追加基础设施排除规则
-    for i in "${!GITIGNORE_ENTRIES[@]}"; do
-        ENTRY="${GITIGNORE_ENTRIES[$i]}"
-        COMMENT="${GITIGNORE_COMMENTS[$i]}"
-        PATTERN=$(echo "$ENTRY" | sed 's/\./\\./g')
-        if ! grep -q "$PATTERN" "$GITIGNORE_DST" 2>/dev/null; then
-            echo "" >> "$GITIGNORE_DST"
-            echo "# $COMMENT" >> "$GITIGNORE_DST"
-            echo "$ENTRY" >> "$GITIGNORE_DST"
-        fi
-    done
 else
-    # 棕地：逐个检查追加缺失的条目
-    APPENDED=false
-    for i in "${!GITIGNORE_ENTRIES[@]}"; do
-        ENTRY="${GITIGNORE_ENTRIES[$i]}"
-        COMMENT="${GITIGNORE_COMMENTS[$i]}"
-        PATTERN=$(echo "$ENTRY" | sed 's/\./\\./g')
-        if ! grep -q "$PATTERN" "$GITIGNORE_DST" 2>/dev/null; then
-            echo "" >> "$GITIGNORE_DST"
-            echo "# $COMMENT" >> "$GITIGNORE_DST"
-            echo "$ENTRY" >> "$GITIGNORE_DST"
-            APPENDED=true
+    # 棕地：标记判定
+    MARKER_COUNT=$(grep -cF "$GITIGNORE_MARKER" "$GITIGNORE_DST" 2>/dev/null || echo 0)
+    if [ "$MARKER_COUNT" -ge 2 ]; then
+        # 已有完整桥接标记 → Prompt 替换/跳过
+        ANSWER=$(prompt_yes_no "$(t "  .gitignore 已有 bridge 内容。替换？" "  .gitignore already has bridge content. Replace?")" "$BROWN_OVERRIDE_GITIGNORE")
+        if [ "$ANSWER" = "yes" ]; then
+            if [ "$DRY_RUN" = false ] && [ -f "$GITIGNORE_SRC" ]; then
+                export ENV_GITIGNORE_DST="$GITIGNORE_DST"
+                export ENV_GITIGNORE_SRC="$GITIGNORE_SRC"
+                node << 'NODEEOF' || true
+const fs = require('fs');
+const dst = process.env.ENV_GITIGNORE_DST;
+const src = process.env.ENV_GITIGNORE_SRC;
+const existing = fs.readFileSync(dst, 'utf8');
+const bridge = fs.readFileSync(src, 'utf8');
+const marker = '# <!-- openspec-superpowers-opencode_gitignore -->';
+const esc = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const pat = new RegExp(esc + '[\\s\\S]*?' + esc);
+fs.writeFileSync(dst, existing.replace(pat, bridge.trimEnd()), 'utf8');
+NODEEOF
+            fi
+            echo "$(t "  ✓ .gitignore（bridge 内容已替换）" "  ✓ .gitignore (bridge content replaced)")"
+        else
+            echo "$(t "  - .gitignore（用户选择跳过）" "  - .gitignore (user skipped)")"
         fi
-    done
-    if [ "$APPENDED" = true ]; then
-        log "$(t "  ✓ .gitignore（已追加基础设施排除规则）" "  ✓ .gitignore (infra exclusions appended)")"
     else
-        log "$(t "  - .gitignore（所有排除规则已存在，跳过）" "  - .gitignore (all exclusions exist, skipping)")"
+        # 无/不完整标记 → 静默追加
+        if [ "$DRY_RUN" = false ] && [ -f "$GITIGNORE_SRC" ]; then
+            BRIDGE=$(cat "$GITIGNORE_SRC")
+            echo "" >> "$GITIGNORE_DST"
+            echo "$BRIDGE" >> "$GITIGNORE_DST"
+        fi
+        echo "$(t "  ✓ .gitignore（已追加桥接规则）" "  ✓ .gitignore (bridge rules appended)")"
     fi
 fi
 
-# .gitattributes（行尾规范化，抑制 CRLF 警告）
+# .gitattributes（marker 判定，同 .gitignore 模式）
 GITATTR_SRC="$TEMPLATE_DIR/.gitattributes"
 GITATTR_DST="$PROJECT_ROOT/.gitattributes"
-if [ -f "$GITATTR_SRC" ] && [ ! -f "$GITATTR_DST" ]; then
-    run_cmd cp "$GITATTR_SRC" "$GITATTR_DST"
-    INSTALLED_FILES+=(".gitattributes")
-    log "$(t "  ✓ .gitattributes" "  ✓ .gitattributes")"
+GITATTR_MARKER='# <!-- openspec-superpowers-opencode_gitattributes -->'
+
+if [ ! -f "$GITATTR_DST" ]; then
+    # 绿地：从模板复制
+    if [ -f "$GITATTR_SRC" ]; then
+        run_cmd cp "$GITATTR_SRC" "$GITATTR_DST"
+        INSTALLED_FILES+=(".gitattributes")
+        log "$(t "  ✓ .gitattributes" "  ✓ .gitattributes")"
+    fi
+else
+    # 棕地：标记判定
+    MARKER_COUNT=$(grep -cF "$GITATTR_MARKER" "$GITATTR_DST" 2>/dev/null || echo 0)
+    if [ "$MARKER_COUNT" -ge 2 ]; then
+        # 已有完整桥接标记 → Prompt 替换/跳过
+        ANSWER=$(prompt_yes_no "$(t "  .gitattributes 已有 bridge 内容。替换？" "  .gitattributes already has bridge content. Replace?")" "$BROWN_OVERRIDE_GITATTR")
+        if [ "$ANSWER" = "yes" ]; then
+            if [ "$DRY_RUN" = false ] && [ -f "$GITATTR_SRC" ]; then
+                export ENV_GITATTR_DST="$GITATTR_DST"
+                export ENV_GITATTR_SRC="$GITATTR_SRC"
+                node << 'NODEEOF' || true
+const fs = require('fs');
+const dst = process.env.ENV_GITATTR_DST;
+const src = process.env.ENV_GITATTR_SRC;
+const existing = fs.readFileSync(dst, 'utf8');
+const bridge = fs.readFileSync(src, 'utf8');
+const marker = '# <!-- openspec-superpowers-opencode_gitattributes -->';
+const esc = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const pat = new RegExp(esc + '[\\s\\S]*?' + esc);
+fs.writeFileSync(dst, existing.replace(pat, bridge.trimEnd()), 'utf8');
+NODEEOF
+            fi
+            echo "$(t "  ✓ .gitattributes（bridge 内容已替换）" "  ✓ .gitattributes (bridge content replaced)")"
+        else
+            echo "$(t "  - .gitattributes（用户选择跳过）" "  - .gitattributes (user skipped)")"
+        fi
+    else
+        # 无/不完整标记 → 静默追加
+        if [ "$DRY_RUN" = false ] && [ -f "$GITATTR_SRC" ]; then
+            BRIDGE=$(cat "$GITATTR_SRC")
+            echo "" >> "$GITATTR_DST"
+            echo "$BRIDGE" >> "$GITATTR_DST"
+        fi
+        echo "$(t "  ✓ .gitattributes（已追加桥接规则）" "  ✓ .gitattributes (bridge rules appended)")"
+    fi
 fi
 
 # .editorconfig（编辑器规则）
@@ -908,7 +887,7 @@ echo ""
 
 # ---- 写入安装清单 ----
 if [ "$DRY_RUN" = false ]; then
-    # 序列化 INSTALLED_FILES 传递给 python3
+    # 序列化 INSTALLED_FILES 传递给 node
     INSTALLED_FILES_JOINED=""
     for f in "${INSTALLED_FILES[@]}"; do
         INSTALLED_FILES_JOINED="${INSTALLED_FILES_JOINED}${f}"$'\n'
@@ -920,49 +899,39 @@ if [ "$DRY_RUN" = false ]; then
     export LANG_ARG
     export SUPERPOWERS_BASE
 
-    python3 << 'PYEOF'
-import json, os, subprocess
-from datetime import datetime, timezone
+    node << 'NODEEOF' || true
+const fs = require('fs');
+const { execSync } = require('child_process');
 
-manifest_path = os.environ.get('MANIFEST_FILE', '')
-project_root = os.environ.get('PROJECT_ROOT', '')
-decisions_file = os.environ.get('DECISIONS_FILE', '')
-files_str = os.environ.get('INSTALLED_FILES_BASH', '')
+const manifest_path = process.env.MANIFEST_FILE;
+const decisions_file = process.env.DECISIONS_FILE || '';
+const files_str = process.env.INSTALLED_FILES_BASH || '';
 
-# 解析 files
-files_list = [f.strip() for f in files_str.split('\n') if f.strip()]
-files_list = sorted(list(set(files_list)))
-
-# 解析 overwriteDecisions
-decisions = {}
-if decisions_file and os.path.exists(decisions_file):
-    with open(decisions_file) as f:
-        for line in f:
-            line = line.strip()
-            if ':' in line:
-                parts = line.split(':', 1)
-                decisions[parts[0]] = parts[1]
-
-# 获取 openspec 版本
-openspec_ver = "unknown"
-try:
-    openspec_ver = subprocess.check_output(['openspec', '--version'], stderr=subprocess.STDOUT, timeout=10).decode('utf-8').strip()
-except:
-    pass
-
-manifest = {
-    'project': 'openspec-superpowers-opencode',
-    'installedAt': datetime.now(timezone.utc).isoformat(),
-    'language': os.environ.get('LANG_ARG', 'en'),
-    'opencodeVersion': openspec_ver,
-    'superpowersPath': os.environ.get('SUPERPOWERS_BASE', ''),
-    'files': files_list,
-    'overwriteDecisions': decisions
+const files_list = [...new Set(files_str.split('\n').map(s => s.trim()).filter(Boolean))].sort();
+let decisions = {};
+if (decisions_file && fs.existsSync(decisions_file)) {
+  const text = fs.readFileSync(decisions_file, 'utf8');
+  for (const line of text.split('\n')) {
+    const l = line.trim();
+    const idx = l.indexOf(':');
+    if (idx > 0) decisions[l.slice(0, idx)] = l.slice(idx + 1);
+  }
 }
-
-with open(manifest_path, 'w', encoding='utf-8') as f:
-    json.dump(manifest, f, indent=2, ensure_ascii=False)
-PYEOF
+let openspec_ver = 'unknown';
+try {
+  openspec_ver = execSync('openspec --version', { timeout: 10000, encoding: 'utf8' }).trim();
+} catch (e) {}
+const manifest = {
+  project: 'openspec-superpowers-opencode',
+  installedAt: new Date().toISOString(),
+  language: process.env.LANG_ARG || 'en',
+  opencodeVersion: openspec_ver,
+  superpowersPath: process.env.SUPERPOWERS_BASE || '',
+  files: files_list,
+  overwriteDecisions: decisions,
+};
+fs.writeFileSync(manifest_path, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+NODEEOF
 
     echo "$(t "✓ 安装清单已写入: .opencode/install-manifest.json" "✓ Install manifest written: .opencode/install-manifest.json")"
     echo "$(t "  已记录 ${#INSTALLED_FILES[@]} 个文件" "  ${#INSTALLED_FILES[@]} files recorded")"

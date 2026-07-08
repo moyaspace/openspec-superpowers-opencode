@@ -1,4 +1,6 @@
+# <!-- openspec-superpowers-opencode_gitattributes -->
 # 全局使用 LF 换行符，避免 Windows 上 git 检出时将 LF 转换为 CRLF，
 # 导致 git status 等命令（因 stat 缓存）误判文件变更状态
 # 该规则自动检测文件是文本还是二进制，对文本文件强制 LF 换行符（检出时不做 CRLF 转换）
 * text=auto eol=lf
+# <!-- openspec-superpowers-opencode_gitattributes -->

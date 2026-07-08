@@ -25,6 +25,8 @@ $envOverrideOpenspec = [System.Environment]::GetEnvironmentVariable("BROWN_OVERR
 $envOverrideCommands = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_COMMANDS")
 $envOverrideSkills = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_SKILLS")
 $envOverrideAgents = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_AGENTS")
+$envOverrideGitignore = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_GITIGNORE")
+$envOverrideGitattr = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_GITATTR")
 
 # ---- 多语言辅助函数 ----
 function t($zh, $en) {
@@ -607,66 +609,106 @@ Write-Host (t "[5/7] 部署 Git 配置 + AGENTS.md..." "[5/7] Deploying git conf
         }
     }
 
-# .gitignore（追加基础设施排除规则，不覆盖已有内容）
+# .gitignore（marker 判定，同 AGENTS.md 模式）
 # 注意：不依赖 $gitignoreSrc 是否存在 — 绕过 npm 11.x 下 .npmignore 对嵌套 .gitignore 的异常排除
 $gitignoreSrc = Join-Path $templateDir "_gitignore"
 $gitignoreDst = Join-Path $projectRoot ".gitignore"
-$gitignoreEntries = @(
-    @{ Pattern = '\.opencode/';  Line = '.opencode/';  Comment = 'OpenCode config - do not track' }
-    @{ Pattern = 'openspec/schemas/'; Line = 'openspec/schemas/'; Comment = 'OpenSpec Schema - do not track' }
-    @{ Pattern = 'openspec/config\.yaml'; Line = 'openspec/config.yaml'; Comment = 'OpenSpec config - do not track' }
-    @{ Pattern = '\.worktrees/'; Line = '.worktrees/'; Comment = 'Worktree isolation - do not track' }
-)
+$gitignoreMarker = '# <!-- openspec-superpowers-opencode_gitignore -->'
+
 if (-not (Test-Path $gitignoreDst)) {
     # 绿地：优先从模板复制
     if (Test-Path $gitignoreSrc) {
         run -block { Copy-Item -Force $gitignoreSrc $gitignoreDst -ErrorAction Stop } -description "创建 .gitignore"
-    }
-    # Fallback: 模板不存在或拷贝失败时直接用 Set-Content 创建
-    if (-not (Test-Path $gitignoreDst)) {
-        @"
+        if (-not $DryRun) { Write-Host (t "  ✓ .gitignore" "  ✓ .gitignore") -ForegroundColor Green }
+    } else {
+        # Fallback: 模板不存在时用 marker 包裹的基础规则创建
+        if (-not $DryRun) {
+            @"
+$gitignoreMarker
 # Worktree isolation
 .worktrees/
+$gitignoreMarker
 "@ | Set-Content -Path $gitignoreDst -NoNewline -Encoding utf8
-        if (-not $DryRun) { Write-Host (t "  ✓ .gitignore（fallback 创建）" "  ✓ .gitignore (fallback created)") -ForegroundColor Green }
-    } else {
-        if (-not $DryRun) { Write-Host (t "  ✓ .gitignore" "  ✓ .gitignore") -ForegroundColor Green }
+            Write-Host (t "  ✓ .gitignore（fallback 创建）" "  ✓ .gitignore (fallback created)") -ForegroundColor Green
+        }
     }
     $installedFiles += ".gitignore"
-    $content = Get-Content $gitignoreDst -Raw
-    $appended = $false
-    foreach ($entry in $gitignoreEntries) {
-        if ($content -notmatch $entry.Pattern) {
-            $append = "`n# $($entry.Comment)`n$($entry.Line)"
-            Add-Content -Path $gitignoreDst -Value $append -NoNewline -Encoding utf8
-            $appended = $true
-        }
-    }
 } else {
-    # 棕地：逐个检查追加缺失的条目
+    # 棕地：标记判定
     $content = Get-Content $gitignoreDst -Raw
-    $appended = $false
-    foreach ($entry in $gitignoreEntries) {
-        if ($content -notmatch $entry.Pattern) {
-            $append = "`n# $($entry.Comment)`n$($entry.Line)"
-            Add-Content -Path $gitignoreDst -Value $append -NoNewline -Encoding utf8
-            $appended = $true
+    $markerCount = ([regex]::Matches($content, $gitignoreMarker)).Count
+    if ($markerCount -ge 2) {
+        # 已有完整桥接标记 → Prompt 替换/跳过
+        $answer = Prompt-YesNo -prompt (t "  .gitignore 已有 bridge 内容。替换？" "  .gitignore already has bridge content. Replace?") -envOverride $envOverrideGitignore
+        if ($answer -eq 'yes') {
+            if (-not $DryRun) {
+                $escaped = [regex]::Escape($gitignoreMarker)
+                $bridgeContent = Get-Content $gitignoreSrc -Raw -ErrorAction SilentlyContinue
+                if ($bridgeContent) {
+                    $pattern = "$escaped[\s\S]*?$escaped"
+                    $newContent = $content -replace $pattern, $bridgeContent.TrimEnd()
+                    Set-Content -Path $gitignoreDst -Value $newContent -NoNewline -Encoding utf8 -ErrorAction Stop
+                }
+            }
+            Write-Host (t "  ✓ .gitignore（bridge 内容已替换）" "  ✓ .gitignore (bridge content replaced)") -ForegroundColor Green
+        } else {
+            Write-Host (t "  - .gitignore（用户选择跳过）" "  - .gitignore (user skipped)") -ForegroundColor Gray
         }
-    }
-    if ($appended) {
-        if (-not $DryRun) { Write-Host (t "  ✓ .gitignore（已追加基础设施排除规则）" "  ✓ .gitignore (infra exclusions appended)") -ForegroundColor Green }
     } else {
-        Write-Host (t "  - .gitignore（所有排除规则已存在，跳过）" "  - .gitignore (all exclusions exist, skipping)") -ForegroundColor Gray
+        # 无/不完整标记 → 静默追加
+        if (-not $DryRun) {
+            $bridgeContent = Get-Content $gitignoreSrc -Raw -ErrorAction SilentlyContinue
+            if ($bridgeContent) {
+                Add-Content -Path $gitignoreDst -Value "`n$bridgeContent" -NoNewline -Encoding utf8
+            }
+        }
+        Write-Host (t "  ✓ .gitignore（已追加桥接规则）" "  ✓ .gitignore (bridge rules appended)") -ForegroundColor Green
     }
 }
 
-# .gitattributes（行尾规范化，抑制 CRLF 警告）
+# .gitattributes（marker 判定，同 .gitignore 模式）
 $gitattrSrc = Join-Path $templateDir ".gitattributes"
 $gitattrDst = Join-Path $projectRoot ".gitattributes"
-if ((Test-Path $gitattrSrc) -and -not (Test-Path $gitattrDst)) {
-    run -block { Copy-Item -Force $gitattrSrc $gitattrDst -ErrorAction Stop } -description "创建 .gitattributes"
-    $installedFiles += ".gitattributes"
-    if (-not $DryRun) { Write-Host (t "  ✓ .gitattributes" "  ✓ .gitattributes") -ForegroundColor Green }
+$gitattrMarker = '# <!-- openspec-superpowers-opencode_gitattributes -->'
+
+if (-not (Test-Path $gitattrDst)) {
+    # 绿地：从模板复制
+    if (Test-Path $gitattrSrc) {
+        run -block { Copy-Item -Force $gitattrSrc $gitattrDst -ErrorAction Stop } -description "创建 .gitattributes"
+        $installedFiles += ".gitattributes"
+        if (-not $DryRun) { Write-Host (t "  ✓ .gitattributes" "  ✓ .gitattributes") -ForegroundColor Green }
+    }
+} else {
+    # 棕地：标记判定
+    $content = Get-Content $gitattrDst -Raw
+    $markerCount = ([regex]::Matches($content, $gitattrMarker)).Count
+    if ($markerCount -ge 2) {
+        # 已有完整桥接标记 → Prompt 替换/跳过
+        $answer = Prompt-YesNo -prompt (t "  .gitattributes 已有 bridge 内容。替换？" "  .gitattributes already has bridge content. Replace?") -envOverride $envOverrideGitattr
+        if ($answer -eq 'yes') {
+            if (-not $DryRun) {
+                $escaped = [regex]::Escape($gitattrMarker)
+                $bridgeContent = Get-Content $gitattrSrc -Raw -ErrorAction SilentlyContinue
+                if ($bridgeContent) {
+                    $pattern = "$escaped[\s\S]*?$escaped"
+                    $newContent = $content -replace $pattern, $bridgeContent.TrimEnd()
+                    Set-Content -Path $gitattrDst -Value $newContent -NoNewline -Encoding utf8 -ErrorAction Stop
+                }
+            }
+            Write-Host (t "  ✓ .gitattributes（bridge 内容已替换）" "  ✓ .gitattributes (bridge content replaced)") -ForegroundColor Green
+        } else {
+            Write-Host (t "  - .gitattributes（用户选择跳过）" "  - .gitattributes (user skipped)") -ForegroundColor Gray
+        }
+    } else {
+        # 无/不完整标记 → 静默追加
+        if (-not $DryRun) {
+            $bridgeContent = Get-Content $gitattrSrc -Raw -ErrorAction SilentlyContinue
+            if ($bridgeContent) {
+                Add-Content -Path $gitattrDst -Value "`n$bridgeContent" -NoNewline -Encoding utf8
+            }
+        }
+        Write-Host (t "  ✓ .gitattributes（已追加桥接规则）" "  ✓ .gitattributes (bridge rules appended)") -ForegroundColor Green
+    }
 }
 
 # .editorconfig（编辑器规则）

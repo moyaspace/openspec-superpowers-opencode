@@ -1,3 +1,4 @@
+# <!-- openspec-superpowers-opencode_gitignore -->
 # Worktree isolation
 .worktrees/
 
@@ -6,3 +7,7 @@
 
 # CodeGraph index cache
 .codegraph/
+
+# Local test run logs
+docs/test-runs/
+# <!-- openspec-superpowers-opencode_gitignore -->
