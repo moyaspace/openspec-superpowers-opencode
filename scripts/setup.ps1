@@ -27,6 +27,7 @@ $envOverrideSkills = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRID
 $envOverrideAgents = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_AGENTS")
 $envOverrideGitignore = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_GITIGNORE")
 $envOverrideGitattr = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_GITATTR")
+$envOverrideEditorconfig = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_EDITORCONFIG")
 
 # ---- 多语言辅助函数 ----
 function t($zh, $en) {
@@ -711,13 +712,49 @@ if (-not (Test-Path $gitattrDst)) {
     }
 }
 
-# .editorconfig（编辑器规则）
+# .editorconfig（marker 判定，同 .gitignore 模式）
 $editorconfigSrc = Join-Path $templateDir ".editorconfig"
 $editorconfigDst = Join-Path $projectRoot ".editorconfig"
-if ((Test-Path $editorconfigSrc) -and -not (Test-Path $editorconfigDst)) {
-    run -block { Copy-Item -Force $editorconfigSrc $editorconfigDst -ErrorAction Stop } -description "创建 .editorconfig"
-    $installedFiles += ".editorconfig"
-    if (-not $DryRun) { Write-Host (t "  ✓ .editorconfig" "  ✓ .editorconfig") -ForegroundColor Green }
+$editorconfigMarker = '# <!-- openspec-superpowers-opencode_editorconfig -->'
+
+if (-not (Test-Path $editorconfigDst)) {
+    # 绿地：从模板复制
+    if (Test-Path $editorconfigSrc) {
+        run -block { Copy-Item -Force $editorconfigSrc $editorconfigDst -ErrorAction Stop } -description "创建 .editorconfig"
+        $installedFiles += ".editorconfig"
+        if (-not $DryRun) { Write-Host (t "  ✓ .editorconfig" "  ✓ .editorconfig") -ForegroundColor Green }
+    }
+} else {
+    # 棕地：标记判定
+    $content = Get-Content $editorconfigDst -Raw
+    $markerCount = ([regex]::Matches($content, $editorconfigMarker)).Count
+    if ($markerCount -ge 2) {
+        # 已有完整桥接标记 → Prompt 替换/跳过
+        $answer = Prompt-YesNo -prompt (t "  .editorconfig 已有 bridge 内容。替换？" "  .editorconfig already has bridge content. Replace?") -envOverride $envOverrideEditorconfig
+        if ($answer -eq 'yes') {
+            if (-not $DryRun) {
+                $escaped = [regex]::Escape($editorconfigMarker)
+                $bridgeContent = Get-Content $editorconfigSrc -Raw -ErrorAction SilentlyContinue
+                if ($bridgeContent) {
+                    $pattern = "$escaped[\s\S]*?$escaped"
+                    $newContent = $content -replace $pattern, $bridgeContent.TrimEnd()
+                    Set-Content -Path $editorconfigDst -Value $newContent -NoNewline -Encoding utf8 -ErrorAction Stop
+                }
+            }
+            Write-Host (t "  ✓ .editorconfig（bridge 内容已替换）" "  ✓ .editorconfig (bridge content replaced)") -ForegroundColor Green
+        } else {
+            Write-Host (t "  - .editorconfig（用户选择跳过）" "  - .editorconfig (user skipped)") -ForegroundColor Gray
+        }
+    } else {
+        # 无/不完整标记 → 静默追加
+        if (-not $DryRun) {
+            $bridgeContent = Get-Content $editorconfigSrc -Raw -ErrorAction SilentlyContinue
+            if ($bridgeContent) {
+                Add-Content -Path $editorconfigDst -Value "`n$bridgeContent" -NoNewline -Encoding utf8
+            }
+        }
+        Write-Host (t "  ✓ .editorconfig（已追加桥接规则）" "  ✓ .editorconfig (bridge rules appended)") -ForegroundColor Green
+    }
 }
 
 # ---- 语言文件清理（仅保留英文 + 所选语言，静默执行）----

@@ -85,6 +85,7 @@ BROWN_OVERRIDE_SKILLS="${BROWN_OVERRIDE_SKILLS:-}"
 BROWN_OVERRIDE_AGENTS="${BROWN_OVERRIDE_AGENTS:-}"
 BROWN_OVERRIDE_GITIGNORE="${BROWN_OVERRIDE_GITIGNORE:-}"
 BROWN_OVERRIDE_GITATTR="${BROWN_OVERRIDE_GITATTR:-}"
+BROWN_OVERRIDE_EDITORCONFIG="${BROWN_OVERRIDE_EDITORCONFIG:-}"
 
 # 用于记录 commands/skills 覆盖决策的临时文件
 DECISIONS_FILE=$(mktemp 2>/dev/null || mktemp -t "opencode-decisions.XXXXXX")
@@ -747,13 +748,53 @@ NODEEOF
     fi
 fi
 
-# .editorconfig（编辑器规则）
+# .editorconfig（marker 判定，同 .gitignore 模式）
 EDITORCONFIG_SRC="$TEMPLATE_DIR/.editorconfig"
 EDITORCONFIG_DST="$PROJECT_ROOT/.editorconfig"
-if [ -f "$EDITORCONFIG_SRC" ] && [ ! -f "$EDITORCONFIG_DST" ]; then
-    run_cmd cp "$EDITORCONFIG_SRC" "$EDITORCONFIG_DST"
-    INSTALLED_FILES+=(".editorconfig")
-    log "$(t "  ✓ .editorconfig" "  ✓ .editorconfig")"
+EDITORCONFIG_MARKER='# <!-- openspec-superpowers-opencode_editorconfig -->'
+
+if [ ! -f "$EDITORCONFIG_DST" ]; then
+    # 绿地：从模板复制
+    if [ -f "$EDITORCONFIG_SRC" ]; then
+        run_cmd cp "$EDITORCONFIG_SRC" "$EDITORCONFIG_DST"
+        INSTALLED_FILES+=(".editorconfig")
+        log "$(t "  ✓ .editorconfig" "  ✓ .editorconfig")"
+    fi
+else
+    # 棕地：标记判定
+    MARKER_COUNT=$(grep -cF "$EDITORCONFIG_MARKER" "$EDITORCONFIG_DST" 2>/dev/null || echo 0)
+    if [ "$MARKER_COUNT" -ge 2 ]; then
+        # 已有完整桥接标记 → Prompt 替换/跳过
+        ANSWER=$(prompt_yes_no "$(t "  .editorconfig 已有 bridge 内容。替换？" "  .editorconfig already has bridge content. Replace?")" "$BROWN_OVERRIDE_EDITORCONFIG")
+        if [ "$ANSWER" = "yes" ]; then
+            if [ "$DRY_RUN" = false ] && [ -f "$EDITORCONFIG_SRC" ]; then
+                export ENV_EC_DST="$EDITORCONFIG_DST"
+                export ENV_EC_SRC="$EDITORCONFIG_SRC"
+                node << 'NODEEOF' || true
+const fs = require('fs');
+const dst = process.env.ENV_EC_DST;
+const src = process.env.ENV_EC_SRC;
+const existing = fs.readFileSync(dst, 'utf8');
+const bridge = fs.readFileSync(src, 'utf8');
+const marker = '# <!-- openspec-superpowers-opencode_editorconfig -->';
+const esc = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const pat = new RegExp(esc + '[\\s\\S]*?' + esc);
+fs.writeFileSync(dst, existing.replace(pat, bridge.trimEnd()), 'utf8');
+NODEEOF
+            fi
+            echo "$(t "  ✓ .editorconfig（bridge 内容已替换）" "  ✓ .editorconfig (bridge content replaced)")"
+        else
+            echo "$(t "  - .editorconfig（用户选择跳过）" "  - .editorconfig (user skipped)")"
+        fi
+    else
+        # 无/不完整标记 → 静默追加
+        if [ "$DRY_RUN" = false ] && [ -f "$EDITORCONFIG_SRC" ]; then
+            BRIDGE=$(cat "$EDITORCONFIG_SRC")
+            echo "" >> "$EDITORCONFIG_DST"
+            echo "$BRIDGE" >> "$EDITORCONFIG_DST"
+        fi
+        echo "$(t "  ✓ .editorconfig（已追加桥接规则）" "  ✓ .editorconfig (bridge rules appended)")"
+    fi
 fi
 echo ""
 
