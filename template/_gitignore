@@ -1,2 +1,8 @@
 # Worktree isolation
 .worktrees/
+
+# OpenCode session/plugin data
+.omo/
+
+# CodeGraph index cache
+.codegraph/
