@@ -35,8 +35,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "install": "node scripts/shims-installer.js install",
-    "preuninstall": "node scripts/shims-installer.js uninstall"
+    "install": "node scripts/shims-installer.js install"
   },
   "engines": {
     "node": ">=16"

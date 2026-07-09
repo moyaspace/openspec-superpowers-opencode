@@ -365,13 +365,18 @@ describe('uninstallShims()', () => {
         assert.strictEqual(fs.readFileSync(path.join(binDir, 'openspec.cmd'), 'utf8'), '@echo off\noriginal openspec');
     });
 
-    test('fails when openspec not in PATH', (t) => {
+    test('falls back to toolDir when openspec not in PATH', (t) => {
         t.mock.method(child_process, 'execSync', () => { throw new Error('not found'); });
 
         const result = shimsInstaller.uninstallShims('/some/tool/dir', false);
+        // uninstallShims → binDirFromToolDir('/some/tool/dir', false):
+        //   nmDir = td/..; not scoped; levelsUp = 0 + 2 = 2
+        //   prefix = path.resolve(nmDir, '..', '..'); return path.join(prefix, 'bin')
+        const nmDir = path.resolve('/some/tool/dir', '..');
+        const expectedBin = path.join(path.resolve(nmDir, '..', '..'), 'bin');
+        assert.strictEqual(result.binDir, expectedBin);
         assert.strictEqual(result.success, false);
-        assert.strictEqual(result.binDir, null);
-        assert.ok(result.details.some(d => d.includes('not found')));
+        assert.ok(result.details.some(d => d.includes('PATH lookup failed')));
     });
 
     test('fails when openspec-orig not found', (t) => {
@@ -406,41 +411,36 @@ describe('uninstallShims()', () => {
 });
 
 // ============================================================
-// install-meta fallback for uninstall
+// binDirFromToolDir()
 // ============================================================
-describe('install-meta fallback', () => {
-    test('saveInstallMeta saves binDir to file', () => {
-        const tmp = tmpDir();
-        const metaPath = path.join(tmp, 'meta.json');
-        shimsInstaller._setMetaPath(metaPath);
-        shimsInstaller.saveInstallMeta('/some/bin/dir');
-        const raw = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-        assert.strictEqual(raw.binDir, '/some/bin/dir');
-        assert.ok(raw.installedAt);
+describe('binDirFromToolDir()', () => {
+    test('scoped package on Windows', () => {
+        const td = 'C:\\portableApp\\nvm\\v24.14.0\\node_modules\\@scope\\pkg';
+        assert.strictEqual(shimsInstaller.binDirFromToolDir(td, true), 'C:\\portableApp\\nvm\\v24.14.0');
     });
 
-    test('loadInstallMeta returns null when file missing', () => {
-        const tmp = tmpDir();
-        const metaPath = path.join(tmp, 'nonexistent.json');
-        shimsInstaller._setMetaPath(metaPath);
-        assert.strictEqual(shimsInstaller.loadInstallMeta(), null);
+    test('non-scoped package on Windows', () => {
+        const td = 'C:\\portableApp\\nvm\\v24.14.0\\node_modules\\some-pkg';
+        assert.strictEqual(shimsInstaller.binDirFromToolDir(td, true), 'C:\\portableApp\\nvm\\v24.14.0');
     });
 
-    test('saveInstallMeta and loadInstallMeta round-trip', () => {
-        const tmp = tmpDir();
-        const metaPath = path.join(tmp, 'meta.json');
-        shimsInstaller._setMetaPath(metaPath);
-        shimsInstaller.saveInstallMeta('/some/bin/dir');
-        const loaded = shimsInstaller.loadInstallMeta();
-        assert.strictEqual(loaded.binDir, '/some/bin/dir');
-        assert.ok(loaded.installedAt);
+    test('scoped package on Unix', () => {
+        // td = /usr/local/lib/node_modules/@scope/pkg
+        // nmDir = td/..; isScoped=true; levelsUp = 1 + 2 = 3
+        // prefix = path.resolve(nmDir, '..', '..', '..'); return path.join(prefix, 'bin')
+        const td = '/usr/local/lib/node_modules/@scope/pkg';
+        const nmDir = path.resolve(td, '..');
+        const prefix = path.resolve(nmDir, '..', '..', '..');
+        assert.strictEqual(shimsInstaller.binDirFromToolDir(td, false), path.join(prefix, 'bin'));
     });
 
-    test('loadInstallMeta returns null on corrupted JSON', () => {
-        const tmp = tmpDir();
-        const metaPath = path.join(tmp, 'bad.json');
-        shimsInstaller._setMetaPath(metaPath);
-        require('fs').writeFileSync(metaPath, 'not json', 'utf8');
-        assert.strictEqual(shimsInstaller.loadInstallMeta(), null);
+    test('non-scoped package on Unix', () => {
+        // td = /usr/local/lib/node_modules/some-pkg
+        // nmDir = td/..; isScoped=false; levelsUp = 0 + 2 = 2
+        // prefix = path.resolve(nmDir, '..', '..'); return path.join(prefix, 'bin')
+        const td = '/usr/local/lib/node_modules/some-pkg';
+        const nmDir = path.resolve(td, '..');
+        const prefix = path.resolve(nmDir, '..', '..');
+        assert.strictEqual(shimsInstaller.binDirFromToolDir(td, false), path.join(prefix, 'bin'));
     });
 });
