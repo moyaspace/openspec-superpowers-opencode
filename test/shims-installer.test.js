@@ -333,9 +333,10 @@ describe('uninstallShims()', () => {
 
     test('full successful uninstall (unix)', (t) => {
         const base = tmpDir();
+        const metaPath = path.join(base, 'meta.json');
+        shimsInstaller._setMetaPath(metaPath);
         const binDir = setupInstalledEnvironment(base, false);
-
-        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+        shimsInstaller.saveInstallMeta(binDir);
 
         const result = shimsInstaller.uninstallShims(base, false);
         assert.strictEqual(result.success, true);
@@ -351,9 +352,10 @@ describe('uninstallShims()', () => {
 
     test('full successful uninstall (Windows)', (t) => {
         const base = tmpDir();
+        const metaPath = path.join(base, 'meta.json');
+        shimsInstaller._setMetaPath(metaPath);
         const binDir = setupInstalledEnvironment(base, true);
-
-        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec.cmd'));
+        shimsInstaller.saveInstallMeta(binDir);
 
         const result = shimsInstaller.uninstallShims(base, true);
         assert.strictEqual(result.success, true);
@@ -365,28 +367,27 @@ describe('uninstallShims()', () => {
         assert.strictEqual(fs.readFileSync(path.join(binDir, 'openspec.cmd'), 'utf8'), '@echo off\noriginal openspec');
     });
 
-    test('fails when openspec not in PATH', (t) => {
-        // 隔离 meta：用 temp 目录下不存在的路径，避免被之前 installShims 测试写入的 meta 污染
+    test('fails when no install meta', (t) => {
+        // 隔离 meta：用 temp 目录下不存在的路径
         const metaTmp = tmpDir();
-        shimsInstaller._setMetaPath(path.join(metaTmp, 'isolated-meta.json'));
-
-        t.mock.method(child_process, 'execSync', () => { throw new Error('not found'); });
+        shimsInstaller._setMetaPath(path.join(metaTmp, 'nonexistent.json'));
 
         const result = shimsInstaller.uninstallShims('/some/tool/dir', false);
         assert.strictEqual(result.success, false);
         assert.strictEqual(result.binDir, null);
-        assert.ok(result.details.some(d => d.includes('not found') || d.includes('no install meta')));
+        assert.ok(result.details.some(d => d.includes('install meta not found')));
 
         shimsInstaller._setMetaPath(null);
     });
 
     test('fails when openspec-orig not found', (t) => {
         const base = tmpDir();
+        const metaPath = path.join(base, 'meta.json');
+        shimsInstaller._setMetaPath(metaPath);
         const binDir = path.join(base, 'bin');
         fs.mkdirSync(binDir);
         fs.writeFileSync(path.join(binDir, 'openspec'), '#!/bin/sh');
-
-        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+        shimsInstaller.saveInstallMeta(binDir);
 
         const result = shimsInstaller.uninstallShims(base, false);
         assert.strictEqual(result.success, false);
@@ -396,13 +397,14 @@ describe('uninstallShims()', () => {
 
     test('handles partial install (only some shim scripts exist)', (t) => {
         const base = tmpDir();
+        const metaPath = path.join(base, 'meta.json');
+        shimsInstaller._setMetaPath(metaPath);
         const binDir = path.join(base, 'bin');
         fs.mkdirSync(binDir);
         fs.writeFileSync(path.join(binDir, 'openspec-orig'), '#!/bin/sh\noriginal');
         // Only one shim script was installed
         fs.writeFileSync(path.join(binDir, 'openspec'), '#!/bin/sh\nshim');
-
-        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+        shimsInstaller.saveInstallMeta(binDir);
 
         const result = shimsInstaller.uninstallShims(base, false);
         assert.strictEqual(result.success, true);
