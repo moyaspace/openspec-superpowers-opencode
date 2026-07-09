@@ -5,7 +5,7 @@ set TOOL_DIR={{TOOL_DIR}}
 if "%TOOL_DIR%"=="" goto passthrough
 if not "%1"=="list" goto passthrough
 
-node "%TOOL_DIR%\lib\registry-utils.js" list
+node "%TOOL_DIR%\lib\registry-utils.js" %*
 exit /b %errorlevel%
 
 :passthrough

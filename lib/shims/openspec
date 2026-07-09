@@ -3,7 +3,7 @@
 TOOL_DIR="{{TOOL_DIR}}"
 
 if [ "$1" = "list" ] && [ -n "$TOOL_DIR" ]; then
-    exec node "$TOOL_DIR/lib/registry-utils.js" list
+    exec node "$TOOL_DIR/lib/registry-utils.js" "$@"
 fi
 
 exec openspec-orig "$@"

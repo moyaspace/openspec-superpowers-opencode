@@ -29,6 +29,115 @@ function tmpNotGit() {
 }
 
 // ============================================================
+// mergeListJson()
+// ============================================================
+describe('mergeListJson()', () => {
+    test('returns empty JSON when no entries', () => {
+        const result = registryUtils.mergeListJson([], '/some/project');
+        assert.strictEqual(result, '{"changes":[]}\n');
+    });
+
+    test('returns empty JSON when no worktrees exist', () => {
+        const dir = tmpProject();
+        const result = registryUtils.mergeListJson([
+            { name: 'ghost', worktree: '.worktrees/ghost' }
+        ], dir);
+        assert.strictEqual(result, '{\n  "changes": []\n}\n');
+    });
+
+    test('aggregates JSON changes from each worktree', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-a'), { recursive: true });
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-b'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', (cmd, opts) => {
+            const cwd = opts.cwd;
+            if (cwd.endsWith('feature-a')) {
+                return Buffer.from(JSON.stringify({
+                    changes: [
+                        { name: 'feature-a', completedTasks: 2, totalTasks: 5, lastModified: '2026-07-08T12:00:00.000Z', status: 'in-progress' }
+                    ]
+                }));
+            }
+            if (cwd.endsWith('feature-b')) {
+                return Buffer.from(JSON.stringify({
+                    changes: [
+                        { name: 'feature-b', completedTasks: 0, totalTasks: 3, lastModified: '2026-07-09T12:00:00.000Z', status: 'no-tasks' }
+                    ]
+                }));
+            }
+            return Buffer.from(JSON.stringify({ changes: [] }));
+        });
+
+        const result = registryUtils.mergeListJson([
+            { name: 'feature-a', worktree: '.worktrees/feature-a' },
+            { name: 'feature-b', worktree: '.worktrees/feature-b' }
+        ], dir);
+
+        const parsed = JSON.parse(result);
+        assert.ok(Array.isArray(parsed.changes));
+        assert.strictEqual(parsed.changes.length, 2);
+        assert.strictEqual(parsed.changes[0].name, 'feature-a');
+        assert.strictEqual(parsed.changes[1].name, 'feature-b');
+    });
+
+    test('deduplicates by name (first wins)', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-a'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', () => Buffer.from(JSON.stringify({
+            changes: [
+                { name: 'feature-a', completedTasks: 1, totalTasks: 2, lastModified: '2026-07-08T12:00:00.000Z', status: 'in-progress' }
+            ]
+        })));
+
+        const result = registryUtils.mergeListJson([
+            { name: 'feature-a', worktree: '.worktrees/feature-a' },
+            { name: 'feature-a', worktree: '.worktrees/feature-a-dup' }
+        ], dir);
+
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 1);
+    });
+
+    test('skips worktree when directory missing', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'live'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', (cmd, opts) => {
+            if (opts.cwd.includes('live')) {
+                return Buffer.from(JSON.stringify({
+                    changes: [{ name: 'live', completedTasks: 1, totalTasks: 1, lastModified: '2026-07-08T12:00:00.000Z', status: 'done' }]
+                }));
+            }
+            return Buffer.from(JSON.stringify({ changes: [] }));
+        });
+
+        const result = registryUtils.mergeListJson([
+            { name: 'live', worktree: '.worktrees/live' },
+            { name: 'ghost', worktree: '.worktrees/ghost' }
+        ], dir);
+
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 1);
+        assert.strictEqual(parsed.changes[0].name, 'live');
+    });
+
+    test('handles execSync failure gracefully', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'broken'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', () => { throw { status: 1 }; });
+
+        const result = registryUtils.mergeListJson([
+            { name: 'broken', worktree: '.worktrees/broken' }
+        ], dir);
+
+        assert.strictEqual(result, '{\n  "changes": []\n}\n');
+    });
+});
+
+// ============================================================
 // findProjectRoot()
 // ============================================================
 describe('findProjectRoot()', () => {
