@@ -14,77 +14,156 @@
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+
+// ========== 诊断日志 ==========
+const diagLog = [];
+function diag(...args) { diagLog.push(args.join(' ')); }
+
+// 也写到 TEMP 文件（因为 npm 可能吞 stdout/stderr）
+const diagFile = path.join(os.tmpdir(), `shims-uninstall-${Date.now()}.log`);
+diag('SHIMS-INSTALLER DIAGNOSTIC');
+diag('timestamp:', new Date().toISOString());
+diag('argv:', process.argv.join(' '));
+diag('cwd:', process.cwd());
+diag('__dirname:', __dirname);
+diag('platform:', process.platform);
+diag('PATH:', process.env.PATH || '(unset)');
+diag('toolDir (resolved):', path.resolve(__dirname, '..'));
 
 const toolDir = path.resolve(__dirname, '..');
 const isWin = process.platform === 'win32';
 
 const action = process.argv[2];
+diag('action:', action);
 
 if (!action || (action !== 'install' && action !== 'uninstall')) {
-    console.error('Usage: node scripts/shims-installer.js <install|uninstall>');
+    const msg = 'Usage: node scripts/shims-installer.js <install|uninstall>';
+    console.error(msg);
+    diag(msg);
+    fs.writeFileSync(diagFile, diagLog.join('\n'), 'utf8');
     process.exit(1);
 }
 
-// ============================================================
-// 从 toolDir 推算 npm prefix bin 目录
-// 例：toolDir = .../node_modules/@scope/pkg
-//     prefix = .../node_modules/@scope/pkg/../../.. = ...
-//     binDir = prefix (Windows) 或 prefix/bin (Unix)
-// ============================================================
-function getBinDirFromToolDir(td) {
-    // 先取 node_modules 的父目录 → npm prefix
-    const nmDir = path.resolve(td, '..');
-    // 如果上一级叫 @xxx（scoped package），再多取一级
-    const nmParent = path.basename(path.dirname(td)).startsWith('@')
-        ? path.resolve(nmDir, '..', '..')
-        : path.resolve(nmDir, '..');
-    return isWin ? nmParent : path.join(nmParent, 'bin');
+// 尝试从 lib 加载
+let lib;
+try {
+    const libPath = path.join(toolDir, 'lib', 'shims-installer');
+    diag('trying require:', libPath);
+    lib = require(libPath);
+    diag('lib loaded successfully, exports:', Object.keys(lib).join(', '));
+} catch (e) {
+    diag('lib require FAILED:', e.message);
+    diag('lib require stack:', e.stack);
+    lib = null;
 }
 
-// ============================================================
-// 内联卸载逻辑（不依赖 lib/ 下的模块，因为 require 可能失败）
-// ============================================================
+// binDirFromToolDir: 优先 lib 导出，否则内联
+const binDirFromToolDir = lib
+    ? lib.binDirFromToolDir
+    : (function(td) {
+        const nmDir = path.resolve(td, '..');
+        diag('  binDirFromToolDir: nmDir =', nmDir);
+        const parentName = path.basename(path.dirname(td));
+        diag('  binDirFromToolDir: parentName =', parentName);
+        const nmParent = parentName.startsWith('@')
+            ? path.resolve(nmDir, '..', '..')
+            : path.resolve(nmDir, '..');
+        diag('  binDirFromToolDir: nmParent =', nmParent);
+        const result = isWin ? nmParent : path.join(nmParent, 'bin');
+        diag('  binDirFromToolDir: result =', result);
+        return result;
+    });
+
+// 辅助函数
 function getShimFiles(win) {
-    return win
+    return lib ? lib.getShimFiles(win) : (win
         ? ['openspec.cmd', 'openspec.ps1']
-        : ['openspec', 'openspec.cmd', 'openspec.ps1'];
+        : ['openspec', 'openspec.cmd', 'openspec.ps1']);
 }
 
-function findOpenspecOrigFile(dir, win) {
+function findOpenspecOrigFile(dir2, win) {
+    if (lib) return lib.findOpenspecOrigFile(dir2, win);
     const candidates = win
         ? ['openspec-orig.cmd', 'openspec-orig.ps1', 'openspec-orig']
         : ['openspec-orig', 'openspec-orig.cmd', 'openspec-orig.ps1'];
     for (const c of candidates) {
-        if (fs.existsSync(path.join(dir, c))) return c;
+        if (fs.existsSync(path.join(dir2, c))) return c;
     }
     return null;
 }
 
 function getRestoreTarget(origFile) {
-    return 'openspec' + path.extname(origFile);
+    return lib ? lib.getRestoreTarget(origFile) : 'openspec' + path.extname(origFile);
 }
 
-function uninstallShimsInline(td) {
+function checkDir(dir) {
+    const entries = [];
+    try {
+        if (fs.existsSync(dir)) {
+            const files = fs.readdirSync(dir);
+            for (const f of files) {
+                if (f.includes('openspec')) entries.push(f);
+            }
+        } else {
+            entries.push('(DIRECTORY DOES NOT EXIST)');
+        }
+    } catch (e) {
+        entries.push('(READ ERROR: ' + e.message + ')');
+    }
+    return entries;
+}
+
+// ============================================================
+// 卸载
+// ============================================================
+function uninstallShims(td) {
     const details = [];
-    const binDir = getBinDirFromToolDir(td);
+    diag('--- uninstallShims ---');
+    diag('td =', td);
+
+    const binDir = binDirFromToolDir(td, isWin);
+    diag('binDirFromToolDir result:', binDir);
     details.push(`computed bin dir: ${binDir}`);
 
+    diag('checking binDir exists?', fs.existsSync(binDir));
+    diag('openspec* files in binDir:', checkDir(binDir).join(', ') || '(none)');
+
     const origFile = findOpenspecOrigFile(binDir, isWin);
+    diag('findOpenspecOrigFile result:', origFile);
     if (!origFile) {
-        return { success: false, binDir, details: [...details, 'openspec-orig not found — nothing to restore'] };
+        const msg = 'openspec-orig not found — nothing to restore';
+        diag(msg);
+        return { success: false, binDir, details: [...details, msg] };
     }
     details.push(`found backup: ${origFile}`);
 
-    // 删除垫片
     for (const sf of getShimFiles(isWin)) {
         const p = path.join(binDir, sf);
-        if (fs.existsSync(p)) { fs.unlinkSync(p); details.push(`deleted: ${sf}`); }
+        diag('checking shim:', sf, 'exists?', fs.existsSync(p));
+        if (fs.existsSync(p)) {
+            fs.unlinkSync(p);
+            diag('deleted:', sf);
+            details.push(`deleted: ${sf}`);
+        }
     }
 
-    // 恢复 openspec-orig → openspec
     const target = getRestoreTarget(origFile);
-    fs.renameSync(path.join(binDir, origFile), path.join(binDir, target));
+    diag('renaming', origFile, '→', target);
+    const srcPath = path.join(binDir, origFile);
+    const dstPath = path.join(binDir, target);
+    diag('src exists?', fs.existsSync(srcPath));
+    diag('dst exists?', fs.existsSync(dstPath));
+    try {
+        fs.renameSync(srcPath, dstPath);
+        diag('rename succeeded');
+    } catch (e) {
+        diag('rename FAILED:', e.message);
+        diag('rename stack:', e.stack);
+        return { success: false, binDir, details: [...details, `rename failed: ${e.message}`] };
+    }
     details.push(`restored: ${origFile} → ${target}`);
+    diag('after restore, openspec* files:', checkDir(binDir).join(', ') || '(none)');
 
     return { success: true, binDir, details };
 }
@@ -93,20 +172,34 @@ function uninstallShimsInline(td) {
 // 入口
 // ============================================================
 
-if (action === 'install') {
-    // install 依赖 lib 模块（垫片模板等）
-    let installer;
-    try {
-        installer = require(path.join(toolDir, 'lib', 'shims-installer'));
-    } catch (e) {
-        console.error(`Failed to load shims-installer: ${e.message}`);
-        process.exit(1);
+try {
+    if (action === 'install') {
+        if (!lib) {
+            const msg = 'Failed to load shims-installer module';
+            console.error(msg);
+            diag(msg);
+            fs.writeFileSync(diagFile, diagLog.join('\n'), 'utf8');
+            process.exit(1);
+        }
+        diag('--- installShims ---');
+        const result = lib.installShims(toolDir, isWin);
+        for (const d of result.details) console.log(`  ${d}`);
+        diag('installShims result:', JSON.stringify(result));
+        fs.writeFileSync(diagFile, diagLog.join('\n'), 'utf8');
+        process.exit(result.success ? 0 : 1);
+    } else {
+        const result = uninstallShims(toolDir);
+        for (const d of result.details) console.log(`  ${d}`);
+        diag('uninstallShims result:', JSON.stringify(result));
+        diag('diagnostic log written to:', diagFile);
+        fs.writeFileSync(diagFile, diagLog.join('\n'), 'utf8');
+        console.error('DIAGNOSTIC LOG:', diagFile);
+        process.exit(result.success ? 0 : 1);
     }
-    const result = installer.installShims(toolDir, isWin);
-    for (const d of result.details) console.log(`  ${d}`);
-    process.exit(result.success ? 0 : 1);
-} else {
-    const result = uninstallShimsInline(toolDir);
-    for (const d of result.details) console.log(`  ${d}`);
-    process.exit(result.success ? 0 : 1);
+} catch (e) {
+    diag('UNCAUGHT ERROR:', e.message);
+    diag('UNCAUGHT STACK:', e.stack);
+    fs.writeFileSync(diagFile, diagLog.join('\n'), 'utf8');
+    console.error('DIAGNOSTIC LOG:', diagFile);
+    process.exit(1);
 }
