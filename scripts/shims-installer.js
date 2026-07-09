@@ -6,8 +6,8 @@
  *   node scripts/shims-installer.js install    安装垫片
  *   node scripts/shims-installer.js uninstall  卸除垫片
  *
- * 被 package.json 中的 scripts.install / scripts.uninstall 调用。
- * 无需额外依赖，零运行时开销。
+ * 被 package.json 中的 scripts.install / scripts.preuninstall 调用。
+ * preuninstall 阶段 npm 还未删除包文件，require 和 PATH 都可用。
  */
 
 const path = require('path');

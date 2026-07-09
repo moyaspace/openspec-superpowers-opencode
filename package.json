@@ -36,7 +36,7 @@
   ],
   "scripts": {
     "install": "node scripts/shims-installer.js install",
-    "uninstall": "node scripts/shims-installer.js uninstall"
+    "preuninstall": "node scripts/shims-installer.js uninstall"
   },
   "engines": {
     "node": ">=16"
