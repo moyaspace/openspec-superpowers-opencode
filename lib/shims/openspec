@@ -2,7 +2,7 @@
 # openspec shim for oso registry
 TOOL_DIR="{{TOOL_DIR}}"
 
-if [ "$1" = "list" ] && [ -n "$TOOL_DIR" ] && [ "$TOOL_DIR" != "{{TOOL_DIR}}" ]; then
+if [ "$1" = "list" ] && [ -n "$TOOL_DIR" ]; then
     exec node "$TOOL_DIR/lib/registry-utils.js" list
 fi
 
