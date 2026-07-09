@@ -221,9 +221,9 @@ describe('readRegistry()', () => {
 // mergeList()
 // ============================================================
 describe('mergeList()', () => {
-    test('returns empty string when no entries', () => {
+    test('returns No active changes when no entries', () => {
         const result = registryUtils.mergeList([], '/some/project');
-        assert.strictEqual(result, '');
+        assert.strictEqual(result, 'No active changes found.\n');
     });
 
     test('returns "No active changes" when no worktrees exist', () => {
