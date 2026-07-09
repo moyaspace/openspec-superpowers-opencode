@@ -366,12 +366,18 @@ describe('uninstallShims()', () => {
     });
 
     test('fails when openspec not in PATH', (t) => {
+        // 隔离 meta：用 temp 目录下不存在的路径，避免被之前 installShims 测试写入的 meta 污染
+        const metaTmp = tmpDir();
+        shimsInstaller._setMetaPath(path.join(metaTmp, 'isolated-meta.json'));
+
         t.mock.method(child_process, 'execSync', () => { throw new Error('not found'); });
 
         const result = shimsInstaller.uninstallShims('/some/tool/dir', false);
         assert.strictEqual(result.success, false);
         assert.strictEqual(result.binDir, null);
-        assert.ok(result.details.some(d => d.includes('not found')));
+        assert.ok(result.details.some(d => d.includes('not found') || d.includes('no install meta')));
+
+        shimsInstaller._setMetaPath(null);
     });
 
     test('fails when openspec-orig not found', (t) => {
@@ -402,5 +408,77 @@ describe('uninstallShims()', () => {
         assert.strictEqual(result.success, true);
         assert.ok(fs.existsSync(path.join(binDir, 'openspec')));
         assert.strictEqual(fs.readFileSync(path.join(binDir, 'openspec'), 'utf8'), '#!/bin/sh\noriginal');
+    });
+});
+
+// ============================================================
+// install-meta fallback for uninstall
+// ============================================================
+describe('install-meta fallback', () => {
+    test('saveInstallMeta saves binDir to file', () => {
+        const tmp = tmpDir();
+        const metaPath = path.join(tmp, 'meta.json');
+        shimsInstaller._setMetaPath(metaPath);
+        shimsInstaller.saveInstallMeta('/some/bin/dir');
+        const raw = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+        assert.strictEqual(raw.binDir, '/some/bin/dir');
+        assert.ok(raw.installedAt);
+    });
+
+    test('loadInstallMeta returns null when file missing', () => {
+        const tmp = tmpDir();
+        const metaPath = path.join(tmp, 'nonexistent.json');
+        shimsInstaller._setMetaPath(metaPath);
+        assert.strictEqual(shimsInstaller.loadInstallMeta(), null);
+    });
+
+    test('uninstallShims uses meta fallback when openspec not in PATH', (t) => {
+        const tmp = tmpDir();
+        const metaPath = path.join(tmp, 'meta.json');
+        shimsInstaller._setMetaPath(metaPath);
+
+        const binDir = path.join(tmp, 'bin');
+        fs.mkdirSync(binDir);
+        // Create original openspec backup
+        fs.writeFileSync(path.join(binDir, 'openspec-orig'), '#!/bin/sh\nrestored-original');
+        // Create shim files
+        fs.writeFileSync(path.join(binDir, 'openspec'), '#!/bin/sh\nshim-wrapper');
+
+        // Save meta with binDir
+        shimsInstaller.saveInstallMeta(binDir);
+        assert.ok(fs.existsSync(metaPath), 'meta should exist before uninstall');
+
+        // Mock: openspec not found in PATH
+        t.mock.method(child_process, 'execSync', () => { throw new Error('not found'); });
+
+        const result = shimsInstaller.uninstallShims(tmp, false);
+        assert.strictEqual(result.success, true);
+        // Shim should be replaced by restored original
+        assert.strictEqual(fs.readFileSync(path.join(binDir, 'openspec'), 'utf8'), '#!/bin/sh\nrestored-original');
+        // Meta <PII type="CASE_ID" id="125"/> be cleaned up
+        assert.ok(!fs.existsSync(metaPath), 'meta should be deleted after successful uninstall');
+    });
+
+    test('uninstallShims deletes meta file after successful cleanup via PATH', (t) => {
+        const tmp = tmpDir();
+        const metaPath = path.join(tmp, 'meta.json');
+        shimsInstaller._setMetaPath(metaPath);
+
+        const binDir = path.join(tmp, 'bin');
+        fs.mkdirSync(binDir);
+        fs.writeFileSync(path.join(binDir, 'openspec-orig'), '#!/bin/sh\nrestored-original');
+        fs.writeFileSync(path.join(binDir, 'openspec'), '#!/bin/sh\nshim-wrapper');
+
+        // Save meta as if installShims had written it
+        shimsInstaller.saveInstallMeta(binDir);
+        assert.ok(fs.existsSync(metaPath));
+
+        // Mock: openspec found in PATH (normal case)
+        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+
+        const result = shimsInstaller.uninstallShims(tmp, false);
+        assert.strictEqual(result.success, true);
+        // Meta should still be cleaned up even though PATH lookup worked
+        assert.ok(!fs.existsSync(metaPath), 'meta should be deleted when shims are found via PATH');
     });
 });
