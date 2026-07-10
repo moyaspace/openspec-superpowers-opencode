@@ -28,6 +28,7 @@ $envOverrideAgents = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRID
 $envOverrideGitignore = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_GITIGNORE")
 $envOverrideGitattr = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_GITATTR")
 $envOverrideEditorconfig = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_EDITORCONFIG")
+$envOverrideOcodeJson = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_OCODEJSON")
 
 # ---- 多语言辅助函数 ----
 function t($zh, $en) {
@@ -88,7 +89,7 @@ function Prompt-YesNoAll {
         # 无效值：不回退，继续往下走到 Read-Host 交互式询问
     }
     while ($true) {
-        $ans = Read-Host "$prompt (yes/no/ask)"
+        $ans = Read-Host "$prompt (yes/No/ask)"
         if ($ans -eq 'y' -or $ans -eq 'Y' -or $ans -eq 'yes') { return 'yes' }
         if ($ans -eq '' -or $ans -eq 'n' -or $ans -eq 'N' -or $ans -eq 'no') { return 'no' }
         if ($ans -eq 'a' -or $ans -eq 'A' -or $ans -eq 'ask') { return 'ask' }
@@ -214,7 +215,7 @@ Write-Host ""
 $installedFiles = @()  # 记录安装的文件，用于清单
 
 # ---- 0. 检查前提条件 ----
-Write-Host (t "[0/7] 检查前提条件..." "[0/7] Checking prerequisites...") -ForegroundColor Yellow
+Write-Host (t "[0/8] 检查前提条件..." "[0/8] Checking prerequisites...") -ForegroundColor Yellow
 
 $allPrereqsOk = $true
 
@@ -263,7 +264,7 @@ if (-not $allPrereqsOk) {
 Write-Host ""
 
 # ---- 1. 检测 Superpowers 安装路径 ----
-Write-Host (t "[1/7] 检测 Superpowers 安装路径..." "[1/7] Detecting Superpowers installation path...") -ForegroundColor Yellow
+Write-Host (t "[1/8] 检测 Superpowers 安装路径..." "[1/8] Detecting Superpowers installation path...") -ForegroundColor Yellow
 
 $superpowersBase = $superpowersBaseSkills
 
@@ -275,8 +276,7 @@ if (-not $superpowersBase) {
 Write-Host (t "✓ Superpowers 路径: $superpowersBase" "✓ Superpowers path: $superpowersBase") -ForegroundColor Green
 Write-Host ""
 
-# ---- 2. Skill lock 校验（WARNING 级别，不阻塞）----
-Write-Host (t "[1.5/7] 校验 Skill 文件完整性..." "[1.5/7] Verifying skill file integrity...") -ForegroundColor Yellow
+# ---- Skill lock 校验（WARNING 级别，不阻塞）----
 
 $lockFile = Join-Path $templateDir "skills.lock.json"
 if (Test-Path $lockFile) {
@@ -309,7 +309,7 @@ if (Test-Path $lockFile) {
 Write-Host ""
 
 # ---- 2. openspec/ 门控（棕地：询问 YES/NO；绿地：自动部署）----
-Write-Host (t "[2/7] 检测 openspec/ 部署状态..." "[2/7] Checking openspec/ deployment state...") -ForegroundColor Yellow
+Write-Host (t "[2/8] 检测 openspec/ 部署状态..." "[2/8] Checking openspec/ deployment state...") -ForegroundColor Yellow
 
 $openspecConfigDst = Join-Path $projectRoot "openspec\config.yaml"
 $openspecHasExisting = Test-Path $openspecConfigDst
@@ -331,7 +331,7 @@ if ($openspecHasExisting) {
 Write-Host ""
 
 # ---- 3. 部署 openspec/（config.yaml + schemas/* + changes/ + specs/）----
-Write-Host (t "[3/7] 部署 openspec/ 配置..." "[3/7] Deploying openspec/ config...") -ForegroundColor Yellow
+Write-Host (t "[3/8] 部署 openspec/ 配置..." "[3/8] Deploying openspec/ config...") -ForegroundColor Yellow
 
 if ($openspecGateResult -eq "yes") {
     # config.yaml（门控已通过，覆盖部署）
@@ -377,8 +377,74 @@ if ($openspecGateResult -eq "yes") {
 }
 Write-Host ""
 
+# ---- 辅助函数：按模板 key 顺序序列化 JSON ----
+function ConvertTo-CanonicalJson {
+    param($Permission, $TemplatePermission, $Indent = 2)
+
+    $nl = "`n"
+    $i = { param($n) " " * $n }
+
+    # 获取对象的所有键（兼容 hashtable 和 PSCustomObject）
+    function Get-ObjectKeys($obj) {
+        if ($null -eq $obj) { return @() }
+        if ($obj -is [hashtable]) { return @($obj.Keys) }
+        return @($obj.PSObject.Properties.Name)
+    }
+
+    # 从模板获取 key 顺序，追加额外 key（用户自定义）
+    function Get-OrderedKeys($obj, $tmplKeys) {
+        $ordered = @($tmplKeys)
+        Get-ObjectKeys $obj | Where-Object { $_ -notin $ordered } | ForEach-Object { $ordered += $_ }
+        return $ordered
+    }
+
+    $lines = @()
+    $lines += "{"
+    $lines += "$(&$i 2)`"permission`": {"
+
+    $permKeys = Get-OrderedKeys $Permission $TemplatePermission.PSObject.Properties.Name
+    $permCount = $permKeys.Count
+    for ($pi = 0; $pi -lt $permCount; $pi++) {
+        $key = $permKeys[$pi]
+        $val = $Permission.$key
+        $comma = if ($pi -lt $permCount - 1) { "," } else { "" }
+
+        if ($key -in "write", "edit" -and $null -ne $val -and $val -isnot [string]) {
+            $lines += "$(&$i 4)`"$key`": {"
+            $tmplSub = $TemplatePermission.$key
+            $subKeys = Get-OrderedKeys $val ($tmplSub.PSObject.Properties.Name)
+            $subCount = $subKeys.Count
+            for ($si = 0; $si -lt $subCount; $si++) {
+                $sk = $subKeys[$si]
+                $sv = $val.$sk
+                $scomma = if ($si -lt $subCount - 1) { "," } else { "" }
+                $lines += "$(&$i 6)`"$sk`": `"$sv`"$scomma"
+            }
+            $lines += "$(&$i 4)}$comma"
+        } elseif ($key -eq "bash" -and $null -ne $val -and $val -isnot [string]) {
+            $lines += "$(&$i 4)`"bash`": {"
+            $tmplBash = $TemplatePermission.bash
+            $bashKeys = Get-OrderedKeys $val ($tmplBash.PSObject.Properties.Name)
+            $bashCount = $bashKeys.Count
+            for ($bi = 0; $bi -lt $bashCount; $bi++) {
+                $bk = $bashKeys[$bi]
+                $bv = $val.$bk
+                $bcomma = if ($bi -lt $bashCount - 1) { "," } else { "" }
+                $lines += "$(&$i 6)`"$bk`": `"$bv`"$bcomma"
+            }
+            $lines += "$(&$i 4)}$comma"
+        } else {
+            $lines += "$(&$i 4)`"$key`": `"$val`"$comma"
+        }
+    }
+
+    $lines += "$(&$i 2)}"
+    $lines += "}"
+    return $lines -join $nl
+}
+
 # ---- 4. 部署 .opencode/（opencode.json 合并 + commands/skills y/N/a）----
-Write-Host (t "[4/7] 部署 .opencode/ 配置..." "[4/7] Deploying .opencode/ config...") -ForegroundColor Yellow
+Write-Host (t "[4/8] 部署 .opencode/ 配置..." "[4/8] Deploying .opencode/ config...") -ForegroundColor Yellow
 
 $opencodeSrc = Join-Path $templateDir ".opencode"
 $opencodeDst = Join-Path $projectRoot ".opencode"
@@ -392,6 +458,11 @@ if (Test-Path $opencodeSrc) {
     $ocJsonSrc = Join-Path $opencodeSrc "opencode.json"
     $ocJsonDst = Join-Path $opencodeDst "opencode.json"
     if ((Test-Path $ocJsonSrc) -and (Test-Path $ocJsonDst)) {
+        # 棕地：询问是否合并
+        $ocJsonOverwrite = Prompt-YesNo -prompt (t "  .opencode\opencode.json 权限顺序是否需要更新为模板标准？选择否将跳过合并" "  .opencode\opencode.json key order — sync to template standard?") -envOverride $envOverrideOcodeJson
+        if ($ocJsonOverwrite -eq "no") {
+            if (-not $DryRun) { Write-Host (t "  - .opencode\opencode.json（跳过）" "  - .opencode\opencode.json (skipped)") -ForegroundColor Gray }
+        } else {
         # 棕地：联合合并
         $userJson = Get-Content $ocJsonDst -Raw -Encoding utf8 | ConvertFrom-Json
         $tmplJson = Get-Content $ocJsonSrc -Raw -Encoding utf8 | ConvertFrom-Json
@@ -448,13 +519,16 @@ if (Test-Path $opencodeSrc) {
                 $mergedPermission["bash"] = $bashHash
             }
         }
-        # 写出合并结果
-        $mergedJson = @{ permission = $mergedPermission } | ConvertTo-Json -Depth 10
+        # 写出合并结果（按模板 key 顺序，而非 ConvertTo-Json 的字母序）
+        $mergedJson = ConvertTo-CanonicalJson -Permission $mergedPermission -TemplatePermission $tmplJson.permission
         if (-not $DryRun) {
             Set-Content -Path $ocJsonDst -Value $mergedJson -NoNewline -Encoding utf8 -ErrorAction Stop
-            Write-Host (t "  ✓ .opencode\opencode.json（已合并：required 路径已强制 allow）" "  ✓ .opencode\opencode.json (merged: required paths force-allowed)") -ForegroundColor Green
-            Write-Host (t "    （用户原有权限保留，模板 required 路径 .worktrees/** / openspec/** / .opencode/** 已补入）" "    (User permissions preserved, template required paths added)") -ForegroundColor Gray
+            Write-Host (t "  ✓ .opencode\opencode.json（已合并）" "  ✓ .opencode\opencode.json (merged)") -ForegroundColor Green
+            Write-Host (t "    - 工作流所需路径权限已按需设置" "    - Workflow path permissions set as required") -ForegroundColor Gray
+            Write-Host (t "    - 用户自定义权限保留在对应块的末尾" "    - User custom permissions placed at the end of each block") -ForegroundColor Gray
+            Write-Host (t "    ⚠ 请检查 .opencode\opencode.json 权限是否符合预期" "    ⚠ Verify opencode.json permissions meet expectations") -ForegroundColor Yellow
         }
+        }  # end else (merge)
     } elseif (Test-Path $ocJsonSrc) {
         # 绿地：直接复制
         run -block { Copy-Item $ocJsonSrc $ocJsonDst -ErrorAction Stop } -description "复制 .opencode\opencode.json"
@@ -572,7 +646,7 @@ if (Test-Path $opencodeSrc) {
 Write-Host ""
 
 # ---- 5. Git 文件 + AGENTS.md ----
-Write-Host (t "[5/7] 部署 Git 配置 + AGENTS.md..." "[5/7] Deploying git config + AGENTS.md...") -ForegroundColor Yellow
+Write-Host (t "[5/8] 部署 Git 配置 + AGENTS.md..." "[5/8] Deploying git config + AGENTS.md...") -ForegroundColor Yellow
 
     # AGENTS.md（检测标记替换/追加，不记入 manifest — 设计决策维度 4）
     $agentsSrc = Join-Path $templateDir "AGENTS.md"
@@ -783,7 +857,7 @@ Write-Host (t "✓ 文件复制完成" "✓ File copy complete") -ForegroundColo
 Write-Host ""
 
 # ---- 6. 替换占位符 ----
-Write-Host (t "[6/7] 替换路径占位符..." "[6/7] Replacing path placeholders...") -ForegroundColor Yellow
+Write-Host (t "[6/8] 替换路径占位符..." "[6/8] Replacing path placeholders...") -ForegroundColor Yellow
 
 $replacement = "$superpowersBase\"
 $filesToProcess = @(
@@ -823,8 +897,8 @@ foreach ($file in $filesToProcess) {
 Write-Host (t "✓ 占位符替换完成" "✓ Placeholder replacement complete") -ForegroundColor Green
 Write-Host ""
 
-# ---- 6. 验证 schema ----
-Write-Host (t "[7/7] 验证 schema..." "[7/7] Validating schema...") -ForegroundColor Yellow
+# ---- 7. 验证 schema ----
+Write-Host (t "[7/8] 验证 schema..." "[7/8] Validating schema...") -ForegroundColor Yellow
 
 $schemaResult = $true
 if (-not $DryRun) {
@@ -841,12 +915,12 @@ if (-not $DryRun) {
 Write-Host ""
 
 # ---- 8. 验证工作流 + 写入安装清单 ----
-Write-Host (t "[8/7] 验证工作流 + 写入安装清单..." "[8/7] Validating workflow + writing manifest...") -ForegroundColor Yellow
+Write-Host (t "[8/8] 验证工作流 + 写入安装清单..." "[8/8] Validating workflow + writing manifest...") -ForegroundColor Yellow
 
 $allOk = $true
 
 if (-not $DryRun) {
-    # 6a. 验证模板路径正确解析
+    # 8a. 验证模板路径正确解析
     $templatesJson = openspec templates --json --schema superpowers-bridge-opencode 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host (t "✗ 模板解析失败" "✗ Template parsing failed") -ForegroundColor Red
@@ -861,7 +935,7 @@ if (-not $DryRun) {
         }
     }
 
-    # 6b. 创建测试变更
+    # 8b. 创建测试变更
     $testChangeName = "verify-deploy"
     openspec new change $testChangeName --description "部署验证" 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
@@ -871,10 +945,23 @@ if (-not $DryRun) {
         Write-Host (t "✓ 测试变更已创建" "✓ Test change created") -ForegroundColor Green
     }
 
-    # 6c. 验证变更被正确列出
+    # 8c. 验证变更被正确列出
     if ($allOk) {
-        $changeList = openspec list --json 2>&1
-        $changeFound = $changeList -match $testChangeName
+        # 尝试 JSON 解析；降级到目录存在检查
+        $changeFound = $false
+        $changeListRaw = openspec list --json 2>$null | Out-String
+        try {
+            $changeListObj = $changeListRaw | ConvertFrom-Json
+            $changeNames = @($changeListObj.changes | ForEach-Object {
+                if ($_ -is [string]) { $_ } else { $_.name }
+            })
+            $changeFound = $changeNames -contains $testChangeName
+        } catch {
+            # JSON 解析失败，保留 $false
+        }
+        if (-not $changeFound) {
+            $changeFound = Test-Path "openspec\changes\$testChangeName"
+        }
         if (-not $changeFound) {
             Write-Host (t "✗ 变更未被列出" "✗ Change not listed") -ForegroundColor Red
             $allOk = $false
@@ -883,7 +970,7 @@ if (-not $DryRun) {
         }
     }
 
-    # 6d. 验证 artifact 依赖链完整
+    # 8d. 验证 artifact 依赖链完整
     if ($allOk) {
         $statusOut = openspec status --change $testChangeName 2>&1
         $artifactCount = ($statusOut | Select-String -Pattern '^\[' -AllMatches).Matches.Count
@@ -895,7 +982,7 @@ if (-not $DryRun) {
         }
     }
 
-    # 6e. 验证指令生成正常
+    # 8e. 验证指令生成正常
     if ($allOk) {
         $instructionsOut = openspec instructions brainstorm --change $testChangeName 2>&1
         if ($LASTEXITCODE -ne 0) {
@@ -906,7 +993,7 @@ if (-not $DryRun) {
         }
     }
 
-    # 6f. 清理测试变更
+    # 8f. 清理测试变更
     Remove-Item "openspec\changes\$testChangeName" -Recurse -Force -ErrorAction SilentlyContinue
     Write-Host (t "✓ 测试变更已清理" "✓ Test change cleaned up") -ForegroundColor Green
 
@@ -956,14 +1043,13 @@ if (-not $DryRun) {
         Write-Host (t "⚠ Schema 验证失败。请修复后重新运行 setup 脚本。" "⚠ Schema validation failed. Fix and re-run setup script.") -ForegroundColor Yellow
     } elseif (-not $allOk) {
         Write-Host (t "⚠ 工作流验证未完全通过。请检查上方错误信息。" "⚠ Workflow validation incomplete. Check errors above.") -ForegroundColor Yellow
-    } else {
-        Write-Host ""
-        Write-Host (t "下一步：" "Next steps:") -ForegroundColor White
-        Write-Host (t "  0. 快速开始指南在安装目录 docs/QUICKSTART.md" "  0. Quick start guide at docs/QUICKSTART.md in installation directory") -ForegroundColor Gray
-        Write-Host (t "  1. /opsx-ff <功能名> 创建第一个变更" "  1. /opsx-ff <feature-name> to create your first change") -ForegroundColor Gray
-        Write-Host (t "  2. 或 /opsx-onboard 进行引导式入门" "  2. Or /opsx-onboard for guided onboarding") -ForegroundColor Gray
-        Write-Host ""
-        Write-Host (t "重置： openspec-superpowers-opencode reset" "Reset: openspec-superpowers-opencode reset") -ForegroundColor Gray
-        Write-Host (t "预览： openspec-superpowers-opencode dry-run" "Preview: openspec-superpowers-opencode dry-run") -ForegroundColor Gray
     }
+    Write-Host ""
+    Write-Host (t "下一步：" "Next steps:") -ForegroundColor White
+    Write-Host (t "  0. 快速开始指南在安装目录 docs/QUICKSTART.md" "  0. Quick start guide at docs/QUICKSTART.md in installation directory") -ForegroundColor Gray
+    Write-Host (t "  1. /opsx-ff <功能名> 创建第一个变更，或" "  1. /opsx-ff <feature-name> to create your first change, or") -ForegroundColor Gray
+    Write-Host (t "  2. /opsx-onboard 进行引导式入门" "  2. /opsx-onboard for guided onboarding") -ForegroundColor Gray
+    Write-Host ""
+    Write-Host (t "重置： openspec-superpowers-opencode reset" "Reset: openspec-superpowers-opencode reset") -ForegroundColor Gray
+    Write-Host (t "预览： openspec-superpowers-opencode dry-run" "Preview: openspec-superpowers-opencode dry-run") -ForegroundColor Gray
 }

@@ -1,19 +1,18 @@
 # openspec shim for oso registry
 $TOOL_DIR = "{{TOOL_DIR}}"
 
-# Self-heal: package was removed, restore original openspec
+# Self-heal: package was removed, restore original openspec and clean up
 $healthCheck = Join-Path $TOOL_DIR "lib" "registry-utils.js"
 if (-not (Test-Path $healthCheck)) {
     $here = Split-Path -Parent $PSCommandPath
     $origCmd = Join-Path $here "openspec-orig.cmd"
     if (Test-Path $origCmd) {
         Copy-Item $origCmd (Join-Path $here "openspec.cmd") -Force
+        Remove-Item $origCmd -Force -ErrorAction SilentlyContinue
     }
-    $origPs1 = Join-Path $here "openspec-orig.ps1"
-    if (Test-Path $origPs1) {
-        Copy-Item $origPs1 (Join-Path $here "openspec.ps1") -Force
-    }
-    & (Join-Path $here "openspec") @args
+    # Self-destruct: our .ps1 shim is no longer needed
+    Remove-Item $PSCommandPath -Force -ErrorAction SilentlyContinue
+    & (Join-Path $here "openspec.cmd") @args
     exit $LASTEXITCODE
 }
 

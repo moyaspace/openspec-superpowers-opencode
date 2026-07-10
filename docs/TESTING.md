@@ -167,6 +167,96 @@ Remove-Item -Recurse -Force "$dirtyDir"
 
 ---
 
+### 1.5 验证逻辑单元测试
+
+> 测试 `test/setup-verify.test.js`，覆盖 setup.ps1 验证子步骤（step 8）中三个辅助函数的解析逻辑，共 **15 个单元测试**。
+
+#### 1.5.1 `parseTemplateOutput()` — 模板输出解析
+
+解析 `openspec templates --json` 的对象格式输出（`{ artifactName: { path, source } }`），统计 `source === 'project'` 的模板数。
+
+| 测试 | 输入 | 预期 |
+|------|------|------|
+| 成功解析 8+ 个 project 源模板 | 10 个模板（8 project + 2 builtin） | `ok=true`, `count=8` |
+| 不足 8 个 project 源模板时报错 | 3 个 project 源模板 | `ok=false`, `count=3` |
+| 无效 JSON 时报错 | `'not json'` | `ok=false`, `count=0` |
+| 空数组返回 count=0 | `'[]'` | `ok=false`, `count=0` |
+
+#### 1.5.2 `changeListed()` — 变更列表解析
+
+解析 `openspec list --json` 的变更列表，在数组中查找指定变更名。支持 `{changes: [...]}` 对象格式、裸数组格式、以及 JSON 解析失败的字符串回退。
+
+| 测试 | 输入 | 预期 |
+|------|------|------|
+| 在 changes 数组中找到变更 | `{changes:[{name:"verify-deploy"}]}` | `true` |
+| 多个变更中找到目标 | 含 3 个变更的数组 | `true` |
+| 变更不存在时返回 false | 单变更数组，目标不同 | `false` |
+| 空 changes 列表返回 false | `{changes:[]}` | `false` |
+| 直接数组格式也能处理 | `['verify-deploy','feature-a']` | `true` |
+| 无效 JSON 回退字符串匹配 | `'verify-deploy'` | `true`（匹配） |
+| 字符串回退不匹配 | `'no-match'` | `false` |
+
+#### 1.5.3 `parseStatusOutput()` — 状态输出解析
+
+解析 `openspec status --change` 的输出，统计以 `[` 开头的 artifact 行。
+
+| 测试 | 输入 | 预期 |
+|------|------|------|
+| 统计 [ 开头的 artifact 行 | 8 artifact 行 + 其他文本 | `ok=true`, `count=8` |
+| artifact 不足时报错 | 2 行 artifact | `ok=false`, `count=2` |
+| 空输出 count=0 | `''` | `ok=false`, `count=0` |
+
+#### 1.5.4 运行
+
+```bash
+node --test test/setup-verify.test.js
+```
+
+筛选仅运行单元测试：
+```bash
+node --test --test-name-pattern="验证逻辑" test/setup-verify.test.js
+```
+
+**🔍 预期结果**：15 个单元测试全部通过 ✓。
+
+---
+
+### 1.6 openspec CLI 集成测试
+
+> 与 1.5 同文件 `test/setup-verify.test.js`，在临时目录中实际调用 openspec CLI，共 **3 个集成测试**。
+>
+> **前置条件**：`openspec` CLI 已安装且可用。
+>
+> **自动跳过**：如果 `openspec --version` 不可用，整个 describe 块跳过（`skip`）。
+
+**📝 流程**：
+1. `before()` 创建临时目录，复制 `template/` 中的 `openspec/` 和 `.opencode/` 结构
+2. 切换到临时目录（模拟 init 后的项目环境）
+3. 每个测试分别在临时目录中执行 openspec CLI 命令
+4. `after()` 切换回原目录并递归删除临时目录
+
+| 测试 | 执行命令 | 验证点 |
+|------|---------|--------|
+| `openspec templates --json` 返回 8+ 个 project 源 | `openspec templates --json --schema superpowers-bridge-opencode` | `parseTemplateOutput(out).ok === true` |
+| `openspec new change + list` 创建并列出变更 | `openspec new change test-verify-integration` → `openspec list --json` | `changeListed(listOut, 'test-verify-integration') === true` |
+| `openspec status --change` 返回 8+ 个 artifact | `openspec new change test-verify-artifacts` → `openspec status --change test-verify-artifacts` | `parseStatusOutput(statusOut).ok === true` |
+
+**运行全部测试（含集成测试）：**
+```bash
+node --test test/setup-verify.test.js
+```
+
+**筛选仅运行集成测试：**
+```bash
+node --test --test-name-pattern="openspec" test/setup-verify.test.js
+```
+
+**🔍 预期结果**：
+- openspec CLI 可用时：3 个集成测试全部通过 ✓（+ 15 个单元测试 = 共 18 个 ✓）
+- openspec CLI 不可用时：集成测试跳过（显示 `# skip`），单元测试 15 个 ✓
+
+---
+
 ## Phase 2 — 项目结构验证
 
 ### 2.1 验证根文件列表

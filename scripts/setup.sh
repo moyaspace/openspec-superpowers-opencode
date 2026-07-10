@@ -111,7 +111,7 @@ prompt_yes_no_all() {
     fi
     local ans
     while true; do
-        read -r -p "$prompt_text (yes/no/ask) " ans
+        read -r -p "$prompt_text (yes/No/ask) " ans
         case "$ans" in
             y|Y|yes|YES) echo "yes"; return ;;
             n|N|no|NO|"") echo "no"; return ;;
@@ -255,7 +255,7 @@ echo ""
 INSTALLED_FILES=()
 
 # ---- 0. 检查前提条件 ----
-echo "$(t "[0/7] 检查前提条件..." "[0/7] Checking prerequisites...")"
+echo "$(t "[0/8] 检查前提条件..." "[0/8] Checking prerequisites...")"
 
 ALL_PREREQS_OK=true
 
@@ -298,7 +298,7 @@ fi
 echo ""
 
 # ---- 1. 检测 Superpowers 安装路径 ----
-echo "$(t "[1/7] 检测 Superpowers 安装路径..." "[1/7] Detecting Superpowers installation path...")"
+echo "$(t "[1/8] 检测 Superpowers 安装路径..." "[1/8] Detecting Superpowers installation path...")"
 
 SUPERPOWERS_BASE="$SUPERPOWERS_SKILLS"
 
@@ -310,8 +310,7 @@ fi
 echo "$(t "✓ Superpowers 路径: $SUPERPOWERS_BASE" "✓ Superpowers path: $SUPERPOWERS_BASE")"
 echo ""
 
-# ---- 1.5. Skill lock 校验 ----
-echo "$(t "[1.5/7] 校验 Skill 文件完整性..." "[1.5/7] Verifying skill file integrity...")"
+# ---- Skill lock 校验 ----
 
 LOCK_FILE="$TEMPLATE_DIR/skills.lock.json"
 if [ -f "$LOCK_FILE" ]; then
@@ -350,7 +349,7 @@ fi
 echo ""
 
 # ---- 2. openspec/ 门控（棕地：询问 YES/NO；绿地：自动部署）----
-echo "$(t "[2/7] 检测 openspec/ 部署状态..." "[2/7] Checking openspec/ deployment state...")"
+echo "$(t "[2/8] 检测 openspec/ 部署状态..." "[2/8] Checking openspec/ deployment state...")"
 
 OPENSPEC_CONFIG_DST="$PROJECT_ROOT/openspec/config.yaml"
 OPENSPEC_HAS_EXISTING=false
@@ -374,7 +373,7 @@ fi
 echo ""
 
 # ---- 3. 部署 openspec/（config.yaml + schemas/* + changes/ + specs/）----
-echo "$(t "[3/7] 部署 openspec/ 配置..." "[3/7] Deploying openspec/ config...")"
+echo "$(t "[3/8] 部署 openspec/ 配置..." "[3/8] Deploying openspec/ config...")"
 
 if [ "$OPENSPEC_GATE_RESULT" = "yes" ]; then
     # config.yaml（门控已通过，覆盖部署）
@@ -416,7 +415,7 @@ fi
 echo ""
 
 # ---- 4. 部署 .opencode/（opencode.json 合并 + commands/skills y/N/a）----
-echo "$(t "[4/7] 部署 .opencode/ 配置..." "[4/7] Deploying .opencode/ config...")"
+echo "$(t "[4/8] 部署 .opencode/ 配置..." "[4/8] Deploying .opencode/ config...")"
 
 OPENCODE_SRC="$TEMPLATE_DIR/.opencode"
 OPENCODE_DST="$PROJECT_ROOT/.opencode"
@@ -430,22 +429,35 @@ if [ -d "$OPENCODE_SRC" ]; then
     OC_JSON_SRC="$OPENCODE_SRC/opencode.json"
     OC_JSON_DST="$OPENCODE_DST/opencode.json"
     if [ -f "$OC_JSON_SRC" ] && [ -f "$OC_JSON_DST" ]; then
+        # 棕地：询问是否合并
+        if [ "$DRY_RUN" = true ]; then
+            echo "  [DRY-RUN] opencode.json merge prompt"
+        else
+            printf "$(t "  .opencode/opencode.json 权限顺序是否需要更新为模板标准？(y/N): " "  .opencode/opencode.json key order — sync to template standard? (y/N): ")"
+            read -r ans_ocjson < /dev/tty
+            case "$ans_ocjson" in
+                y|Y) ;;
+                *) echo "$(t "  - .opencode/opencode.json（跳过）" "  - .opencode/opencode.json (skipped)")";;
+            esac
+        fi
         # 棕地：用 node 做联合合并
         if [ "$DRY_RUN" = false ]; then
             node -e "
-const tmpl=JSON.parse(require('fs').readFileSync('$OC_JSON_SRC','utf8'));
-const user=JSON.parse(require('fs').readFileSync('$OC_JSON_DST','utf8'));
-const merged={permission:{...(user.permission||{})}};
-for(const[k,v]of Object.entries(tmpl.permission||{})){if(!(k in merged.permission))merged.permission[k]=v;}
+const fs=require('fs');
+const tmpl=JSON.parse(fs.readFileSync('$OC_JSON_SRC','utf8'));
+const user=JSON.parse(fs.readFileSync('$OC_JSON_DST','utf8'));
+function mergeKeys(a,b){const o={};for(const k of Object.keys(a||{}))o[k]=k in(b||{})?b[k]:a[k];for(const k of Object.keys(b||{})){if(!(k in(a||{})))o[k]=b[k];}return o;}
+const perm=mergeKeys(tmpl.permission,user.permission);
 const required=['.worktrees/**','openspec/changes/**','openspec/specs/**','.opencode/**'];
 const denied=['openspec/schemas/**','openspec/config.yaml'];
-for(const action of['write','edit']){const obj=merged.permission[action];if(obj&&typeof obj==='object'){for(const r of required)obj[r]='allow';for(const d of denied)obj[d]='deny';}}
-const tbash=tmpl.permission?.bash;const ubash=merged.permission.bash;
-if(ubash&&typeof ubash==='object'&&tbash&&typeof tbash==='object'){for(const[k,v]of Object.entries(tbash)){if(!(k in ubash))ubash[k]=v;}}
-require('fs').writeFileSync('$OC_JSON_DST',JSON.stringify(merged,null,2)+'\n','utf8');
+for(const action of['write','edit']){const obj=perm[action];if(obj&&typeof obj==='object'){const sub=mergeKeys(tmpl.permission?.[action],obj);for(const r of required)sub[r]='allow';for(const d of denied)sub[d]='deny';perm[action]=sub;}}
+if(perm.bash&&typeof perm.bash==='object'&&tmpl.permission?.bash){perm.bash=mergeKeys(tmpl.permission.bash,perm.bash);}
+fs.writeFileSync('$OC_JSON_DST',JSON.stringify({permission:perm},null,2)+'\n','utf8');
 " || true
-            echo "$(t "  ✓ .opencode/opencode.json（已合并：required 路径已强制 allow）" "  ✓ .opencode/opencode.json (merged: required paths force-allowed)")"
-            echo "$(t "    （用户原有权限保留，模板 required 路径已补入）" "    (User permissions preserved, template required paths added)")"
+            echo "$(t "  ✓ .opencode/opencode.json（已合并）" "  ✓ .opencode/opencode.json (merged)")"
+            echo "$(t "    - 工作流所需路径权限已按需设置" "    - Workflow path permissions set as required")"
+            echo "$(t "    - 用户自定义权限保留在对应块的末尾" "    - User custom permissions placed at the end of each block")"
+            echo "$(t "    ⚠ 请检查 .opencode/opencode.json 权限是否符合预期" "    ⚠ Verify opencode.json permissions meet expectations")"
         else
             echo "  [DRY-RUN] node union merge opencode.json"
         fi
@@ -593,7 +605,7 @@ fi
 echo ""
 
 # ---- 5. Git + AGENTS.md ----
-echo "$(t "[5/7] 部署 Git 配置 + AGENTS.md..." "[5/7] Deploying git config + AGENTS.md...")"
+echo "$(t "[5/8] 部署 Git 配置 + AGENTS.md..." "[5/8] Deploying git config + AGENTS.md...")"
 
 # AGENTS.md（检测标记替换/追加，不记入 manifest — 设计决策维度 4）
 AGENTS_SRC="$TEMPLATE_DIR/AGENTS.md"
@@ -819,7 +831,7 @@ log "$(t "✓ 文件复制完成" "✓ File copy complete")"
 echo ""
 
 # ---- 6. 替换占位符 ----
-echo "$(t "[6/7] 替换路径占位符..." "[6/7] Replacing path placeholders...")"
+echo "$(t "[6/8] 替换路径占位符..." "[6/8] Replacing path placeholders...")"
 
 ESCAPED_BASE=$(echo "$SUPERPOWERS_BASE" | sed 's|/|\\/|g')
 REPLACEMENT="${ESCAPED_BASE}\\/"
@@ -847,7 +859,7 @@ echo "$(t "✓ 占位符替换完成" "✓ Placeholder replacement complete")"
 echo ""
 
 # ---- 7. 验证 schema ----
-echo "$(t "[7/7] 验证 schema..." "[7/7] Validating schema...")"
+echo "$(t "[7/8] 验证 schema..." "[7/8] Validating schema...")"
 if [ "$DRY_RUN" = false ]; then
     openspec schema validate superpowers-bridge-opencode || true
     echo "$(t "✓ Schema 验证通过" "✓ Schema validation passed")"
@@ -857,7 +869,7 @@ fi
 echo ""
 
 # ---- 8. 验证工作流 + 写入安装清单 ----
-echo "$(t "[8/7] 验证工作流 + 写入安装清单..." "[8/7] Validating workflow + writing manifest...")"
+echo "$(t "[8/8] 验证工作流 + 写入安装清单..." "[8/8] Validating workflow + writing manifest...")"
 
 ALL_OK=true
 TEST_CHANGE="verify-deploy"
@@ -865,7 +877,7 @@ TEST_CHANGE="verify-deploy"
 if [ "$DRY_RUN" = false ]; then
     set +e
 
-    TEMPLATES_JSON=$(openspec templates --json --schema superpowers-bridge-opencode 2>&1)
+    TEMPLATES_JSON=$(openspec templates --json --schema superpowers-bridge-opencode 2>/dev/null)
     if [ $? -ne 0 ]; then
         echo "$(t "✗ 模板解析失败" "✗ Template parsing failed")"
         ALL_OK=false
@@ -887,15 +899,34 @@ if [ "$DRY_RUN" = false ]; then
         echo "$(t "✓ 测试变更已创建" "✓ Test change created")"
     fi
 
-    CHANGE_LIST=$(openspec list --json 2>&1)
-    if echo "$CHANGE_LIST" | grep -q "$TEST_CHANGE"; then
-        echo "$(t "✓ 变更列表正常" "✓ Change list OK")"
-    else
+    # 尝试 JSON 解析；降级到目录存在检查
+    CHANGE_FOUND=false
+    CHANGE_LIST=$(openspec list --json 2>/dev/null)
+    if command -v node &>/dev/null; then
+        CHANGE_NAMES=$(echo "$CHANGE_LIST" | node -e "
+            const d=require('fs').readFileSync('/dev/stdin','utf8');
+            try {
+                const j=JSON.parse(d);
+                const changes=j.changes||j||[];
+                changes.forEach(c=>console.log(typeof c==='string'?c:c.name));
+            } catch(e) { process.exit(1); }
+        " 2>/dev/null) && {
+            while IFS= read -r name; do
+                [ "$name" = "$TEST_CHANGE" ] && CHANGE_FOUND=true && break
+            done <<< "$CHANGE_NAMES"
+        }
+    fi
+    if [ "$CHANGE_FOUND" = false ] && [ -d "openspec/changes/$TEST_CHANGE" ]; then
+        CHANGE_FOUND=true
+    fi
+    if [ "$CHANGE_FOUND" = false ]; then
         echo "$(t "✗ 变更未被列出" "✗ Change not listed")"
         ALL_OK=false
+    else
+        echo "$(t "✓ 变更列表正常" "✓ Change list OK")"
     fi
 
-    STATUS_OUT=$(openspec status --change "$TEST_CHANGE" 2>&1)
+    STATUS_OUT=$(openspec status --change "$TEST_CHANGE" 2>/dev/null)
     ARTIFACT_COUNT=$(echo "$STATUS_OUT" | grep -c '^\[')
     if [ "$ARTIFACT_COUNT" -ge 8 ]; then
         echo "$(t "✓ Artifact 链完整（${ARTIFACT_COUNT} 个）" "✓ Artifact chain complete (${ARTIFACT_COUNT})")"
@@ -904,7 +935,7 @@ if [ "$DRY_RUN" = false ]; then
         ALL_OK=false
     fi
 
-    openspec instructions brainstorm --change "$TEST_CHANGE" 2>&1 > /dev/null
+    openspec instructions brainstorm --change "$TEST_CHANGE" > /dev/null 2>&1
     if [ $? -ne 0 ]; then
         echo "$(t "✗ 指令生成失败" "✗ Instruction generation failed")"
         ALL_OK=false
@@ -995,8 +1026,8 @@ echo "$(t "=== 安装完成 ===" "=== Installation Complete ===")"
 echo ""
 echo "$(t "下一步：" "Next steps:")"
 echo "$(t "  0. 快速开始指南在安装目录 docs/QUICKSTART.md" "  0. Quick start guide at docs/QUICKSTART.md in installation directory")"
-echo "$(t "  1. /opsx-ff <功能名> 创建第一个变更" "  1. /opsx-ff <feature-name> to create your first change")"
-echo "$(t "  2. 或 /opsx-onboard 进行引导式入门" "  2. Or /opsx-onboard for guided onboarding")"
+echo "$(t "  1. /opsx-ff <功能名> 创建第一个变更，或" "  1. /opsx-ff <feature-name> to create your first change, or")"
+echo "$(t "  2. /opsx-onboard 进行引导式入门" "  2. /opsx-onboard for guided onboarding")"
 echo ""
 echo "$(t "重置： openspec-superpowers-opencode reset" "Reset: openspec-superpowers-opencode reset")"
 echo "$(t "预览： openspec-superpowers-opencode dry-run" "Preview: openspec-superpowers-opencode dry-run")"
