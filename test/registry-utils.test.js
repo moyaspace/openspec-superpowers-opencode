@@ -78,7 +78,9 @@ describe('mergeListJson()', () => {
         assert.ok(Array.isArray(parsed.changes));
         assert.strictEqual(parsed.changes.length, 2);
         assert.strictEqual(parsed.changes[0].name, 'feature-a');
+        assert.strictEqual(parsed.changes[0].worktree, '.worktrees/feature-a');
         assert.strictEqual(parsed.changes[1].name, 'feature-b');
+        assert.strictEqual(parsed.changes[1].worktree, '.worktrees/feature-b');
     });
 
     test('deduplicates by name (first wins)', (t) => {
