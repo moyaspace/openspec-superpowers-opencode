@@ -30,6 +30,14 @@ openspec-superpowers-opencode ensure-worktree <name>
 cd .worktrees/<name>
 ```
 
+初始化 worktree 代码索引：
+
+```
+- codegraph 命令可用 → codegraph init
+```
+
+工具不存在或初始化失败不应阻断流程。
+
 ### Step 4: 在 worktree 内创建变更
 
 ```bash
@@ -54,6 +62,7 @@ openspec-superpowers-opencode registry add <name> .worktrees/<name>
 ### Step 5: 生成 proposal + design + tasks
 
 按 `openspec status --change "<name>" --json` 的依赖顺序逐个创建 artifact：
+
 - `openspec instructions <id> --change "<name>" --json` 获取模板和指引
 - 读依赖 artifact 获取上下文
 - 用 template 结构创建文件

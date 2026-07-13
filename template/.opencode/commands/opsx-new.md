@@ -9,6 +9,7 @@ description: Start a new change in an isolated worktree (Experimental)
 ### Step 1: 确定名称
 
 如果提供了名称则直接用。否则 AskUserQuestion：
+
 > "你想创建什么变更？描述一下你要构建或修复的内容。"
 
 从描述推导 kebab-case 名称（如 "add user authentication" → `add-user-auth`）。
@@ -40,6 +41,14 @@ Artifacts 应在 feature 分支上生成，不在 main 上留痕迹。
 openspec-superpowers-opencode ensure-worktree <name>
 cd .worktrees/<name>
 ```
+
+初始化 worktree 代码索引：
+
+```
+- codegraph 命令可用 → codegraph init
+```
+
+工具不存在或初始化失败不应阻断流程。
 
 > worktree 继承了 repo 的所有基础设施文件（`.opencode/`、`openspec/config.yaml` 等）。
 

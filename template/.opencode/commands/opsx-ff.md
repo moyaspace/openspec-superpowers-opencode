@@ -32,6 +32,14 @@ openspec-superpowers-opencode ensure-worktree <name>
 cd .worktrees/<name>
 ```
 
+初始化 worktree 代码索引：
+
+```
+- codegraph 命令可用 → codegraph init
+```
+
+工具不存在或初始化失败不应阻断流程。
+
 ### Step 4: 在 worktree 内创建变更
 
 ```bash
@@ -62,6 +70,7 @@ openspec-superpowers-opencode registry add <name> .worktrees/<name>
 对各 artifact：
 
 a. 获取指令：
+
 ```bash
 openspec instructions <artifact-id> --change "<name>" --json
 ```
