@@ -12,6 +12,15 @@
 
 .codegraph/
 
+# OpenCode tool-generated artifacts — track only opencode.json
+
+.opencode/
+!.opencode/opencode.json
+
+# Skills lock — global Superpowers version pinning, not project code
+
+skills.lock.json
+
 # OpenSpec Schema — do not track
 
 openspec/schemas/
@@ -19,6 +28,10 @@ openspec/schemas/
 # OpenSpec config — do not track
 
 openspec/config.yaml
+
+# OpenSpec change registry — local dev state only
+
+openspec/oso-change-registry.json
 
 # Local test records
 

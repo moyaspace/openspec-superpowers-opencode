@@ -102,13 +102,13 @@
 
 > **`main` 目录是仓库，`.worktrees/<name>/` 是 AI 的办公室。**
 
-| 概念 | 比喻 | 说明 |
-|------|------|------|
-| `main` 目录 | 仓库 | 存放所有基础设施（schema、config、模板）。不在此处写代码。 |
-| `.worktrees/<name>/` | AI 的办公室 | 实际工作区。只放需要的东西（`changes/`、`specs/`）。 |
-| `openspec/schemas/` | 工具柜的说明书 | 仓库里有，办公室**不复制**。 |
-| `.gitignore` | 仓库门口的告示 | 说「说明书别装进快递箱（git commit）」。 |
-| `opencode.json` deny 规则 | 仓库的安全门禁 | AI 回仓库拿资料时不能乱翻工具柜。 |
+| 概念                      | 比喻           | 说明                                                       |
+| ------------------------- | -------------- | ---------------------------------------------------------- |
+| `main` 目录               | 仓库           | 存放所有基础设施（schema、config、模板）。不在此处写代码。 |
+| `.worktrees/<name>/`      | AI 的办公室    | 实际工作区。只放需要的东西（`changes/`、`specs/`）。       |
+| `openspec/schemas/`       | 工具柜的说明书 | 仓库里有，办公室**不复制**。                               |
+| `.gitignore`              | 仓库门口的告示 | 说「说明书别装进快递箱（git commit）」。                   |
+| `opencode.json` deny 规则 | 仓库的安全门禁 | AI 回仓库拿资料时不能乱翻工具柜。                          |
 
 **为什么两个机制缺一不可：**
 
@@ -132,21 +132,59 @@ main 目录（仓库）                 worktree（AI 办公室）
 
 ### 文件分类
 
-| 文件 | 属于目标项目？ | 行为 | 部署方式 |
-|------|:------------:|------|---------|
-| `.opencode/commands/` | ✅ | 需要，工作流入口 | 不覆盖，不存在才复制 |
-| `.opencode/skills/` | ✅ | 需要，OPSX skill 定义 | 不覆盖，不存在才复制 |
-| `.opencode/opencode.json` | ✅ | 需要，AI 权限规则 | 不覆盖，不存在才复制 |
-| `.opencode/install-manifest.json` | ❌ 包管理数据 | 仅 reset 用，对项目透明 | 总是写入（记录实际安装文件） |
-| `openspec/changes/` | ✅ | 需要，用户变更数据 | 不存在才创建空目录 |
-| `openspec/specs/` | ✅ | 需要，用户规格文档 | 不存在才创建空目录 |
-| `openspec/schemas/` | ❌ 工具基础设施 | 只读，AI 不可修改 | 覆盖部署 |
-| `openspec/config.yaml` | ❌ 工具基础设施 | 只读，AI 不可修改 | 覆盖部署 |
-| `AGENTS.md` | ✅ | 需要，AI 指导 | 不覆盖已有 bridge 内容 |
-| `.gitignore` | ✅ | 需要，排除 .worktrees/ 等 | 不存在才创建；已存在只追加基础设施排除 |
-| `.gitattributes` | ✅ | 需要，行尾规范化 | 不存在才创建 |
-| `LICENSE` | ❌ | 包的许可，非项目许可 | 不部署 |
-| `skills.lock.json` | ❌ | 包校验数据 | 不部署 |
+| 文件                              | 属于目标项目？  | 行为                      | 部署方式                               |
+| --------------------------------- | :-------------: | ------------------------- | -------------------------------------- |
+| `.opencode/commands/`             |       ✅        | 需要，工作流入口          | 不覆盖，不存在才复制                   |
+| `.opencode/skills/`               |       ✅        | 需要，OPSX skill 定义     | 不覆盖，不存在才复制                   |
+| `.opencode/opencode.json`         |       ✅        | 需要，AI 权限规则         | 不覆盖，不存在才复制                   |
+| `.opencode/install-manifest.json` |  ❌ 包管理数据  | 仅 reset 用，对项目透明   | 总是写入（记录实际安装文件）           |
+| `openspec/changes/`               |       ✅        | 需要，用户变更数据        | 不存在才创建空目录                     |
+| `openspec/specs/`                 |       ✅        | 需要，用户规格文档        | 不存在才创建空目录                     |
+| `openspec/schemas/`               | ❌ 工具基础设施 | 只读，AI 不可修改         | 覆盖部署                               |
+| `openspec/config.yaml`            | ❌ 工具基础设施 | 只读，AI 不可修改         | 覆盖部署                               |
+| `AGENTS.md`                       |       ✅        | 需要，AI 指导             | 不覆盖已有 bridge 内容                 |
+| `.gitignore`                      |       ✅        | 需要，排除 .worktrees/ 等 | 不存在才创建；已存在只追加基础设施排除 |
+| `.gitattributes`                  |       ✅        | 需要，行尾规范化          | 不存在才创建                           |
+| `LICENSE`                         |       ❌        | 包的许可，非项目许可      | 不部署                                 |
+| `skills.lock.json`                |       ❌        | 包校验数据                | 不部署                                 |
+
+### gitignore 跟踪策略
+
+#### 原则
+
+```
+项目约定的配置    → 跟踪
+项目的产物        → 跟踪
+工具生成的产物    → 不跟踪
+```
+
+- **项目约定的配置** — "项目应该怎么干活"的配置（`.editorconfig`、`.gitattributes`、`.gitignore`、`AGENTS.md`、`.opencode/opencode.json` 等）
+- **项目的产物** — 用户写的代码、specs、变更记录等
+- **工具生成的产物** — CLI 生成/可重建的文件（`commands/`、`skills/`、`schemas/`、`config.yaml` 等）
+
+#### 决策记录
+
+##### DDR-1: 工具制品不跟踪
+
+- **决策**: `template/_gitignore` 中追加以下忽略规则：
+
+  ```gitignore
+  .opencode/
+  !.opencode/opencode.json
+  skills.lock.json
+  ```
+
+  - `.opencode/`（含 `commands/`、`skills/` 等）— 整个忽略，只放行 `opencode.json`
+  - `skills.lock.json` — 锁全局 Superpowers 版本，非项目依赖
+
+- **理由**: `.opencode/` 目录由 `openspec init` / `openspec update` 批量生成，版本绑定 CLI 而非项目代码。整体忽略 + 显式放行 `opencode.json` 比逐一列出更简洁，且未来新增的工具目录自动被覆盖。`skills.lock.json` 是全局锁定数据，同不跟踪。
+
+- **不影响跟踪的配置**:
+  - `.editorconfig` — 项目约定，跟踪
+  - `.gitattributes` — 项目约定，跟踪
+  - `.gitignore` — 项目约定，跟踪
+  - `AGENTS.md` — 项目约定，跟踪
+  - `.opencode/opencode.json` — 项目级工具配置，跟踪
 
 #### ADR-10: npm 11.x `.gitignore` → `.npmignore` 重命名 Bug
 
