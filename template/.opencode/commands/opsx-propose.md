@@ -25,18 +25,20 @@ git add -A && git commit -m "chore: initial project setup"
 
 ### Step 3: 创建隔离 Worktree
 
+**3a. 创建 worktree：**
+
 ```bash
 openspec-superpowers-opencode ensure-worktree <name>
 cd .worktrees/<name>
 ```
 
-初始化 worktree 代码索引：
+**3b. 初始化代码索引：**
 
 ```
 - codegraph 命令可用 → codegraph init
 ```
 
-工具不存在或初始化失败不应阻断流程。
+命令不存在或初始化失败不阻断流程，继续下一步。
 
 ### Step 4: 在 worktree 内创建变更
 

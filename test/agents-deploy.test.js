@@ -12,7 +12,7 @@ const os = require('node:os');
 
 // 读取模板 AGENTS.md 作为 bridge 内容
 const templateDir = path.resolve(__dirname, '..', 'template');
-const bridgeContent = fs.readFileSync(path.join(templateDir, 'AGENTS.md'), 'utf-8');
+const bridgeContent = fs.readFileSync(path.join(templateDir, '_AGENTS.md'), 'utf-8');
 const marker = '<!-- openspec-superpowers-opencode_instructions -->';
 
 describe('AGENTS.md 部署逻辑', () => {

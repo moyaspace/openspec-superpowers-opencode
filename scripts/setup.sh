@@ -608,7 +608,7 @@ echo ""
 echo "$(t "[5/8] 部署 Git 配置 + AGENTS.md..." "[5/8] Deploying git config + AGENTS.md...")"
 
 # AGENTS.md（检测标记替换/追加，不记入 manifest — 设计决策维度 4）
-AGENTS_SRC="$TEMPLATE_DIR/AGENTS.md"
+AGENTS_SRC="$TEMPLATE_DIR/_AGENTS.md"
 if [ -f "$AGENTS_SRC" ]; then
     AGENTS_DST="$PROJECT_ROOT/AGENTS.md"
     BRIDGE_CONTENT=$(cat "$AGENTS_SRC")
@@ -712,7 +712,7 @@ NODEEOF
 fi
 
 # .gitattributes（marker 判定，同 .gitignore 模式）
-GITATTR_SRC="$TEMPLATE_DIR/.gitattributes"
+GITATTR_SRC="$TEMPLATE_DIR/_gitattributes"
 GITATTR_DST="$PROJECT_ROOT/.gitattributes"
 GITATTR_MARKER='# <!-- openspec-superpowers-opencode_gitattributes -->'
 
@@ -761,7 +761,7 @@ NODEEOF
 fi
 
 # .editorconfig（marker 判定，同 .gitignore 模式）
-EDITORCONFIG_SRC="$TEMPLATE_DIR/.editorconfig"
+EDITORCONFIG_SRC="$TEMPLATE_DIR/_editorconfig"
 EDITORCONFIG_DST="$PROJECT_ROOT/.editorconfig"
 EDITORCONFIG_MARKER='# <!-- openspec-superpowers-opencode_editorconfig -->'
 

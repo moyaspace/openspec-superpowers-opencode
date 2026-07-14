@@ -649,7 +649,7 @@ Write-Host ""
 Write-Host (t "[5/8] 部署 Git 配置 + AGENTS.md..." "[5/8] Deploying git config + AGENTS.md...") -ForegroundColor Yellow
 
     # AGENTS.md（检测标记替换/追加，不记入 manifest — 设计决策维度 4）
-    $agentsSrc = Join-Path $templateDir "AGENTS.md"
+    $agentsSrc = Join-Path $templateDir "_AGENTS.md"
     if (Test-Path $agentsSrc) {
         $agentsDst = Join-Path $projectRoot "AGENTS.md"
         $bridgeContent = Get-Content $agentsSrc -Raw
@@ -742,7 +742,7 @@ $gitignoreMarker
 }
 
 # .gitattributes（marker 判定，同 .gitignore 模式）
-$gitattrSrc = Join-Path $templateDir ".gitattributes"
+$gitattrSrc = Join-Path $templateDir "_gitattributes"
 $gitattrDst = Join-Path $projectRoot ".gitattributes"
 $gitattrMarker = '# <!-- openspec-superpowers-opencode_gitattributes -->'
 
@@ -787,7 +787,7 @@ if (-not (Test-Path $gitattrDst)) {
 }
 
 # .editorconfig（marker 判定，同 .gitignore 模式）
-$editorconfigSrc = Join-Path $templateDir ".editorconfig"
+$editorconfigSrc = Join-Path $templateDir "_editorconfig"
 $editorconfigDst = Join-Path $projectRoot ".editorconfig"
 $editorconfigMarker = '# <!-- openspec-superpowers-opencode_editorconfig -->'
 

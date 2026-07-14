@@ -141,8 +141,9 @@ main 目录（仓库）                 worktree（AI 办公室）
 | `openspec/changes/`               |       ✅        | 需要，用户变更数据        | 不存在才创建空目录                     |
 | `openspec/specs/`                 |       ✅        | 需要，用户规格文档        | 不存在才创建空目录                     |
 | `openspec/schemas/`               | ❌ 工具基础设施 | 只读，AI 不可修改         | 覆盖部署                               |
-| `openspec/config.yaml`            | ❌ 工具基础设施 | 只读，AI 不可修改         | 覆盖部署                               |
-| `AGENTS.md`                       |       ✅        | 需要，AI 指导             | 不覆盖已有 bridge 内容                 |
+| `openspec/config.yaml` | ❌ 工具基础设施 | 只读，AI 不可修改 | 覆盖部署 |
+| `openspec/oso-change-registry.json` | ❌ 本地开发状态 | 记录活跃 worktree，非项目历史。clone 新机器的人不需要知道别人本地开了哪些 worktree。 | 存在时询问用户 |
+| `AGENTS.md` | ✅ | 需要，AI 指导 | 不覆盖已有 bridge 内容 |
 | `.gitignore`                      |       ✅        | 需要，排除 .worktrees/ 等 | 不存在才创建；已存在只追加基础设施排除 |
 | `.gitattributes`                  |       ✅        | 需要，行尾规范化          | 不存在才创建                           |
 | `LICENSE`                         |       ❌        | 包的许可，非项目许可      | 不部署                                 |
@@ -185,6 +186,34 @@ main 目录（仓库）                 worktree（AI 办公室）
   - `.gitignore` — 项目约定，跟踪
   - `AGENTS.md` — 项目约定，跟踪
   - `.opencode/opencode.json` — 项目级工具配置，跟踪
+
+##### DDR-2: Template 点文件使用 `_` 前缀
+
+- **背景**: `template/` 目录存放部署到目标项目的原料文件。其中点前缀文件（`.editorconfig`、`.gitattributes`、`.gitignore`、`AGENTS.md`）在包仓库中会被 git、编辑器、OpenCode 自动识别为"生效配置"，而非"模板原料"：
+
+  | 文件 | 谁会被影响 | 影响 |
+  |------|-----------|------|
+  | `.gitignore` | git | 规则可能意外排除包仓库自身的文件 |
+  | `.editorconfig` | 编辑器 | 影响当前仓库的编辑行为 |
+  | `.gitattributes` | git | 影响当前仓库的 git 行为 |
+  | `AGENTS.md` | OpenCode | 被自动加载为 AI 指令，模板占位符 `{{SUPERPOWERS_BASE_PATH}}` 未替换 |
+
+- **决策**: template 根级所有点文件统一使用 `_` 前缀替代 `.`：
+  - `_gitignore`（原 `.gitignore`，由 npm 11.x bug 触发）
+  - `_gitattributes`（原 `.gitattributes`）
+  - `_editorconfig`（原 `.editorconfig`）
+  - `_AGENTS.md`（原 `AGENTS.md`）
+
+  setup 脚本在部署时复制 `_xxx` → `.xxx`，目标项目得到的是正常点文件。
+
+- **理由**:
+  - `_gitignore` 由 npm 11.x bug（自动重命名 `.gitignore` → `.npmignore`）发起，但 `_` 前缀实际更合理——语义准确：**"这是模板原料，不是生效配置"**
+  - 名为 `.gitignore` 时会影响 git 对其所在目录的行为，`_gitignore` 避免了这种副作用
+  - `AGENTS.md`（无 `.` 前缀）同样被 OpenCode 自动发现加载，改为 `_AGENTS.md` 后逃脱文件名自动发现机制，消除未替换占位符的副作用
+  - 文件名自动发现通常按精确文件名匹配，`_` 前缀是有效的逃脱手段
+  - 语义一致：template/ 下的点文件全部带 `_` 前缀，一目了然
+
+- **影响**: 无功能影响。setup 脚本部署路径和测试文件路径同步更新即可。新贡献者看到 `_gitignore` 第一反应是"模板原料，不是生效的 `.gitignore`"。
 
 #### ADR-10: npm 11.x `.gitignore` → `.npmignore` 重命名 Bug
 

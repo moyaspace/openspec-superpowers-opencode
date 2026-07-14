@@ -37,20 +37,22 @@ git add -A && git commit -m "chore: initial project setup"
 
 Artifacts 应在 feature 分支上生成，不在 main 上留痕迹。
 
+**3a. 创建 worktree：**
+
 ```bash
 openspec-superpowers-opencode ensure-worktree <name>
 cd .worktrees/<name>
 ```
 
-初始化 worktree 代码索引：
+> worktree 继承了 repo 的所有基础设施文件（`.opencode/`、`openspec/config.yaml` 等）。
+
+**3b. 初始化代码索引：**
 
 ```
 - codegraph 命令可用 → codegraph init
 ```
 
-工具不存在或初始化失败不应阻断流程。
-
-> worktree 继承了 repo 的所有基础设施文件（`.opencode/`、`openspec/config.yaml` 等）。
+命令不存在或初始化失败不阻断流程，继续下一步。
 
 ### Step 5: 在 worktree 内创建变更
 

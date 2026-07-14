@@ -18,15 +18,15 @@ const gitignoreMarker     = 'openspec-superpowers-opencode_gitignore';
 const gitattrMarker       = 'openspec-superpowers-opencode_gitattributes';
 const editorconfigMarker  = 'openspec-superpowers-opencode_editorconfig';
 const gitignoreContent     = fs.readFileSync(path.join(templateDir, '_gitignore'), 'utf-8');
-const gitattrContent       = fs.readFileSync(path.join(templateDir, '.gitattributes'), 'utf-8');
-const editorconfigContent  = fs.readFileSync(path.join(templateDir, '.editorconfig'), 'utf-8');
+const gitattrContent       = fs.readFileSync(path.join(templateDir, '_gitattributes'), 'utf-8');
+const editorconfigContent  = fs.readFileSync(path.join(templateDir, '_editorconfig'), 'utf-8');
 
 // 通用测试运行器：对所有 marker/内容对分别执行同一组断言
 function forBothMarkers(name, fn) {
   const scenarios = [
     { name: '.gitignore', marker: gitignoreMarker, content: gitignoreContent, file: '_gitignore' },
-    { name: '.gitattributes', marker: gitattrMarker, content: gitattrContent, file: '.gitattributes' },
-    { name: '.editorconfig', marker: editorconfigMarker, content: editorconfigContent, file: '.editorconfig' },
+    { name: '.gitattributes', marker: gitattrMarker, content: gitattrContent, file: '_gitattributes' },
+    { name: '.editorconfig', marker: editorconfigMarker, content: editorconfigContent, file: '_editorconfig' },
   ];
   for (const s of scenarios) {
     it(`${name} (${s.name})`, () => fn(s));
@@ -253,16 +253,16 @@ describe('.gitignore / .gitattributes / .editorconfig 部署逻辑', () => {
     assert.strictEqual(matches ? matches.length : 0, 2, '_gitignore template 应有恰好 2 个 marker');
   });
 
-  it('template/.gitattributes 包含恰好的 marker 对', () => {
+  it('template/_gitattributes 包含恰好的 marker 对', () => {
     const escaped = gitattrMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const matches = gitattrContent.match(new RegExp(escaped, 'g'));
-    assert.strictEqual(matches ? matches.length : 0, 2, '.gitattributes template 应有恰好 2 个 marker');
+    assert.strictEqual(matches ? matches.length : 0, 2, '_gitattributes template 应有恰好 2 个 marker');
   });
 
-  it('template/.editorconfig 包含恰好的 marker 对', () => {
+  it('template/_editorconfig 包含恰好的 marker 对', () => {
     const escaped = editorconfigMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const matches = editorconfigContent.match(new RegExp(escaped, 'g'));
-    assert.strictEqual(matches ? matches.length : 0, 2, '.editorconfig template 应有恰好 2 个 marker');
+    assert.strictEqual(matches ? matches.length : 0, 2, '_editorconfig template 应有恰好 2 个 marker');
   });
 
   it('.gitignore marker 在 # 注释行中（忽略 # 前缀也可搜索到）', () => {
