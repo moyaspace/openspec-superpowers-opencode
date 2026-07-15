@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const readline = require('readline');
 
 const toolDir = path.resolve(__dirname, '..');          // 工具安装根目录
 const { findProjectRoot, getChangeRegistryPath } = require(path.join(toolDir, 'lib', 'registry-utils'));
@@ -115,7 +116,7 @@ if (isHelp) {
 
 if (subcommand === 'init') {
     const targetDir = subarg ? path.resolve(subarg) : process.cwd();
-    runInit(targetDir, isWin, lang);
+    runInit(targetDir, isWin, lang).catch(e => { console.error(e); process.exit(1); });
 } else if (subcommand === 'reset') {
     const targetDir = subarg ? path.resolve(subarg) : process.cwd();
     runSetupScript(targetDir, isWin, true, false, lang);
@@ -144,7 +145,22 @@ if (subcommand === 'init') {
 
 // ====================================================================
 
-function runInit(targetDir, isWin, lang) {
+/**
+ * 交互式询问函数
+ * @param {string} query — 提示文字
+ * @returns {Promise<string>}
+ */
+function ask(query) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    return new Promise(resolve => {
+        rl.question(query, answer => {
+            rl.close();
+            resolve(answer.trim().toLowerCase());
+        });
+    });
+}
+
+async function runInit(targetDir, isWin, lang) {
     console.log(`\ninit: ${targetDir}`);
 
     // ---- 0. 检查 git 仓库状态（在所有操作之前）----
@@ -182,7 +198,14 @@ function runInit(targetDir, isWin, lang) {
         fs.writeFileSync(registryPath, JSON.stringify({ changes: [] }, null, 2) + '\n');
         console.log(t('  ✓ 创建注册表: openspec/oso-change-registry.json', '  ✓ Created registry: openspec/oso-change-registry.json'));
     } else {
-        console.log(t('  ∼ 注册表已存在，跳过', '  ∼ Registry exists, skipping'));
+        // 存在时询问用户是否覆盖（见 DESIGN.md 文件分类表）
+        const answer = await ask(t('  openspec/oso-change-registry.json 已存在。覆盖？(y/N) ', '  openspec/oso-change-registry.json exists. Overwrite? (y/N) '));
+        if (answer === 'y' || answer === 'yes') {
+            fs.writeFileSync(registryPath, JSON.stringify({ changes: [] }, null, 2) + '\n');
+            console.log(t('  ✓ 注册表已重置: openspec/oso-change-registry.json', '  ✓ Registry reset: openspec/oso-change-registry.json'));
+        } else {
+            console.log(t('  ∼ 注册表已存在，跳过', '  ∼ Registry exists, skipping'));
+        }
     }
 
     // ---- 5. Git 初始化 + 提交 ----
@@ -241,7 +264,18 @@ function runSetupScript(targetDir, isWin, uninstall, dryRun, lang) {
         uninstall ? 'Uninstalling' : dryRun ? 'Dry-run' : 'Setting up'
     );
     console.log(`  → ${title}...`);
-    return run(setupCmd, targetDir);
+
+    try {
+        execSync(setupCmd, { cwd: targetDir, stdio: 'inherit', shell: true });
+        return true;
+    } catch (e) {
+        if (e.status === 2) {
+            // 全局门控 N → exit 2（用户取消，静默退出整个 init）
+            process.exit(0);
+        }
+        console.error(t(`  ✗ 命令失败 (exit ${e.status}): ${setupCmd}`, `  ✗ Command failed (exit ${e.status}): ${setupCmd}`));
+        return false;
+    }
 }
 
 function run(cmd, cwd) {

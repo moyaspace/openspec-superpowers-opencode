@@ -86,6 +86,7 @@ BROWN_OVERRIDE_AGENTS="${BROWN_OVERRIDE_AGENTS:-}"
 BROWN_OVERRIDE_GITIGNORE="${BROWN_OVERRIDE_GITIGNORE:-}"
 BROWN_OVERRIDE_GITATTR="${BROWN_OVERRIDE_GITATTR:-}"
 BROWN_OVERRIDE_EDITORCONFIG="${BROWN_OVERRIDE_EDITORCONFIG:-}"
+BROWN_OVERRIDE_INIT="${BROWN_OVERRIDE_INIT:-}"
 
 # 用于记录 commands/skills 覆盖决策的临时文件
 DECISIONS_FILE=$(mktemp 2>/dev/null || mktemp -t "opencode-decisions.XXXXXX")
@@ -358,15 +359,20 @@ OPENSPEC_HAS_EXISTING=false
 OPENSPEC_GATE_RESULT="yes"
 
 if [ "$OPENSPEC_HAS_EXISTING" = true ]; then
-    echo "$(t "  - openspec/ 已存在" "  - openspec/ already exists")"
-    ANSWER=$(prompt_yes_no "$(t "  openspec/ 已存在。覆盖 config.yaml + schemas/？" "  openspec/ already exists. Overwrite config.yaml + schemas/?")" "$BROWN_OVERRIDE_OPENSPEC")
-    if [ "$ANSWER" = "no" ]; then
-        echo "$(t "  用户选择不覆盖 openspec/。退出。" "  User chose not to overwrite openspec/. Exiting.")"
-        echo "$(t "  提示: 如需后续部署，删除 openspec/ 后重新运行。" "  Hint: Delete openspec/ and re-run to deploy.")"
-        exit 0
+    echo "$(t "  - openspec/ 已存在 (棕地)" "  - openspec/ already exists (brownfield)")"
+    GLOBAL_ANSWER=$(prompt_yes_no "$(t "  棕地项目。继续完整 init？" "  Brownfield project. Continue with full init?")" "$BROWN_OVERRIDE_INIT")
+    if [ "$GLOBAL_ANSWER" = "no" ]; then
+        echo "$(t "  Init 取消。" "  Init cancelled.")"
+        exit 2
     fi
-    echo "$(t "  ✓ 用户确认覆盖 openspec/" "  ✓ User confirmed openspec/ overwrite")"
-    OPENSPEC_GATE_RESULT="yes"
+    OPENSPEC_ANSWER=$(prompt_yes_no "$(t "  覆盖 config.yaml + schemas/？" "  Overwrite config.yaml + schemas/?")" "$BROWN_OVERRIDE_OPENSPEC")
+    if [ "$OPENSPEC_ANSWER" = "no" ]; then
+        echo "$(t "  - 跳过 openspec/ 部署" "  - Skip openspec/ deployment")"
+        OPENSPEC_GATE_RESULT="no"
+    else
+        echo "$(t "  ✓ 用户确认覆盖 openspec/" "  ✓ User confirmed openspec/ overwrite")"
+        OPENSPEC_GATE_RESULT="yes"
+    fi
 else
     echo "$(t "  - openspec/ 不存在（绿地模式，自动部署）" "  - openspec/ not found (greenfield, auto-deploy)")"
 fi
@@ -383,6 +389,7 @@ if [ "$OPENSPEC_GATE_RESULT" = "yes" ]; then
         run_cmd mkdir -p "$(dirname "$CONFIG_DST")"
         run_cmd cp -f "$CONFIG_SRC" "$CONFIG_DST"
         INSTALLED_FILES+=("openspec/config.yaml")
+        add_decision "openspec/config.yaml" "overwrite"
         log "$(t "  ✓ openspec/config.yaml" "  ✓ openspec/config.yaml")"
     fi
 
@@ -398,6 +405,7 @@ if [ "$OPENSPEC_GATE_RESULT" = "yes" ]; then
             [ -z "$sf" ] && continue
             REL_PATH="${sf#$PROJECT_ROOT/}"
             INSTALLED_FILES+=("$REL_PATH")
+            add_decision "$REL_PATH" "overwrite"
         done <<< "$SCHEMA_FILES"
         SCHEMA_COUNT=$(echo "$SCHEMA_FILES" | grep -c . || echo "0")
         log "$(t "  ✓ openspec/schemas/（$SCHEMA_COUNT 文件）" "  ✓ openspec/schemas/ ($SCHEMA_COUNT files)")"
@@ -607,7 +615,7 @@ echo ""
 # ---- 5. Git + AGENTS.md ----
 echo "$(t "[5/8] 部署 Git 配置 + AGENTS.md..." "[5/8] Deploying git config + AGENTS.md...")"
 
-# AGENTS.md（检测标记替换/追加，不记入 manifest — 设计决策维度 4）
+# AGENTS.md
 AGENTS_SRC="$TEMPLATE_DIR/_AGENTS.md"
 if [ -f "$AGENTS_SRC" ]; then
     AGENTS_DST="$PROJECT_ROOT/AGENTS.md"
@@ -632,6 +640,7 @@ const result=existing.replace(pat,bridge.trimEnd());
 fs.writeFileSync('$AGENTS_DST',result,'utf8');
 " || true
                 fi
+                [ "$DRY_RUN" = false ] && INSTALLED_FILES+=("AGENTS.md")
                 echo "$(t "  ✓ AGENTS.md（bridge 内容已替换）" "  ✓ AGENTS.md (bridge content replaced)")"
             else
                 echo "$(t "  - AGENTS.md（用户选择跳过）" "  - AGENTS.md (user skipped)")"
@@ -641,6 +650,7 @@ fs.writeFileSync('$AGENTS_DST',result,'utf8');
             if [ "$DRY_RUN" = false ]; then
                 echo "$BRIDGE_CONTENT" >> "$AGENTS_DST"
             fi
+            [ "$DRY_RUN" = false ] && INSTALLED_FILES+=("AGENTS.md")
             echo "$(t "  ✓ AGENTS.md（已追加 bridge 内容）" "  ✓ AGENTS.md (bridge content appended)")"
         fi
     else
@@ -648,7 +658,8 @@ fs.writeFileSync('$AGENTS_DST',result,'utf8');
         if [ "$DRY_RUN" = false ]; then
             echo "$BRIDGE_CONTENT" > "$AGENTS_DST"
         fi
-        echo "$(t "  ✓ AGENTS.md（不记入 manifest）" "  ✓ AGENTS.md (NOT recorded in manifest)")"
+        [ "$DRY_RUN" = false ] && INSTALLED_FILES+=("AGENTS.md")
+        echo "$(t "  ✓ AGENTS.md" "  ✓ AGENTS.md")"
     fi
 fi
 

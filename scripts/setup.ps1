@@ -29,6 +29,7 @@ $envOverrideGitignore = [System.Environment]::GetEnvironmentVariable("BROWN_OVER
 $envOverrideGitattr = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_GITATTR")
 $envOverrideEditorconfig = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_EDITORCONFIG")
 $envOverrideOcodeJson = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_OCODEJSON")
+$envOverrideInit = [System.Environment]::GetEnvironmentVariable("BROWN_OVERRIDE_INIT")
 
 # ---- 多语言辅助函数 ----
 function t($zh, $en) {
@@ -156,6 +157,12 @@ if ($Uninstall) {
         $isProtected = $false
         foreach ($protected in $protectedFiles) {
             if ($file -eq $protected -or $file -like "$protected/*" -or $file -like "$protected\*") {
+                $isProtected = $true
+                break
+            }
+            # 子目录中的同名文件也匹配（如 .opencode\opencode.json → opencode.json 匹配）
+            $basename = Split-Path $file -Leaf
+            if ($basename -eq $protected) {
                 $isProtected = $true
                 break
             }
@@ -316,15 +323,20 @@ $openspecHasExisting = Test-Path $openspecConfigDst
 $openspecGateResult = "yes"
 
 if ($openspecHasExisting) {
-    Write-Host (t "  - openspec/ 已存在" "  - openspec/ already exists") -ForegroundColor Yellow
-    $answer = Prompt-YesNo -prompt (t "  openspec/ 已存在。覆盖 config.yaml + schemas/？" "  openspec/ already exists. Overwrite config.yaml + schemas/?") -envOverride $envOverrideOpenspec
-    if ($answer -eq 'no') {
-        Write-Host (t "  用户选择不覆盖 openspec/。退出。" "  User chose not to overwrite openspec/. Exiting.") -ForegroundColor Yellow
-        Write-Host (t "  提示: 如需后续部署，删除 openspec/ 后重新运行。" "  Hint: Delete openspec/ and re-run to deploy.") -ForegroundColor Gray
-        exit 0
+    Write-Host (t "  - openspec/ 已存在 (棕地)" "  - openspec/ already exists (brownfield)") -ForegroundColor Yellow
+    $globalAnswer = Prompt-YesNo -prompt (t "  棕地项目。继续完整 init？" "  Brownfield project. Continue with full init?") -envOverride $envOverrideInit
+    if ($globalAnswer -eq 'no') {
+        Write-Host (t "  Init 取消。" "  Init cancelled.") -ForegroundColor Yellow
+        exit 2
     }
-    Write-Host (t "  ✓ 用户确认覆盖 openspec/" "  ✓ User confirmed openspec/ overwrite") -ForegroundColor Green
-    $openspecGateResult = "yes"
+    $openspecAnswer = Prompt-YesNo -prompt (t "  覆盖 config.yaml + schemas/？" "  Overwrite config.yaml + schemas/?") -envOverride $envOverrideOpenspec
+    if ($openspecAnswer -eq 'no') {
+        Write-Host (t "  - 跳过 openspec/ 部署" "  - Skip openspec/ deployment") -ForegroundColor Gray
+        $openspecGateResult = "no"
+    } else {
+        Write-Host (t "  ✓ 用户确认覆盖 openspec/" "  ✓ User confirmed openspec/ overwrite") -ForegroundColor Green
+        $openspecGateResult = "yes"
+    }
 } else {
     Write-Host (t "  - openspec/ 不存在（绿地模式，自动部署）" "  - openspec/ not found (greenfield, auto-deploy)") -ForegroundColor Gray
 }
@@ -343,6 +355,7 @@ if ($openspecGateResult -eq "yes") {
             Copy-Item -Force $configSrc $configDst -ErrorAction Stop
         } -description "复制 openspec/config.yaml"
         $installedFiles += "openspec\config.yaml"
+        $overwriteDecisions["openspec\config.yaml"] = "overwrite"
         if (-not $DryRun) { Write-Host (t "  ✓ openspec/config.yaml" "  ✓ openspec/config.yaml") -ForegroundColor Green }
     }
 
@@ -354,11 +367,12 @@ if ($openspecGateResult -eq "yes") {
             New-Item -ItemType Directory -Path $schemasDstDir -Force | Out-Null
             Copy-Item -Recurse -Force "$($schemasTemplateDir)\*" "$($schemasDstDir)\"
         } -description "复制 openspec/schemas/"
-        # 记录所有复制的文件到 installedFiles（修复 BUG: L298 原代码未记录）
+        # 记录所有复制的文件到 installedFiles
         $schemaFiles = Get-ChildItem -Path $schemasDstDir -Recurse -File -ErrorAction SilentlyContinue
         foreach ($sf in $schemaFiles) {
             $relativePath = $sf.FullName.Substring($projectRoot.Length + 1)
             $installedFiles += $relativePath
+            $overwriteDecisions[$relativePath] = "overwrite"
         }
         if (-not $DryRun) { Write-Host (t "  ✓ openspec/schemas/（$(($schemaFiles | Measure-Object).Count) 文件）" "  ✓ openspec/schemas/ ($(($schemaFiles | Measure-Object).Count) files)") -ForegroundColor Green }
     }
@@ -648,7 +662,7 @@ Write-Host ""
 # ---- 5. Git 文件 + AGENTS.md ----
 Write-Host (t "[5/8] 部署 Git 配置 + AGENTS.md..." "[5/8] Deploying git config + AGENTS.md...") -ForegroundColor Yellow
 
-    # AGENTS.md（检测标记替换/追加，不记入 manifest — 设计决策维度 4）
+    # AGENTS.md
     $agentsSrc = Join-Path $templateDir "_AGENTS.md"
     if (Test-Path $agentsSrc) {
         $agentsDst = Join-Path $projectRoot "AGENTS.md"
@@ -667,6 +681,7 @@ Write-Host (t "[5/8] 部署 Git 配置 + AGENTS.md..." "[5/8] Deploying git conf
                     if (-not $DryRun) {
                         Set-Content -Path $agentsDst -Value $newContent -NoNewline -Encoding utf8 -ErrorAction Stop
                     }
+                    if (-not $DryRun) { $installedFiles += "AGENTS.md" }
                     Write-Host (t "  ✓ AGENTS.md（bridge 内容已替换）" "  ✓ AGENTS.md (bridge content replaced)") -ForegroundColor Green
                 } else {
                     Write-Host (t "  - AGENTS.md（用户选择跳过）" "  - AGENTS.md (user skipped)") -ForegroundColor Gray
@@ -676,11 +691,15 @@ Write-Host (t "[5/8] 部署 Git 配置 + AGENTS.md..." "[5/8] Deploying git conf
                 if (-not $DryRun) {
                     Add-Content -Path $agentsDst -Value "`n$bridgeContent" -NoNewline -Encoding utf8
                 }
+                if (-not $DryRun) { $installedFiles += "AGENTS.md" }
                 Write-Host (t "  ✓ AGENTS.md（已追加 bridge 内容）" "  ✓ AGENTS.md (bridge content appended)") -ForegroundColor Green
             }
         } else {
             run -block { Set-Content -Path $agentsDst -Value $bridgeContent -NoNewline -Encoding utf8 } -description "创建 AGENTS.md"
-            if (-not $DryRun) { Write-Host (t "  ✓ AGENTS.md" "  ✓ AGENTS.md") -ForegroundColor Green }
+            if (-not $DryRun) {
+                $installedFiles += "AGENTS.md"
+                Write-Host (t "  ✓ AGENTS.md" "  ✓ AGENTS.md") -ForegroundColor Green
+            }
         }
     }
 
