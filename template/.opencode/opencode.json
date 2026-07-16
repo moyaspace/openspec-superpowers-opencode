@@ -15,7 +15,8 @@
       "openspec/config.yaml": "deny",
       ".opencode/**": "ask",
       "AGENTS.md": "allow",
-      "opencode.json": "allow"
+      "opencode.json": "allow",
+      "**/temp/opencode/**": "allow"
     },
     "bash": {
       "*": "allow"
