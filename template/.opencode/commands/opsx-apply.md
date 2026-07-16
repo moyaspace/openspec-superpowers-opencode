@@ -59,10 +59,10 @@ openspec instructions apply --change "<name>" --json
 
 **4a. 确认以下 skill 文件都可 Read：**
 
-{{SUPERPOWERS_BASE_PATH}}subagent-driven-development\implementer-prompt.md
-{{SUPERPOWERS_BASE_PATH}}subagent-driven-development\spec-reviewer-prompt.md
-{{SUPERPOWERS_BASE_PATH}}subagent-driven-development\code-quality-reviewer-prompt.md
-{{SUPERPOWERS_BASE_PATH}}test-driven-development\SKILL.md
+{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
+{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/spec-reviewer-prompt.md
+{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/code-quality-reviewer-prompt.md
+{{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
 
 如果有任一 Read 失败，STOP 并告知用户，不要静默降级。
 
@@ -71,8 +71,8 @@ openspec instructions apply --change "<name>" --json
 ### Step 5: 逐任务实现
 
 Read：
-  {{SUPERPOWERS_BASE_PATH}}subagent-driven-development\implementer-prompt.md
-  {{SUPERPOWERS_BASE_PATH}}test-driven-development\SKILL.md
+  {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
+  {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
 
 对 plan.md 中的每个微任务：
 1. 使用 implementer-prompt.md 模板构造基础 prompt
@@ -98,13 +98,13 @@ task(
 
 **Spec 审查**：
 Read：
-  {{SUPERPOWERS_BASE_PATH}}subagent-driven-development\spec-reviewer-prompt.md
+  {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/spec-reviewer-prompt.md
 
 用 spec-reviewer-prompt.md 模板构造审查 prompt，派 `task(subagent_type="oracle", ...)` 审查。
 
 **代码质量审查**：
 Read：
-  {{SUPERPOWERS_BASE_PATH}}subagent-driven-development\code-quality-reviewer-prompt.md
+  {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/code-quality-reviewer-prompt.md
 
 用 code-quality-reviewer-prompt.md 模板构造审查 prompt，派 `task(subagent_type="oracle", ...)` 审查。
 

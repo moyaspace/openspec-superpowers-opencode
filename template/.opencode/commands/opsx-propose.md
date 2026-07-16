@@ -12,29 +12,36 @@ description: Propose a new change - create worktree and generate all artifacts i
 
 ### Step 2: 确认 git 仓库已有至少一个 commit
 
+**2a. 检查 HEAD 是否存在：**
+
 ```bash
 git rev-parse --verify HEAD
 ```
 
-- 返回非 0 → 自动创建首次提交：
+- 返回 0 → 跳到 2c
+- 返回非 0 → 跳到 2b
+
+**2b. 创建首次提交：**
 
 ```bash
 git add -A && git commit -m "chore: initial project setup"
 ```
 
-- 返回 0 → 检查 main 是否有未提交更改：
+跳到 Step 3
 
-  ```bash
-  git status --porcelain
-  ```
+**2c. 检查 main 是否有未提交更改：**
 
-  - 输出为空 → 干净，继续 Step 3
-  - 输出非空 → 用 **question** 工具询问：
+```bash
+git status --porcelain
+```
 
-    > **main 分支有未提交的更改。是否先提交？(y/N)**
-    >
-    > - Y → 执行 `git add -A && git commit -m "chore: wip"`，继续 Step 3
-    > - N → 不提交，继续 Step 3
+- 输出为空 → 跳到 Step 3
+- 输出非空 → 用 **question** 工具询问：
+
+  > **main 分支有未提交的更改。是否先提交？(y/N)**
+  >
+  > - Y → `git add -A && git commit`，跳到 Step 3
+  > - N → 不提交，跳到 Step 3
 
 ### Step 3: 创建隔离 Worktree
 

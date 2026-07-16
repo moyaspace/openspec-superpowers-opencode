@@ -22,16 +22,36 @@ description: Start a new change in an isolated worktree (Experimental)
 
 ### Step 3: 确认 git 仓库已有至少一个 commit
 
+**3a. 检查 HEAD 是否存在：**
+
 ```bash
 git rev-parse --verify HEAD
 ```
 
-- 返回 0 → 继续
-- 返回非 0（新部署项目无 commit）→ 自动创建首次提交：
+- 返回 0 → 跳到 3c
+- 返回非 0 → 跳到 3b
+
+**3b. 创建首次提交：**
 
 ```bash
 git add -A && git commit -m "chore: initial project setup"
 ```
+
+跳到 Step 4
+
+**3c. 检查 main 是否有未提交更改：**
+
+```bash
+git status --porcelain
+```
+
+- 输出为空 → 跳到 Step 4
+- 输出非空 → 用 **question** 工具询问：
+
+  > **main 分支有未提交的更改。是否先提交？(y/N)**
+  >
+  > - Y → `git add -A && git commit`，跳到 Step 4
+  > - N → 不提交，跳到 Step 4
 
 ### Step 4: 创建隔离 Worktree
 
