@@ -1,3 +1,7 @@
+
+---
+
+<!-- ⛔ 下方 openspec-superpowers-opencode_instructions 区块为自动生成，禁止修改 ⛔ -->
 <!-- openspec-superpowers-opencode_instructions -->
 
 # AGENTS.md - AI 行为指令
@@ -88,3 +92,4 @@ Superpowers 技能（TDD、brainstorming 等）是文件系统上的 `.md` 文�
 - `docs/learnings/` — 开发过程中沉淀的经验、踩坑记录、需要重复执行的场景应对方式
 
 <!-- openspec-superpowers-opencode_instructions -->
+<!-- ⛔ 上方 openspec-superpowers-opencode_instructions 区块为自动生成，禁止修改 ⛔ -->
