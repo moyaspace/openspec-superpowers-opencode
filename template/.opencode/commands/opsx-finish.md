@@ -9,7 +9,6 @@ description: Finish an implemented change - merge worktree, cleanup, archive, PR
 **收尾流程**：
 
 ```
- 1. 更新任务 → /moya-task change（自动标记当前 change 完成 + 记录 Change Context）
  2. 检测     → 找到要完成的 worktree
  3. 提交+测试 → 切换到 worktree → 提交未完成工作 → 运行测试套件（验证 worktree 自身完好）
  4. 回顾     → 产出 retrospective.md（文件操作，与代码无关）
@@ -17,18 +16,6 @@ description: Finish an implemented change - merge worktree, cleanup, archive, PR
  6. 选项     → Read finishing-a-development-branch skill → 展示 4 个选项
  7. 执行     → 按用户选择执行
 ```
-
----
-
-### Step 1: 更新当前任务
-
-执行 `/moya-task change`。注意这是 OpenCode 斜杠命令，不是 CLI 程序——**不要用 bash 执行**。请用 `skill` 工具调用：
-
-```
-skill(name="moya-task", user_message="change")
-```
-
-加载后按返回的指引操作（auto-detect active change → 更新 tasks.md → 记录 Change Context）。
 
 ---
 

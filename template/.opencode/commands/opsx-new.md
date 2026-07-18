@@ -77,8 +77,9 @@ Artifacts 应在 feature 分支上生成，不在 main 上留痕迹。
 ```bash
 openspec-superpowers-opencode ensure-worktree <name>
 cd .worktrees/<name>
-# 复制 .gitignore 忽略的 openspec/schemas/ 目录到 worktree
+# 复制 .gitignore 忽略的 openspec/schemas/ 和 config.yaml 到 worktree
 cp -r <project-root>/openspec/schemas/ openspec/
+cp <project-root>/openspec/config.yaml openspec/
 ```
 
 > worktree 继承了 repo 的所有基础设施文件（`.opencode/`、`openspec/config.yaml` 等）。
