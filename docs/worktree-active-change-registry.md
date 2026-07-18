@@ -308,45 +308,55 @@ openspec-superpowers-opencode registry verify
 
 ### `openspec list` 输出格式
 
-垫片脚本的输出直接来自 worktree 内 `openspec-orig list` 的原始输出，不做格式再加工：
+`openspec list` 采用**两阶段合并**策略：
+
+- **Phase ①**：遍历 registry entries → 进入 worktree → 执行 `openspec-orig list` → 提取该变更的数据行（按 name 过滤），追加 worktree 路径后缀
+- **Phase ②**：在项目根目录执行 `openspec-orig list` → 取出**不在 registry 中**的 change（无 worktree，直接存在项目根目录），标记为 `worktree: "."`
+
+所有变更行的右边列统一通过 `padEnd(52)` 对齐：
 
 ```
-# 垫片脚本执行流程：
-# 1. 读注册表获取 worktree 路径列表
-# 2. 逐个 cd 进 worktree → exec openspec-orig list
-# 3. 从各 worktree 的输出中提取数据行
-# 4. 同名去重（先到先得）
-# 5. 拼装输出
+# 合并过程示意：
 
-# worktree-a 里的 openspec-orig list 输出：
+# Phase ① — registry 中的 worktree 条目：
+#   feature-login 在 .worktrees/feature-login/ 中
+#   feature-search 在 .worktrees/feature-search/ 中
+
+# Phase ② — 根目录 openspec-orig 提供的额外变更（不在 registry）：
+#   root-only 直接存在于项目根目录的 openspec/changes/ 中
+
+# 最终输出（统一 padEnd(52) 对齐右边列）：
 Changes:
-  feature-login    Proposal    2 tasks    5m ago
+  feature-login    Proposal    2 tasks    5m ago              .worktrees/feature-login
+  feature-search   Spec        1 task     2h ago              .worktrees/feature-search
+  root-only        0 tasks     1d ago                          .
 
-# worktree-b 里的输出：
-Changes:
-  feature-search   Spec        1 task     2h ago
+# 三种右边列标记：
 
-# 合并输出：
-Changes:
-  feature-login    Proposal    2 tasks    5m ago
-  feature-search   Spec        1 task     2h ago
+# | 标记 | 含义 | 来源 |
+# |------|------|------|
+# | `.worktrees/<name>` | 变更在隔离的 worktree 中 | Phase ① |
+# | `.`                 | 变更在项目根目录（无 worktree） | Phase ② |
+# | `(no worktree)`     | registry 中配置了 worktree 但目录不存在或命令失败 | Phase ① 异常 |
 
-# 每个变更的状态来自其 worktree 的实时数据，
+# 每个变更的状态来自其 worktree（或根目录）的实时 openspec-orig 数据，
 # 不是注册表里的缓存值。这就是 registry 不存 status 的原因。
 ```
 
-> **关键设计**：垫片脚本**不解析也不重新格式化** openspec list 的输出行。数据行原样从 worktree 提取并拼接。这意味着如果未来 openspec 更新了 list 的输出格式（追加列、改对齐等），垫片脚本自动适配——零维护。
+> **关键设计**：垫片脚本**不重新格式化** openspec-orig list 的数据内容（name、status、tasks、time 等列），只做**统一列对齐 + 追加右边标记**。这意味着如果未来 openspec 更新了 list 的输出格式（追加列、改对齐等），垫片脚本自动适配——零维护。
 
 ### 非项目目录 / 无注册表行为
 
 | 场景 | 行为 |
 |------|------|
-| 在项目内、有注册表、有 worktree | 遍历 worktree 合并输出 |
-| 在项目内、有注册表、但所有 worktree 目录被删 | 输出 `No active changes found.` |
-| 在项目内、注册表存在但为空（`changes:[]`） | 输出 `No active changes found.`（我们的项目，无活跃变更） |
+| 在项目内、有注册表、有 worktree | 遍历 worktree 合并输出（Phase ①）+ 扫描根目录 openspec-orig 取额外变更（Phase ②） |
+| 在项目内、有注册表、但所有 worktree 目录被删 | Phase ① 输出 `(no worktree)` 标记 + Phase ② 输出根目录变更 |
+| 在项目内、注册表存在但为空（`changes:[]`） | Phase ① 跳过，仅 Phase ②：从根目录 openspec-orig 取所有变更（标记为 `.`） |
+| 在项目内、注册表为空 **且** 根目录 openspec-orig 也无变更 | Phase ① 跳过，Phase ② 无结果 → 输出 `No active changes found.` |
+| 在项目内、注册表有条目但 worktree 全不可用 **且** 根目录也无变更 | Phase ① 全 `(no worktree)`，Phase ② 无结果 → 输出 `No active changes found.` |
 | 在项目内、注册表不存在 | 透传 `openspec-orig list`（不是我们的项目，不走合并） |
 | 在项目外 | 透传 `openspec-orig list`（原生行为） |
-| 注册表 JSON 损坏 | `readRegistry()` 返回 `{changes:[]}` → 空输出。`registry verify` 可检测并提示修复 |
+| 注册表 JSON 损坏 | `readRegistry()` 返回 `{changes:[]}` → 退化为 Phase ② 仅输出根目录变更（或 `No active changes found.`）。`registry verify` 可检测并提示修复 |
 
 ## 待实现
 
@@ -405,13 +415,39 @@ if args[0] == "list":
     else:
         registry = readJSON(root + "/openspec/oso-change-registry.json")
         lines = []
+        seen = set()
+        COLUMN = 52
+
+        # Phase ①: 遍历注册表条目，进入各 worktree 取 openspec-orig 详情
         for each change in registry.changes:
-            worktree_path = root + "/" + change.worktree
-            if not exists(worktree_path): continue
-            output = exec("openspec-orig list", { cwd: worktree_path })
+            name = change["name"]
+            if name in seen: continue
+            seen.add(name)
+            wt = change.get("worktree")
+            wt_path = root + "/" + wt if wt else None
+            if not wt_path or not exists(wt_path):
+                lines.append(padEnd("  " + name, COLUMN) + "  (no worktree)")
+                continue
+            output = exec("openspec-orig list", { cwd: wt_path })
             for each line in output:
-                if line matches data pattern and name not seen:
-                    lines.append(line)
+                if line matches "^  \\S" and name in line:
+                    lines.append(padEnd(line, COLUMN) + "  " + wt)
+                    break
+            else:
+                lines.append(padEnd("  " + name, COLUMN) + "  (no worktree)")
+
+        # Phase ②: 项目根目录 openspec-orig 取不在 registry 的变更
+        try:
+            root_output = exec("openspec-orig list", { cwd: root })
+            for each line in root_output:
+                if line matches "^  \\S":
+                    m = extract_name(line)
+                    if m and m not in seen:
+                        seen.add(m)
+                        lines.append(padEnd(line, COLUMN) + "  .")
+        except:
+            pass    # 根目录无 openspec-orig 也可接受
+
         if lines is empty:
             print("No active changes found.")
         else:
@@ -439,18 +475,31 @@ else:
 
 ## 行为效果
 
-`openspec list` 在各场景下的实际表现：
+`openspec list` 在各场景下的实际表现（列号说明：右边列统一从第 52 列开始，用 `padEnd` 对齐）：
 
-**正常场景**：在项目目录（main 或任意 worktree）跑 `openspec list`：
+**正常场景**：在项目目录（main 或任意 worktree）跑 `openspec list`，worktree 变更 + 根目录变更合并输出：
 
 ```
 $ openspec list
 Changes:
-  feature-login      Proposal    2 tasks    5m ago
-  feature-search     Spec        1 task     2h ago
+  feature-login      Proposal    2 tasks    5m ago              .worktrees/feature-login
+  feature-search     Spec        1 task     2h ago              .worktrees/feature-search
+  root-only          0 tasks     1d ago                          .
 ```
 
-合并了所有 worktree 中的活跃变更。每个变更的状态从它自己的 worktree 实时获取。
+Phase ① 合并所有 worktree 中的活跃变更，Phase ② 补上根目录中的额外变更（标记为 `.`）。每个变更的状态从它自己的 worktree 或根目录实时获取。
+
+**worktree 缺失**（registry 中有条目但 worktree 目录被删或命令失败）：
+
+```
+$ openspec list
+Changes:
+  feature-login      Proposal    2 tasks    5m ago              .worktrees/feature-login
+  ghost                                                    (no worktree)
+  root-only          0 tasks     1d ago                          .
+```
+
+`(no worktree)` 与正常 worktree 路径在同一列对齐，直观看出该条目有问题。根目录变更仍旧出现。
 
 **无活跃变更**：
 
@@ -459,16 +508,24 @@ $ openspec list
 No active changes found.
 ```
 
+**无 registry 但有根目录变更**（注册表 `changes:[]`，根目录 openspec-orig 有变更）：
+
+```
+$ openspec list
+Changes:
+  legacy-change      Spec        5 tasks    2w ago               .
+```
+
+所有变更标记为 `.` 来源自根目录。
+
 **在项目外**：透传原生 `openspec-orig list`，等价于没装垫片。
 
 **非 list 命令**（如 `openspec status --change foo --json`）：全程透传，垫片不碰。
 
-**worktree 被删除**：注册表记录还在，但遍历时目录不存在 → 跳过该条目，不报错。下次 `registry remove` 清理即可。
-
-**JSON 损坏**：`readRegistry()` 返回 `{changes:[]}` → 输出 `No active changes found.`，不崩溃。
+**JSON 损坏**：`readRegistry()` 返回 `{changes:[]}` → Phase ① 跳过，退化为 Phase ② 仅输出根目录变更。不崩溃。
 
 **垫片未安装**：`openspec list` 走原版，只看到当前目录（main）的变更，看不到任何 worktree 里的变更。
 
 **从 main 看 vs 从 worktree 看**：`git rev-parse --git-common-dir` 都返回 `project/.git` → 同一项目根 → 行为一致。
 
-**性能**：每个 worktree 执行一次 `openspec-orig list`（约 100-200ms），3 个 worktree 约半秒。注册表读取和 JSON 解析在 1ms 内。
+**性能**：每个 worktree 执行一次 `openspec-orig list`（约 100-200ms），3 个 worktree 约半秒。Phase ② 额外一次根目录 `openspec-orig list`（< 200ms）。注册表读取和 JSON 解析在 1ms 内。

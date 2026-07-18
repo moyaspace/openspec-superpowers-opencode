@@ -1,3 +1,5 @@
+# ↑ Manual gitattributes entries go ABOVE this line (outside auto-generated block) ↑
+
 # <!-- openspec-superpowers-opencode_gitattributes -->
 # 全局使用 LF 换行符，避免 Windows 上 git 检出时将 LF 转换为 CRLF，
 # 导致 git status 等命令（因 stat 缓存）误判文件变更状态

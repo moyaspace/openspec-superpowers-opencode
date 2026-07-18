@@ -27,7 +27,14 @@ This is an **agent-driven** operation - you will read delta specs and directly e
 
    **IMPORTANT**: Do NOT guess or auto-select a change. Always let the user choose.
 
-2. **Find delta specs**
+2. **Ensure worktree exists and enter it**
+
+   ```bash
+   openspec-superpowers-opencode ensure-worktree <name>
+   cd .worktrees/<name>
+   ```
+
+3. **Find delta specs**
 
    Look for delta spec files in `openspec/changes/<name>/specs/*/spec.md`.
 
@@ -39,7 +46,7 @@ This is an **agent-driven** operation - you will read delta specs and directly e
 
    If no delta specs found, inform user and stop.
 
-3. **For each delta spec, apply changes to main specs**
+4. **For each delta spec, apply changes to main specs**
 
    For each capability with a delta spec at `openspec/changes/<name>/specs/<capability>/spec.md`:
 
@@ -72,7 +79,7 @@ This is an **agent-driven** operation - you will read delta specs and directly e
       - Add Purpose section (can be brief, mark as TBD)
       - Add Requirements section with the ADDED requirements
 
-4. **Show summary**
+5. **Show summary**
 
    After applying all changes, summarize:
    - Which capabilities were updated

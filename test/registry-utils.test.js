@@ -37,12 +37,15 @@ describe('mergeListJson()', () => {
         assert.strictEqual(result, '{"changes":[]}\n');
     });
 
-    test('returns empty JSON when no worktrees exist', () => {
+    test('returns entry with null worktree when no worktrees exist', () => {
         const dir = tmpProject();
         const result = registryUtils.mergeListJson([
             { name: 'ghost', worktree: '.worktrees/ghost' }
         ], dir);
-        assert.strictEqual(result, '{\n  "changes": []\n}\n');
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 1);
+        assert.strictEqual(parsed.changes[0].name, 'ghost');
+        assert.strictEqual(parsed.changes[0].worktree, null);
     });
 
     test('aggregates JSON changes from each worktree', (t) => {
@@ -102,7 +105,7 @@ describe('mergeListJson()', () => {
         assert.strictEqual(parsed.changes.length, 1);
     });
 
-    test('skips worktree when directory missing', (t) => {
+    test('preserves ghost entry and merges live entry', (t) => {
         const dir = tmpProject();
         fs.mkdirSync(path.join(dir, '.worktrees', 'live'), { recursive: true });
 
@@ -121,8 +124,11 @@ describe('mergeListJson()', () => {
         ], dir);
 
         const parsed = JSON.parse(result);
-        assert.strictEqual(parsed.changes.length, 1);
+        assert.strictEqual(parsed.changes.length, 2);
         assert.strictEqual(parsed.changes[0].name, 'live');
+        assert.strictEqual(parsed.changes[0].worktree, '.worktrees/live');
+        assert.strictEqual(parsed.changes[1].name, 'ghost');
+        assert.strictEqual(parsed.changes[1].worktree, null);
     });
 
     test('handles execSync failure gracefully', (t) => {
@@ -135,7 +141,103 @@ describe('mergeListJson()', () => {
             { name: 'broken', worktree: '.worktrees/broken' }
         ], dir);
 
-        assert.strictEqual(result, '{\n  "changes": []\n}\n');
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 1);
+        assert.strictEqual(parsed.changes[0].name, 'broken');
+        assert.strictEqual(parsed.changes[0].worktree, null);
+    });
+
+    // ---- Bug fix tests ----
+
+    test('preserves entry with null worktree when worktree dir missing', () => {
+        const dir = tmpProject();
+        const result = registryUtils.mergeListJson([
+            { name: 'ghost', worktree: '.worktrees/ghost' }
+        ], dir);
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 1);
+        assert.strictEqual(parsed.changes[0].name, 'ghost');
+        assert.strictEqual(parsed.changes[0].worktree, null);
+    });
+
+    test('filters changes by entry name from worktree, Phase ② picks up extra from root', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'project-setup'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', () => Buffer.from(JSON.stringify({
+            changes: [
+                { name: 'project-setup', completedTasks: 23, totalTasks: 23, lastModified: '2026-07-17T06:44:06.594Z', status: 'complete' },
+                { name: 'project-scaffold', completedTasks: 0, totalTasks: 0, lastModified: '2026-07-16T16:07:09.903Z', status: 'no-tasks' }
+            ]
+        })));
+
+        const result = registryUtils.mergeListJson([
+            { name: 'project-setup', worktree: '.worktrees/project-setup' }
+        ], dir);
+
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 2);
+        assert.strictEqual(parsed.changes[0].name, 'project-setup');
+        assert.strictEqual(parsed.changes[0].worktree, '.worktrees/project-setup');
+        assert.strictEqual(parsed.changes[1].name, 'project-scaffold');
+        assert.strictEqual(parsed.changes[1].worktree, '.');
+    });
+
+    test('Phase ② picks up extra change from root openspec-orig not in registry', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-a'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', (cmd, opts) => {
+            if (opts.cwd.endsWith('feature-a')) {
+                return Buffer.from(JSON.stringify({
+                    changes: [{ name: 'feature-a', completedTasks: 1, totalTasks: 3, lastModified: '2026-07-17T00:00:00.000Z', status: 'in-progress' }]
+                }));
+            }
+            // 根目录返回额外 change
+            return Buffer.from(JSON.stringify({
+                changes: [{ name: 'root-only-change', completedTasks: 0, totalTasks: 0, lastModified: '2026-07-16T00:00:00.000Z', status: 'no-tasks' }]
+            }));
+        });
+
+        const result = registryUtils.mergeListJson([
+            { name: 'feature-a', worktree: '.worktrees/feature-a' }
+        ], dir);
+
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 2);
+        assert.strictEqual(parsed.changes[0].name, 'feature-a');
+        assert.strictEqual(parsed.changes[0].worktree, '.worktrees/feature-a');
+        assert.strictEqual(parsed.changes[1].name, 'root-only-change');
+        assert.strictEqual(parsed.changes[1].worktree, '.');
+    });
+
+    test('Phase ② skips root change when already seen (first wins from registry)', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-a'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', (cmd, opts) => {
+            if (opts.cwd.endsWith('feature-a')) {
+                return Buffer.from(JSON.stringify({
+                    changes: [{ name: 'feature-a', completedTasks: 1, totalTasks: 3, lastModified: '2026-07-17T00:00:00.000Z', status: 'in-progress' }]
+                }));
+            }
+            // 根目录也存在同名 change，但不应该被加入（first wins）
+            return Buffer.from(JSON.stringify({
+                changes: [
+                    { name: 'feature-a', completedTasks: 99, totalTasks: 999, lastModified: '2026-07-15T00:00:00.000Z', status: 'stale' }
+                ]
+            }));
+        });
+
+        const result = registryUtils.mergeListJson([
+            { name: 'feature-a', worktree: '.worktrees/feature-a' }
+        ], dir);
+
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 1);
+        assert.strictEqual(parsed.changes[0].name, 'feature-a');
+        assert.strictEqual(parsed.changes[0].worktree, '.worktrees/feature-a');
+        assert.strictEqual(parsed.changes[0].completedTasks, 1);  // 来自 worktree，不是 root 的 99
     });
 });
 
@@ -228,12 +330,13 @@ describe('mergeList()', () => {
         assert.strictEqual(result, 'No active changes found.\n');
     });
 
-    test('returns "No active changes" when no worktrees exist', () => {
+    test('shows ghost entry when no worktrees exist', () => {
         const dir = tmpProject();
         const result = registryUtils.mergeList([
             { name: 'ghost', worktree: '.worktrees/ghost' }
         ], dir);
-        assert.strictEqual(result, 'No active changes found.\n');
+        assert.ok(result.includes('ghost'));
+        assert.ok(result.includes('(no worktree)'));
     });
 
     test('aggregates entries from each worktree', (t) => {
@@ -278,7 +381,7 @@ describe('mergeList()', () => {
         assert.strictEqual(featureLines.length, 1);
     });
 
-    test('skips worktree when directory missing', (t) => {
+    test('preserves ghost entry and shows live entry (text)', (t) => {
         const dir = tmpProject();
         fs.mkdirSync(path.join(dir, '.worktrees', 'live'), { recursive: true });
 
@@ -295,10 +398,11 @@ describe('mergeList()', () => {
         ], dir);
 
         assert.ok(result.includes('live'));
-        assert.ok(!result.includes('ghost'));
+        assert.ok(result.includes('ghost'));
+        assert.ok(result.includes('(no worktree)'));
     });
 
-    test('handles worktree with no active changes output', (t) => {
+    test('shows entry when worktree returns no active changes', (t) => {
         const dir = tmpProject();
         fs.mkdirSync(path.join(dir, '.worktrees', 'empty'), { recursive: true });
 
@@ -308,7 +412,8 @@ describe('mergeList()', () => {
             { name: 'empty', worktree: '.worktrees/empty' }
         ], dir);
 
-        assert.strictEqual(result, 'No active changes found.\n');
+        assert.ok(result.includes('empty'));
+        assert.ok(result.includes('(no worktree)'));
     });
 
     test('handles execSync failure gracefully', (t) => {
@@ -321,7 +426,69 @@ describe('mergeList()', () => {
             { name: 'broken', worktree: '.worktrees/broken' }
         ], dir);
 
-        assert.strictEqual(result, 'No active changes found.\n');
+        assert.ok(result.includes('broken'));
+        assert.ok(result.includes('(no worktree)'));
+    });
+
+    // ---- Bug fix tests ----
+
+    test('preserves entry with null worktree when worktree dir missing (text)', () => {
+        const dir = tmpProject();
+        const result = registryUtils.mergeList([
+            { name: 'ghost', worktree: '.worktrees/ghost' }
+        ], dir);
+        assert.ok(result.includes('ghost'));
+        assert.ok(result.includes('(no worktree)'));
+    });
+
+    test('filters changes by entry name (text), Phase ② picks up extra from root', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'project-setup'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', () => 'Changes:\n  project-setup    23 tasks    1m ago\n  project-scaffold    0 tasks    1d ago\n');
+
+        const result = registryUtils.mergeList([
+            { name: 'project-setup', worktree: '.worktrees/project-setup' }
+        ], dir);
+
+        const lines = result.split('\n').filter(l => l.includes('project-'));
+        assert.strictEqual(lines.length, 2);
+        assert.ok(lines[0].includes('project-setup'));
+        assert.ok(lines[1].includes('project-scaffold'));
+    });
+
+    test('Phase ② picks up extra change from root openspec-orig not in registry (text)', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-a'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', (cmd, opts) => {
+            if (opts.cwd.endsWith('feature-a')) {
+                return 'Changes:\n  feature-a    3 tasks    1m ago\n';
+            }
+            return 'Changes:\n  root-only-change    0 tasks    1d ago\n';
+        });
+
+        const result = registryUtils.mergeList([
+            { name: 'feature-a', worktree: '.worktrees/feature-a' }
+        ], dir);
+
+        assert.ok(result.includes('feature-a'));
+        assert.ok(result.includes('root-only-change'));
+    });
+
+    test('Phase ② skips root change when already seen (text, first wins from registry)', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-a'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', () => 'Changes:\n  feature-a    1 task     1m ago\n');
+
+        const result = registryUtils.mergeList([
+            { name: 'feature-a', worktree: '.worktrees/feature-a' }
+        ], dir);
+
+        const lines = result.split('\n').filter(l => l.includes('feature-a') && !l.startsWith('Changes'));
+        assert.strictEqual(lines.length, 1);
+        assert.ok(lines[0].includes('.worktrees/feature-a'));  // 来自 worktree，非根目录
     });
 });
 

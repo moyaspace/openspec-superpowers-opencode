@@ -22,11 +22,13 @@ description: Finish an implemented change - merge worktree, cleanup, archive, PR
 
 ### Step 1: 更新当前任务
 
+执行 `/moya-task change`。注意这是 OpenCode 斜杠命令，不是 CLI 程序——**不要用 bash 执行**。请用 `skill` 工具调用：
+
 ```
-/moya-task change
+skill(name="moya-task", user_message="change")
 ```
 
-自动检测当前 active change，标记对应任务完成，记录 Change Context（遗留问题/外溢发现/依赖内容）。
+加载后按返回的指引操作（auto-detect active change → 更新 tasks.md → 记录 Change Context）。
 
 ---
 
@@ -57,12 +59,28 @@ cd .worktrees/<name>
 
 **3a. 提交未提交内容：**
 
+**3a-1. 检查状态**
+
 ```bash
 git status --porcelain
 ```
 
-- 输出为空 → 干净，跳过
-- 输出非空 → `git add -A && git commit`
+- 输出为空 → 干净，跳到 3b
+
+**3a-2. 提交变更**
+
+```bash
+git add -A && git commit
+```
+
+**3a-3. 确认提交**
+
+```bash
+git log --oneline -1
+```
+
+- 显示有新 commit → 成功，跳到 3b  
+- 无新 commit 或报错 → 失败，回到 3a-2 重试
 
 **3b. 运行测试套件（自动检测项目类型）：**
 

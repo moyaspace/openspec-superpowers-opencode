@@ -50,23 +50,40 @@ git status --porcelain
 
   > **main 分支有未提交的更改。是否先提交？(y/N)**
   >
-  > - Y → `git add -A && git commit`，跳到 Step 4
-  > - N → 不提交，跳到 Step 4
+  > - **N** → 不提交，跳到 Step 4
+  > - **Y** →
+
+  **3c-1. 提交变更：**
+
+  ```bash
+  git add -A && git commit
+  ```
+
+  **3c-2. 确认提交：**
+
+  ```bash
+  git log --oneline -1
+  ```
+
+  - 显示有新 commit → 成功，跳到 Step 4
+  - 无新 commit 或报错 → 失败，回到 3c-1 重试
 
 ### Step 4: 创建隔离 Worktree
 
 Artifacts 应在 feature 分支上生成，不在 main 上留痕迹。
 
-**3a. 创建 worktree：**
+**4a. 创建 worktree：**
 
 ```bash
 openspec-superpowers-opencode ensure-worktree <name>
 cd .worktrees/<name>
+# 复制 .gitignore 忽略的 openspec/schemas/ 目录到 worktree
+cp -r <project-root>/openspec/schemas/ openspec/
 ```
 
 > worktree 继承了 repo 的所有基础设施文件（`.opencode/`、`openspec/config.yaml` 等）。
 
-**3b. 初始化代码索引：**
+**4b. 初始化代码索引：**
 
 ```
 - codegraph 命令可用 → codegraph init
