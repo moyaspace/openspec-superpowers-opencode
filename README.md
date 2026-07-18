@@ -91,6 +91,7 @@ openspec-superpowers-opencode init
 | 7 | **SHA-256 lock** | Skill file integrity verified on deploy |
 | 8 | **Layered architecture** | Superpowers (HOW) → OpenSpec (WHAT) → Worktree (WHERE) → Commands (WHEN) |
 | 9 | **Full worktree + openspec change support** | Auto-register on change creation, smart `openspec list` interception, `verify` one-click health check |
+| 10 | **High-performance Worktree code search** | CodeGraph integrated in worktree, auto-indexed for high-performance code search |
 
 > Detailed features → [docs/FEATURES.md](docs/FEATURES.md)
 

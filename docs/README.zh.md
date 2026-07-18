@@ -89,6 +89,7 @@ openspec-superpowers-opencode init
 | 7 | **SHA-256 锁** | 部署时自动校验 skill 文件完整性 |
 | 8 | **多层架构** | Superpowers（HOW）→ OpenSpec（WHAT）→ Worktree（WHERE）→ 命令（WHEN） |
 | 9 | **worktree + openspec change 全面支持** | 创建变更自动注册、`openspec list` 智能拦截、`verify` 一键健康检查 |
+| 10 | **支持 Worktree 代码高性能检索** | Worktree 内集成 CodeGraph，自动索引，支持高性能的代码检索 |
 
 > 详细功能说明 → [docs/FEATURES.md](docs/FEATURES.md)
 
