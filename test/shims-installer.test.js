@@ -36,6 +36,7 @@ describe('findOpenspecBinDir()', () => {
     });
 
     test('handles Windows where command', (t) => {
+        if (process.platform !== 'win32') return t.skip('Windows only');
         t.mock.method(child_process, 'execSync', () => 'C:\\Program Files\\nodejs\\openspec.cmd');
         assert.strictEqual(shimsInstaller.findOpenspecBinDir(true), 'C:\\Program Files\\nodejs');
     });
@@ -118,6 +119,21 @@ describe('copyOpenspecToOrig()', () => {
         assert.throws(() => {
             shimsInstaller.copyOpenspecToOrig(dir, false);
         }, /openspec CLI not found/);
+    });
+
+    test('preserves symlink when openspec is a symlink', () => {
+        const dir = tmpDir();
+        // 模拟 npm -g 安装：openspec 是符号链接指向另一个目录的 JS 文件
+        const targetDir = tmpDir();
+        fs.writeFileSync(path.join(targetDir, 'openspec.js'), '#!/usr/bin/env node\nimport "../dist/cli/index.js";');
+        fs.symlinkSync(path.join(targetDir, 'openspec.js'), path.join(dir, 'openspec'));
+        const result = shimsInstaller.copyOpenspecToOrig(dir, false);
+        assert.strictEqual(result, 'openspec-orig');
+        assert.ok(fs.existsSync(path.join(dir, 'openspec-orig')));
+        // 验证 openspec-orig 也是符号链接，指向同一目标
+        const stat = fs.lstatSync(path.join(dir, 'openspec-orig'));
+        assert.ok(stat.isSymbolicLink());
+        assert.strictEqual(fs.readlinkSync(path.join(dir, 'openspec-orig')), path.join(targetDir, 'openspec.js'));
     });
 
     test('does not overwrite existing openspec-orig', () => {
@@ -414,12 +430,14 @@ describe('uninstallShims()', () => {
 // binDirFromToolDir()
 // ============================================================
 describe('binDirFromToolDir()', () => {
-    test('scoped package on Windows', () => {
+    test('scoped package on Windows', (t) => {
+        if (process.platform !== 'win32') return t.skip('Windows only');
         const td = 'C:\\portableApp\\nvm\\v24.14.0\\node_modules\\@scope\\pkg';
         assert.strictEqual(shimsInstaller.binDirFromToolDir(td, true), 'C:\\portableApp\\nvm\\v24.14.0');
     });
 
-    test('non-scoped package on Windows', () => {
+    test('non-scoped package on Windows', (t) => {
+        if (process.platform !== 'win32') return t.skip('Windows only');
         const td = 'C:\\portableApp\\nvm\\v24.14.0\\node_modules\\some-pkg';
         assert.strictEqual(shimsInstaller.binDirFromToolDir(td, true), 'C:\\portableApp\\nvm\\v24.14.0');
     });
