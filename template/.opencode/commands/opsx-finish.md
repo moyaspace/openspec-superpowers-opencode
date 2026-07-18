@@ -100,6 +100,12 @@ git log --oneline -1
 
 ### Step 4: 产出 retrospective
 
+已在 worktree 内（Step 3 已 `cd .worktrees/<name>`，但是AI实际执行发现经常是在 main 中）。为了确保，再切：
+
+```bash
+cd .worktrees/<name>
+```
+
 Read retrospective artifact 的 instruction：
 
 ```bash
@@ -110,8 +116,11 @@ openspec instructions retrospective --change "<name>"
 
 ### Step 5: 归档变更
 
+已在 worktree 内。为了确保，再切：
+
 ```bash
-openspec archive -y
+cd .worktrees/<name>
+openspec archive <name> -y
 ```
 
 此操作将：
