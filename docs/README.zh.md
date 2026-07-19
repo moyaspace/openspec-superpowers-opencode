@@ -2,13 +2,13 @@
 
 > 将 Superpowers + OpenSpec 工作流桥接到 OpenCode，强制执行 worktree 隔离。
 
-[![CI](https://img.shields.io/github/actions/workflow/status/moyaspace/openspec-superpowers-opencode/ci.yml?style=for-the-badge&logo=github&color=2ea44f)](https://github.com/moyaspace/openspec-superpowers-opencode/actions)
-[![GitHub last commit](https://img.shields.io/github/last-commit/moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=github&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
-[![GitHub Stars](https://img.shields.io/github/stars/moyaspace/openspec-superpowers-opencode?style=for-the-badge&color=yellow&logo=github)](https://github.com/moyaspace/openspec-superpowers-opencode)
-[![npm Version](https://img.shields.io/npm/v/@moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
-[![npm Weekly Downloads](https://img.shields.io/npm/dw/@moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
-[![npm Monthly Downloads](https://img.shields.io/npm/dm/@moyaspace/openspec-superpowers-opencode?style=for-the-badge&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
-[![License](https://img.shields.io/github/license/moyaspace/openspec-superpowers-opencode?style=for-the-badge&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
+[![CI](https://img.shields.io/github/actions/workflow/status/moyaspace/openspec-superpowers-opencode/ci.yml?style=flat-square&logo=github&color=2ea44f)](https://github.com/moyaspace/openspec-superpowers-opencode/actions)
+[![GitHub last commit](https://img.shields.io/github/last-commit/moyaspace/openspec-superpowers-opencode?style=flat-square&logo=github&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
+[![GitHub Stars](https://img.shields.io/github/stars/moyaspace/openspec-superpowers-opencode?style=flat-square&color=yellow&logo=github)](https://github.com/moyaspace/openspec-superpowers-opencode)
+[![npm Version](https://img.shields.io/npm/v/@moyaspace/openspec-superpowers-opencode?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
+[![npm Total Downloads](https://img.shields.io/npm/dt/@moyaspace/openspec-superpowers-opencode?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
+[![npm Monthly Downloads](https://img.shields.io/npm/dm/@moyaspace/openspec-superpowers-opencode?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
+[![License](https://img.shields.io/github/license/moyaspace/openspec-superpowers-opencode?style=flat-square&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
 
 > 如果觉得有用，请在 GitHub 上给个 ⭐！
 
