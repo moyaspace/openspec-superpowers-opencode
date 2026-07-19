@@ -49,12 +49,12 @@ jobs:
             "package/bin/create-project.js" \
             "package/.gitattributes" \
             "package/package.json" \
-            "package/template/AGENTS.md" \
+            "package/template/_AGENTS.md" \
             "package/template/openspec/schemas/superpowers-bridge-opencode/schema.yaml" \
             "package/template/skills.lock.json" \
             "package/template/_gitignore" \
-            "package/template/.editorconfig" \
-            "package/template/.gitattributes" \
+            "package/template/_editorconfig" \
+            "package/template/_gitattributes" \
             "package/scripts/setup.sh" \
             "package/scripts/setup.ps1" \
             "package/docs/QUICKSTART.md" \
