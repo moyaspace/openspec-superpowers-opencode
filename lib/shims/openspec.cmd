@@ -5,7 +5,8 @@ set TOOL_DIR={{TOOL_DIR}}
 rem Self-heal: package was removed, restore original openspec and clean up
 if not exist "%TOOL_DIR%\lib\registry-utils.js" (
     if exist "%~dp0openspec-orig.cmd" (
-        move /Y "%~dp0openspec-orig.cmd" "%~dp0openspec.cmd" >nul 2>&1
+        copy /Y "%~dp0openspec-orig.cmd" "%~dp0openspec.cmd" >nul 2>&1
+        del "%~dp0openspec-orig.cmd" >nul 2>&1
     )
     "%~dp0openspec.cmd" %*
     exit /b %errorlevel%
