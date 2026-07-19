@@ -44,9 +44,21 @@ import '../dist/cli/index.js'
 
 测试只覆盖了**常规文件**场景，没覆盖 npm -g 安装的**符号链接**场景。
 
-### 修复
+### 修复一：备份时保留符号链接
 
 检测源文件是否为符号链接，如果是则创建 `openspec-orig` 为指向同一目标的符号链接，而不是跟随链接复制文件内容。
+
+### 还有一个坑：写入垫片时覆盖了 openspec.js
+
+`copyOpenspecToOrig()` 修复后，`installShimScripts()` 用 `fs.writeFileSync()` 把垫片脚本写入 `/usr/local/bin/openspec`。但此时 `openspec` 还是**符号链接**（上一步只备份了它，没有删除它），`writeFileSync` 跟随链接直接覆盖了 `openspec.js` 目标文件。
+
+```
+/usr/local/bin/openspec → ../lib/node_modules/@fission-ai/openspec/bin/openspec.js
+                                                                ↓ writeFileSync 跟随链接
+openspec.js 被垫片内容覆盖！
+```
+
+**修复二**：`installShimScripts()` 写入前先 `unlinkSync` 删除已有文件/符号链接。
 
 ### 平台测试分离
 
@@ -54,4 +66,27 @@ import '../dist/cli/index.js'
 
 ```js
 if (process.platform !== 'win32') return t.skip('Windows only');
+```
+
+### 还有一个坑：旧 openspec-orig 残留
+
+修复后的代码有能力正确处理符号链接，但 `installShims()` 中有一个「存在就跳过」的优化：
+
+```js
+if (!origExists) {
+    copyOpenspecToOrig(binDir, isWin); // 修复后的代码
+} else {
+    // 旧版本留下的损坏 openspec-orig 永远没机会被修理
+}
+```
+
+旧版本已经把 `openspec-orig` 写坏了（普通文件而非符号链接），修复后的代码虽然有能力正确处理，但因为「存在就跳过」的逻辑，永远不会执行。
+
+**修复二**：`installShims()` 中始终调用 `copyOpenspecToOrig()`，不再跳过。
+
+### 还有一个坑：垫片备份垫片
+
+`npm install -g` 的 `install` 脚本会在安装时自动运行 `install-shims`。如果在垫片**已安装**的状态下再次运行 `install-shims`，`copyOpenspecToOrig()` 会把垫片脚本本身当做 openspec 的原版备份——结果 `openspec-orig` 还是一个垫片。
+
+**修复三**：`copyOpenspecToOrig()` 检测源文件内容是否包含 `openspec shim for oso registry` 标记。如果是垫片，保留现有 `openspec-orig` 不动。
 ```

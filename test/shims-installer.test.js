@@ -272,17 +272,20 @@ describe('installShims()', () => {
         assert.ok(fs.existsSync(path.join(binDir, 'openspec.cmd')));
     });
 
-    test('skips openspec-orig copy when it already exists', (t) => {
+    test('recreates openspec-orig when it already exists (fixes broken backup from old versions)', (t) => {
         const base = tmpDir();
         const { toolDir, binDir } = setupEnvironment(base);
-        fs.writeFileSync(path.join(binDir, 'openspec-orig'), '#!/bin/sh\nexisting backup');
+        // 模拟旧版本留下的损坏备份（普通文件而非符号链接）
+        fs.writeFileSync(path.join(binDir, 'openspec-orig'), '#!/bin/sh\nexisting corrupt backup');
 
         t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
 
         const result = shimsInstaller.installShims(toolDir, false);
         assert.strictEqual(result.success, true);
-        assert.strictEqual(fs.readFileSync(path.join(binDir, 'openspec-orig'), 'utf8'), '#!/bin/sh\nexisting backup');
-        assert.ok(result.details.some(d => d.includes('already exists')));
+        // openspec 是常规文件（测试环境模拟），备份应被覆盖
+        assert.notStrictEqual(fs.readFileSync(path.join(binDir, 'openspec-orig'), 'utf8'), '#!/bin/sh\nexisting corrupt backup');
+        assert.ok(!result.details.some(d => d.includes('already exists')));
+        assert.ok(result.details.some(d => d.includes('openspec-orig:')));
     });
 
     test('fails gracefully when openspec not in PATH', (t) => {
