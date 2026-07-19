@@ -6,8 +6,7 @@ TOOL_DIR="{{TOOL_DIR}}"
 if [ ! -f "$TOOL_DIR/lib/registry-utils.js" ]; then
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd 2>/dev/null || echo "$(dirname "$0")")"
     if [ -f "$SCRIPT_DIR/openspec-orig" ]; then
-        cp "$SCRIPT_DIR/openspec-orig" "$SCRIPT_DIR/openspec" 2>/dev/null
-        rm -f "$SCRIPT_DIR/openspec-orig" 2>/dev/null
+        mv -f "$SCRIPT_DIR/openspec-orig" "$SCRIPT_DIR/openspec" 2>/dev/null
         exec "$SCRIPT_DIR/openspec" "$@"
     fi
 fi

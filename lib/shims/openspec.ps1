@@ -7,8 +7,7 @@ if (-not (Test-Path $healthCheck)) {
     $here = Split-Path -Parent $PSCommandPath
     $origCmd = Join-Path $here "openspec-orig.cmd"
     if (Test-Path $origCmd) {
-        Copy-Item $origCmd (Join-Path $here "openspec.cmd") -Force
-        Remove-Item $origCmd -Force -ErrorAction SilentlyContinue
+        Move-Item $origCmd (Join-Path $here "openspec.cmd") -Force -ErrorAction SilentlyContinue
     }
     # Self-destruct: our .ps1 shim is no longer needed
     Remove-Item $PSCommandPath -Force -ErrorAction SilentlyContinue
