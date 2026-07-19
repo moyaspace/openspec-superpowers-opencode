@@ -1,6 +1,6 @@
 {
   "name": "@moyaspace/openspec-superpowers-opencode",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Bridges Superpowers + OpenSpec workflows into OpenCode with enforced worktree isolation",
   "keywords": [
     "openspec",
