@@ -72,7 +72,7 @@ git log --oneline -1
 **3b. 运行测试套件（自动检测项目类型）：**
 
 ```
-- 存在 package.json     → npm test
+- 存在 package.json     → 检测 package.json 是否有 test script，有则 npm test，无则 WARNING "无 test script，跳过" 并继续
 - 存在 Cargo.toml       → cargo test
 - 存在 requirements.txt
   或 pyproject.toml     → pytest
@@ -113,6 +113,22 @@ openspec archive <name> -y
 此操作将：
 - 把 `openspec/changes/<name>/specs/` 的 delta specs 同步到 `openspec/specs/`
 - 变更目录移到 `openspec/changes/archive/YYYY-MM-DD-<name>/`
+
+### Step 5a: 提交归档变更
+
+```bash
+git add -A && git commit -m "<name>: archive change"
+```
+
+### Step 5b: 确认提交
+
+```bash
+git log --oneline -1
+```
+
+- 显示有新 commit → 成功，跳到 Step 6
+- 无新 commit 或报错 → 回到 Step 5a 重试
+- 如报 "nothing to commit"（已是最新）→ 直接跳到 Step 6
 
 ### Step 6: 读取 finishing-a-development-branch skill
 

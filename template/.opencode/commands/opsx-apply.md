@@ -79,6 +79,20 @@ Read：
 
 **4b. 确认 plan.md 中提到的工具链（mvn、docker、node 等）可用。**
 
+**4c. 确认 .gitignore 已就绪：**
+
+读取 plan.md，如果计划中包含 `npm install` / `cargo build` / `pip install` 等
+会产生构建产物的命令，则在执行前确认对应子目录已有 .gitignore 排除产物：
+
+| 项目类型 | 需排除的产物 |
+|---------|-------------|
+| Node/TypeScript | `node_modules/`, `dist/`, `*.tsbuildinfo` |
+| Rust | `target/` |
+| Python | `__pycache__/`, `*.pyc`, `.venv/`, `dist/` |
+| Go | 二进制产物 |
+
+**原则：先写 .gitignore，再跑 install/build。避免产物被误提交。**
+
 ### Step 5: 逐任务实现
 
 先检测 Superpowers 版本，然后按对应版本流程执行。
@@ -112,7 +126,7 @@ Read：
   {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
 
 对 plan.md 中的每个微任务：
-1. 运行 `scripts/task-brief <plan.md 路径> <任务序号>`，提取任务到文件，记录返回的文件路径
+1. 运行 `{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/task-brief <plan.md 路径> <任务序号>`，提取任务到文件，记录返回的文件路径
 2. 使用 implementer-prompt.md 模板构造基础 prompt，嵌入 task-brief 返回的文件路径
 3. 从 TDD SKILL.md 中提取 RED-GREEN-REFACTOR 流程、铁律作为 prompt 的前置指令
 4. 通过 `task()` 派 Agent 实现（load_skills=[]，TDD 通过 prompt 嵌入传递）：
@@ -154,7 +168,7 @@ Read：
 
 **Superpowers v6（单步审查）：**
 
-先运行 `scripts/review-package BASE HEAD` 生成 diff package，记录返回的文件路径。
+先运行 `{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package BASE HEAD` 生成 diff package，记录返回的文件路径。
 
 然后读取 task-reviewer-prompt.md，构造审查 prompt（嵌入 diff package 路径），
 派 `task(subagent_type="oracle", ...)` 一次审查（spec compliance + code quality）。
