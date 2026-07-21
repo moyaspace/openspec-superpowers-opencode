@@ -16,7 +16,7 @@
 
 # OpenCode tool-generated artifacts — track only opencode.json
 
-.opencode/
+.opencode/*
 !.opencode/opencode.json
 
 # Skills lock — global Superpowers version pinning, not project code
@@ -37,7 +37,7 @@ openspec/oso-change-registry.json
 
 # Local test records
 
-docs/test-records/
+docs/test-records/*
 !docs/test-records/.gitkeep
 
 # Personal local workspace (do not track)

@@ -17,7 +17,9 @@
       ".opencode/**": "ask",
       "AGENTS.md": "ask",
       "opencode.json": "ask",
+      "**/temp/**": "allow",
       "**/temp/opencode/**": "allow",
+      "**/tmp/**": "allow",
       "**/tmp/opencode/**": "allow"
     },
     "bash": {

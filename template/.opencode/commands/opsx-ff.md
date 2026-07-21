@@ -74,7 +74,7 @@ cp -r <project-root>/openspec/schemas/* openspec/schemas/ && cp <project-root>/o
 
 **验证复制是否成功：**
 ```bash
-test -d openspec/schemas/ && test -f openspec/config.yaml
+test -f openspec/config.yaml && test -f openspec/schemas/superpowers-bridge-opencode/schema.yaml && test -f openspec/schemas/superpowers-bridge-opencode/templates/brainstorm.md
 ```
 
 - **成功** → 继续
