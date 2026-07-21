@@ -66,9 +66,17 @@ git status --porcelain
 openspec-superpowers-opencode ensure-worktree <name>
 cd .worktrees/<name>
 # 复制 .gitignore 忽略的 openspec/schemas/ 和 config.yaml 到 worktree
-cp -r <project-root>/openspec/schemas/ openspec/
-cp <project-root>/openspec/config.yaml openspec/
+mkdir -p openspec/schemas/
+cp -r <project-root>/openspec/schemas/* openspec/schemas/ && cp <project-root>/openspec/config.yaml openspec/
 ```
+
+**验证复制是否成功：**
+```bash
+test -d openspec/schemas/ && test -f openspec/config.yaml
+```
+
+- **成功** → 继续
+- **失败** → 重新执行复制再验证，成功后才能进入下一步
 
 **3b. 初始化代码索引：**
 

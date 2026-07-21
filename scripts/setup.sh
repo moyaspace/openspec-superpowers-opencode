@@ -152,18 +152,20 @@ if [ "$UNINSTALL" = true ]; then
     if [ ! -f "$MANIFEST_FILE" ]; then
         echo "$(t "✗ 未找到安装清单 ($MANIFEST_FILE)" "✗ Install manifest not found ($MANIFEST_FILE)")"
         echo "$(t "  可能项目未通过此脚本安装，或清单已被删除。" "  The project may not have been installed via this script, or the manifest was deleted.")"
-        echo "$(t "  手动删除以下目录:" "  Manually delete these directories:")"
+        echo "$(t "  手动删除已部署的文件:" "  Manually delete deployed files:")"
         echo "    .opencode/commands/ (opsx-* $(t "命令" "commands"))"
         echo "    .opencode/skills/openspec-*-change/ (skill $(t "定义" "definitions"))"
-        echo "    openspec/ (schema + changes + specs)"
+        echo "    openspec/config.yaml"
+        echo "    openspec/schemas/ (template + schema)"
+        echo "    skills.lock.json (skill $(t "完整性锁" "integrity lock"))"
         echo "    AGENTS.md (bridge $(t "部分" "content"))"
         echo "    opencode.json (permission $(t "规则" "rules"))"
+        echo "$(t "  注意: openspec/changes/ + openspec/specs/ 中的用户数据不会被删除" "  Note: User data in openspec/changes/ + openspec/specs/ will not be deleted")"
         exit 1
     fi
 
     REMOVED_COUNT=0
     FAILED_COUNT=0
-    SKIPPED_COUNT=0
 
     # 用 node 解析 JSON
     if ! command -v node &>/dev/null; then
@@ -175,18 +177,58 @@ if [ "$UNINSTALL" = true ]; then
     # 受保护文件列表（reset 不碰）
     PROTECTED_FILES=("opencode.json" "AGENTS.md" ".gitignore" ".gitattributes" ".editorconfig")
 
-    # 解析 overwriteDecisions
-    OVERWRITE_DECISIONS_MANIFEST=$(node -e "
-const m=JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8'));
-const d=m.overwriteDecisions||{};
-for(const[k,v]of Object.entries(d)) console.log(k+'|'+v);
-")
-
     # 解析文件列表
     FILES=$(node -e "
 const m=JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8'));
 (m.files||[]).forEach(f=>console.log(f));
 ")
+
+    # ---- 预览：计算将删除/跳过什么 ----
+    PREVIEW=$(node -e "
+const m=JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8'));
+const files=m.files||[];
+const protected=['opencode.json','AGENTS.md','.gitignore','.gitattributes','.editorconfig'];
+const toDelete=[], toSkip=[];
+for(const f of files){
+  let isProtected=false;
+  for(const p of protected){
+    if(f===p||f.startsWith(p+'/')||f.startsWith(p+'\\\\')){
+      isProtected=true; break;
+    }
+    const base=f.split(/[\\\\/]/).pop();
+    if(base===p){isProtected=true; break;}
+  }
+  if(isProtected){toSkip.push({file:f,reason:'受保护'}); continue;}
+  toDelete.push(f);
+}
+console.log('DELETE_COUNT='+toDelete.length);
+console.log('SKIP_COUNT='+toSkip.length);
+for(const f of toDelete) console.log('DEL:'+f);
+for(const s of toSkip) console.log('SKP:'+s.file+'|'+s.reason);
+")
+    DELETE_COUNT=$(echo "$PREVIEW" | grep '^DELETE_COUNT=' | cut -d= -f2)
+    SKIP_COUNT=$(echo "$PREVIEW" | grep '^SKIP_COUNT=' | cut -d= -f2)
+    mapfile -t DELETE_FILES < <(echo "$PREVIEW" | grep '^DEL:' | sed 's/^DEL://')
+    mapfile -t SKIP_ENTRIES < <(echo "$PREVIEW" | grep '^SKP:' | sed 's/^SKP://')
+
+    echo "$(t "=== 重置预览 ===" "=== Reset Preview ===")"
+    echo "$(t "将删除 $DELETE_COUNT 个文件/目录:" "Files/dirs to delete ($DELETE_COUNT):")"
+    for f in "${DELETE_FILES[@]}"; do
+        echo "  ✗ $f"
+    done
+    echo ""
+    echo "$(t "跳过（保留）$SKIP_COUNT 项:" "Skipped (retained) $SKIP_COUNT items:")"
+    for s in "${SKIP_ENTRIES[@]}"; do
+        echo "  - $s"
+    done
+    echo ""
+    echo "$(t "用户数据不碰: openspec/changes/, openspec/specs/" "User data untouched: openspec/changes/, openspec/specs/")"
+    echo ""
+    CONFIRM=$(prompt_yes_no "$(t "是否继续重置？(y/N) " "Continue reset? (y/N) ")")
+    if [ "$CONFIRM" != "yes" ]; then
+        echo "$(t "重置已取消" "Reset cancelled")"
+        exit 0
+    fi
 
     while IFS= read -r file; do
         [ -z "$file" ] && continue
@@ -200,20 +242,6 @@ const m=JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8'));
         done
         if [ "$is_protected" = true ]; then
             echo "$(t "  - $file（受保护，跳过）" "  - $file (protected, skipped)")"
-            continue
-        fi
-
-        # 跳过 overwriteDecisions 标记为 skip 的文件
-        skip_file=false
-        while IFS='|' read -r od_path od_decision; do
-            if [ "$od_path" = "$file" ] && [ "$od_decision" = "skip" ]; then
-                skip_file=true
-                break
-            fi
-        done <<< "$OVERWRITE_DECISIONS_MANIFEST"
-        if [ "$skip_file" = true ]; then
-            echo "$(t "  - $file（用户选择跳过覆盖，保留）" "  - $file (user chose skip, retained)")"
-            SKIPPED_COUNT=$((SKIPPED_COUNT+1))
             continue
         fi
 
@@ -235,9 +263,6 @@ const m=JSON.parse(require('fs').readFileSync('$MANIFEST_FILE','utf8'));
     echo ""
     echo "$(t "=== 卸载完成 ===" "=== Uninstall Complete ===")"
     echo "$(t "已删除: $REMOVED_COUNT 项" "Deleted: $REMOVED_COUNT items")"
-    if [ "$SKIPPED_COUNT" -gt 0 ]; then
-        echo "$(t "跳过（保留）: $SKIPPED_COUNT 项" "Skipped (retained): $SKIPPED_COUNT items")"
-    fi
     if [ "$FAILED_COUNT" -gt 0 ]; then
         echo "$(t "失败: $FAILED_COUNT 项（手动清理）" "Failed: $FAILED_COUNT items (manual cleanup)")"
     fi
@@ -311,18 +336,49 @@ fi
 echo "$(t "✓ Superpowers 路径: $SUPERPOWERS_BASE" "✓ Superpowers path: $SUPERPOWERS_BASE")"
 echo ""
 
-# ---- Skill lock 校验 ----
+# ---- Skill lock 部署 + 校验 ----
 
-LOCK_FILE="$TEMPLATE_DIR/skills.lock.json"
-if [ -f "$LOCK_FILE" ]; then
+# 部署技能锁文件到项目根目录（版本检测 → 选择模板源 → 复制为 skills.lock.json）
+PROJECT_LOCK_FILE="$PROJECT_ROOT/skills.lock.json"
+SP_PKG="$SUPERPOWERS_BASE/../package.json"
+LOCK_SOURCE_FILE=""
+
+if [ -f "$SP_PKG" ]; then
+    SP_VERSION=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$SP_PKG" | head -1 | cut -d'"' -f4)
+    MAJOR=$(echo "$SP_VERSION" | cut -d. -f1)
+    CANDIDATE_LOCK="$TEMPLATE_DIR/skills.lock.v${MAJOR}.json"
+    if [ -f "$CANDIDATE_LOCK" ]; then
+        LOCK_SOURCE_FILE="$CANDIDATE_LOCK"
+        echo "$(t "  - 检测到 Superpowers v${MAJOR}，使用对应锁文件" "  - Detected Superpowers v${MAJOR}, using matching lock")"
+    else
+        echo "$(t "  - 未找到 skills.lock.v${MAJOR}.json" "  - skills.lock.v${MAJOR}.json not found")"
+    fi
+else
+    echo "$(t "  - 未找到 Superpowers package.json" "  - Superpowers package.json not found")"
+fi
+
+# 保底：未匹配到版本锁时，取第一个存在的 skills.lock.v*.json
+if [ -z "$LOCK_SOURCE_FILE" ]; then
+    ANY_VERSION_LOCK=$(ls "$TEMPLATE_DIR"/skills.lock.v*.json 2>/dev/null | head -1)
+    if [ -n "$ANY_VERSION_LOCK" ]; then
+        LOCK_SOURCE_FILE="$ANY_VERSION_LOCK"
+        echo "$(t "  - 降级到 $(basename $ANY_VERSION_LOCK)" "  - Falling back to $(basename $ANY_VERSION_LOCK)")"
+    fi
+fi
+
+if [ -n "$LOCK_SOURCE_FILE" ]; then
+    # 部署到项目根目录为 skills.lock.json
+    cp "$LOCK_SOURCE_FILE" "$PROJECT_LOCK_FILE" 2>/dev/null
+    echo "$(t "  ✓ 已部署 skills.lock.json" "  ✓ Deployed skills.lock.json")"
+
     ALL_MATCH=true
     if ! command -v node &>/dev/null; then
         echo "  - 需要 node 解析 lock 文件，跳过校验"
     else
-        SKILL_KEYS=$(node -e "const l=JSON.parse(require('fs').readFileSync('$LOCK_FILE','utf8')); Object.keys(l.skills).forEach(k=>console.log(k))")
+        SKILL_KEYS=$(node -e "const l=JSON.parse(require('fs').readFileSync('$PROJECT_LOCK_FILE','utf8')); Object.keys(l.skills).forEach(k=>console.log(k))")
         while IFS= read -r key; do
             [ -z "$key" ] && continue
-            EXPECTED_HASH=$(node -e "const l=JSON.parse(require('fs').readFileSync('$LOCK_FILE','utf8')); console.log(l.skills['$key'].sha256)")
+            EXPECTED_HASH=$(node -e "const l=JSON.parse(require('fs').readFileSync('$PROJECT_LOCK_FILE','utf8')); console.log(l.skills['$key'].sha256)")
             SKILL_PATH="$SUPERPOWERS_BASE/$key"
             if [ -f "$SKILL_PATH" ]; then
                 ACTUAL_HASH=$(sha256sum "$SKILL_PATH" | awk '{print $1}' | tr '[:lower:]' '[:upper:]')

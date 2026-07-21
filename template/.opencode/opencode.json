@@ -15,8 +15,8 @@
       "openspec/schemas/**": "deny",
       "openspec/config.yaml": "deny",
       ".opencode/**": "ask",
-      "AGENTS.md": "allow",
-      "opencode.json": "allow",
+      "AGENTS.md": "ask",
+      "opencode.json": "ask",
       "**/temp/opencode/**": "allow",
       "**/tmp/opencode/**": "allow"
     },

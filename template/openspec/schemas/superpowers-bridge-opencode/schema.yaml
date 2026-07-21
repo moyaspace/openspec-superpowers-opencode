@@ -451,14 +451,21 @@ apply:
 
     0. **Pre-flight — 確認環境就緒**：
 
-       確認以下 skill 檔案可讀取，若有任一 Read 失敗則 STOP：
+        先檢測 Superpowers 版本（讀取 `{{SUPERPOWERS_BASE_PATH}}../package.json` 的 version 字段，取主版本號），
+        然後按版本確認以下 skill 檔案可讀取，若有任一 Read 失敗則 STOP：
 
-       Read 以下檔案：
-         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
-         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
-         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/spec-reviewer-prompt.md
-         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/code-quality-reviewer-prompt.md
-         {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
+        **Superpowers v5 需檢查：**
+          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
+          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
+          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/spec-reviewer-prompt.md
+          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/code-quality-reviewer-prompt.md
+          {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
+
+        **Superpowers v6 需檢查：**
+          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
+          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
+          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/task-reviewer-prompt.md
+          {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
 
        同時確認專案所需的 CLI 工具可用。讀取 plan.md 找出所有提到的工具
        （如 `mvn`/`mvnw`、`docker`、`python3`、`node`/`npm` 等）。
@@ -496,11 +503,17 @@ apply:
               run_in_background=true
             )
 
-       c) 任務完成後，讀取 spec-reviewer-prompt.md 做 spec 審查：
+       c) 任務完成後，按版本執行對應審查：
 
-       d) 審查通過後，讀取 code-quality-reviewer-prompt.md 做代碼質量審查：
+       **Superpowers v5（兩步審查）：**
+         c1) 讀取 spec-reviewer-prompt.md → oracle 做 spec 審查
+         c2) 審查通過後，讀取 code-quality-reviewer-prompt.md → oracle 做代碼質量審查
+         c3) 全部通過後，標記 tasks.md checkbox 為完成
 
-       e) 審查全部通過後，標記 tasks.md 中的 checkbox 為完成。
+       **Superpowers v6（單步審查）：**
+         c1) 運行 scripts/review-package BASE HEAD 生成 diff package，記錄文件路徑
+         c2) 讀取 task-reviewer-prompt.md → oracle 一次審查（spec compliance + code quality）
+         c3) 審查通過後，標記 tasks.md checkbox 為完成
 
        重要 — TDD 方法論通過 Read + prompt 嵌入傳遞給子 Agent，
        而非透過 load_skills（Superpowers skills 為檔案系統路徑，

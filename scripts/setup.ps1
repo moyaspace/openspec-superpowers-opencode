@@ -123,25 +123,21 @@ if ($Uninstall) {
     if (-not (Test-Path $manifestFile)) {
         Write-Host (t "✗ 未找到安装清单 ($manifestFile)" "✗ Install manifest not found ($manifestFile)") -ForegroundColor Red
         Write-Host (t "  可能项目未通过此脚本安装，或清单已被删除。" "  The project may not have been installed via this script, or the manifest was deleted.") -ForegroundColor Yellow
-        Write-Host (t "  手动删除以下目录:" "  Manually delete these directories:") -ForegroundColor Yellow
-        Write-Host ("    .opencode/commands/ (opsx-* " + (t "命令" "commands") + ")") -ForegroundColor Gray
-        Write-Host ("    .opencode/skills/openspec-*-change/ (skill " + (t "定义" "definitions") + ")") -ForegroundColor Gray
-        Write-Host "    openspec/ (schema + changes + specs)" -ForegroundColor Gray
+        Write-Host (t "  手动删除已部署的文件:" "  Manually delete deployed files:") -ForegroundColor Yellow
+        Write-Host ("    .opencode\commands\ (opsx-* " + (t "命令" "commands") + ")") -ForegroundColor Gray
+        Write-Host ("    .opencode\skills\openspec-*-change\ (skill " + (t "定义" "definitions") + ")") -ForegroundColor Gray
+        Write-Host "    openspec\config.yaml" -ForegroundColor Gray
+        Write-Host "    openspec\schemas\ (template + schema)" -ForegroundColor Gray
+        Write-Host ("    skills.lock.json (skill " + (t "完整性锁" "integrity lock") + ")") -ForegroundColor Gray
         Write-Host ("    AGENTS.md (bridge " + (t "部分" "content") + ")") -ForegroundColor Gray
         Write-Host ("    opencode.json (permission " + (t "规则" "rules") + ")") -ForegroundColor Gray
+        Write-Host (t "  注意: openspec/changes/ + openspec/specs/ 中的用户数据不会被删除" "  Note: User data in openspec/changes/ + openspec/specs/ will not be deleted") -ForegroundColor Yellow
         exit 1
     }
 
     $manifest = Get-Content $manifestFile -Raw -Encoding utf8 | ConvertFrom-Json
     $removedCount = 0
     $failedCount = 0
-    $skippedCount = 0
-
-    # 解析 overwriteDecisions（棕地覆盖决策）
-    $overwriteDecisionsFromManifest = @{}
-    if ($manifest.overwriteDecisions) {
-        $overwriteDecisionsFromManifest = $manifest.overwriteDecisions
-    }
 
     # 受保护文件列表（reset 不碰）
     $protectedFiles = @(
@@ -151,6 +147,50 @@ if ($Uninstall) {
         ".gitattributes",
         ".editorconfig"
     )
+
+    # ---- 预览：计算将删除/跳过什么 ----
+    $toDelete = @()
+    $toSkip = @()
+    foreach ($file in $manifest.files) {
+        # 检查受保护
+        $isProtected = $false
+        foreach ($protected in $protectedFiles) {
+            if ($file -eq $protected -or $file -like "$protected/*" -or $file -like "$protected\*") {
+                $isProtected = $true
+                break
+            }
+            $basename = Split-Path $file -Leaf
+            if ($basename -eq $protected) {
+                $isProtected = $true
+                break
+            }
+        }
+        if ($isProtected) {
+            $toSkip += @{ file = $file; reason = "受保护" }
+            continue
+        }
+        $toDelete += $file
+    }
+
+    Write-Host (t "=== 重置预览 ===" "=== Reset Preview ===") -ForegroundColor Cyan
+    Write-Host (t "将删除 $($toDelete.Count) 个文件/目录:" "Files/dirs to delete ($($toDelete.Count)):") -ForegroundColor Yellow
+    foreach ($f in $toDelete) {
+        Write-Host "  ✗ $f" -ForegroundColor Red
+    }
+    Write-Host ""
+    Write-Host (t "跳过（保留）$($toSkip.Count) 项:" "Skipped (retained) $($toSkip.Count) items:") -ForegroundColor Gray
+    foreach ($s in $toSkip) {
+        Write-Host "  - $($s.file) ($($s.reason))" -ForegroundColor Gray
+    }
+    Write-Host ""
+    Write-Host (t "用户数据不碰: openspec/changes/, openspec/specs/" "User data untouched: openspec/changes/, openspec/specs/") -ForegroundColor Cyan
+
+    $confirm = Read-Host (t "是否继续重置？(y/N) " "Continue reset? (y/N) ")
+    if ($confirm -ne 'y' -and $confirm -ne 'Y') {
+        Write-Host (t "重置已取消" "Reset cancelled") -ForegroundColor Yellow
+        exit 0
+    }
+    Write-Host ""
 
     foreach ($file in $manifest.files) {
         # 跳过受保护文件
@@ -169,13 +209,6 @@ if ($Uninstall) {
         }
         if ($isProtected) {
             Write-Host (t "  - $file（受保护，跳过）" "  - $file (protected, skipped)") -ForegroundColor Gray
-            continue
-        }
-
-        # 跳过 overwriteDecisions 标记为 skip 的文件（用户选择了不覆盖）
-        if ($overwriteDecisionsFromManifest.$file -eq 'skip') {
-            Write-Host (t "  - $file（用户选择跳过覆盖，保留）" "  - $file (user chose skip, retained)") -ForegroundColor Gray
-            $skippedCount++
             continue
         }
 
@@ -203,9 +236,6 @@ if ($Uninstall) {
     Write-Host ""
     Write-Host (t "=== 卸载完成 ===" "=== Uninstall Complete ===") -ForegroundColor Cyan
     Write-Host (t "已删除: $removedCount 项" "Deleted: $removedCount items") -ForegroundColor White
-    if ($skippedCount -gt 0) {
-        Write-Host (t "跳过（保留）: $skippedCount 项" "Skipped (retained): $skippedCount items") -ForegroundColor Gray
-    }
     if ($failedCount -gt 0) {
         Write-Host (t "失败: $failedCount 项（手动清理）" "Failed: $failedCount items (manual cleanup)") -ForegroundColor Yellow
     }
@@ -283,11 +313,47 @@ if (-not $superpowersBase) {
 Write-Host (t "✓ Superpowers 路径: $superpowersBase" "✓ Superpowers path: $superpowersBase") -ForegroundColor Green
 Write-Host ""
 
-# ---- Skill lock 校验（WARNING 级别，不阻塞）----
+# ---- Skill lock 部署 + 校验（WARNING 级别，不阻塞）----
 
-$lockFile = Join-Path $templateDir "skills.lock.json"
-if (Test-Path $lockFile) {
-    $lock = Get-Content $lockFile -Raw -Encoding utf8 | ConvertFrom-Json
+# 部署技能锁文件到项目根目录（版本检测 → 选择模板源 → 复制为 skills.lock.json）
+$projectLockFile = Join-Path $projectRoot "skills.lock.json"
+$spPkg = Join-Path $superpowersBase "..\package.json"
+$lockSourceFile = $null
+
+if (Test-Path $spPkg) {
+    $spVersion = (Get-Content $spPkg -Raw -Encoding utf8 | ConvertFrom-Json).version
+    $major = $spVersion -replace '\..*'
+    $candidateLock = Join-Path $templateDir "skills.lock.v${major}.json"
+    if (Test-Path $candidateLock) {
+        $lockSourceFile = $candidateLock
+        Write-Host (t "  - 检测到 Superpowers v${major}，使用对应锁文件" "  - Detected Superpowers v${major}, using matching lock") -ForegroundColor Gray
+    } else {
+        Write-Host (t "  - 未找到 skills.lock.v${major}.json" "  - skills.lock.v${major}.json not found") -ForegroundColor Yellow
+    }
+} else {
+    Write-Host (t "  - 未找到 Superpowers package.json" "  - Superpowers package.json not found") -ForegroundColor Yellow
+}
+
+# 保底：未匹配到版本锁时，取第一个存在的 skills.lock.v*.json
+if (-not $lockSourceFile) {
+    $anyVersionLock = Get-ChildItem -Path (Join-Path $templateDir "skills.lock.v*.json") -File -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($anyVersionLock) {
+        $lockSourceFile = $anyVersionLock.FullName
+        Write-Host (t "  - 降级到 $($anyVersionLock.Name)" "  - Falling back to $($anyVersionLock.Name)") -ForegroundColor Gray
+    }
+}
+
+if ($lockSourceFile) {
+    # 部署到项目根目录为 skills.lock.json
+    run -block {
+        $null = New-Item -ItemType Directory -Path (Split-Path $projectLockFile -Parent) -Force
+        Copy-Item -Force $lockSourceFile $projectLockFile -ErrorAction Stop
+    } -description "部署 skills.lock.json"
+    $installedFiles += "skills.lock.json"
+    if (-not $DryRun) { Write-Host (t "  ✓ 已部署 skills.lock.json" "  ✓ Deployed skills.lock.json") -ForegroundColor Green }
+
+    # 从项目根目录校验
+    $lock = Get-Content $projectLockFile -Raw -Encoding utf8 | ConvertFrom-Json
     $allMatch = $true
     foreach ($skillKey in $lock.skills.PSObject.Properties.Name) {
         $expectedHash = $lock.skills.$skillKey.sha256
