@@ -23,6 +23,9 @@ Thumbs.db
 # CodeGraph index cache
 .codegraph/
 
+# Playwright MCP
+.playwright-mcp/
+
 # Local test records
 docs/test-records/
 !docs/test-records/.gitkeep
