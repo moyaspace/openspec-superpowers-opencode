@@ -40,4 +40,7 @@ openspec/oso-change-registry.json
 docs/test-records/
 !docs/test-records/.gitkeep
 
+# Personal local workspace (do not track)
+docs/local/
+
 # <!-- openspec-superpowers-opencode_gitignore -->

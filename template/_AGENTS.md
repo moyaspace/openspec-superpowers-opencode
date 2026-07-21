@@ -1,4 +1,3 @@
-
 ---
 
 <!-- ⛔ 下方 openspec-superpowers-opencode_instructions 区块为自动生成，禁止修改 ⛔ -->
@@ -60,36 +59,45 @@ Superpowers 技能（TDD、brainstorming 等）是文件系统上的 `.md` 文�
 
 以下文档是 AI 理解项目上下文的主要入口。标注 `*` 的为推荐必配。
 
+## 项目文档参考
+
+以下文档是 AI 理解项目上下文的主要入口。标注 `*` 的为推荐必配。
+
 ### 项目概览
 
 - `README.md` — 项目定位、安装、快速开始 *
 - `docs/QUICKSTART.md` — 用户快速上手指南
-- `docs/features.md` — 功能列表与特性说明
+- `docs/features.md` — 功能清单与版本差异说明
 
 ### 架构与设计
 
-- `docs/architecture.md` — 总体架构、模块划分 *
-- `docs/decisions/` — 各类决策记录
-  - 架构决策（ADR）：系统级选型、模块拆分理由
-  - 设计决策（DDR）：功能设计方案对比、API 权衡
-  - 实现决策（IDR）：编码阶段取舍、性能优化策略
-- `docs/design.md` — 功能设计文档
+- `docs/architecture/` — 总体架构（二进制拆分、模块关系、运行时路径）*
+- `docs/decisions/` — 决策记录（ADR 架构决策 / DDR 设计决策 / IDR 实现决策）
+- `docs/designs/` — 功能设计方案与对比
 
 ### 开发与测试
 
 - `docs/development.md` — 开发环境、构建命令、代码风格 *
-- `docs/how-it-works.md` — 工作原理
+- `docs/how-it-works.md` — 工作原理（高层面）
 - `docs/testing.md` — 测试规范与运行方式 *
+- `docs/cli-commands.md` — 命令行参考
 - `docs/test-runs/` — 本地测试运行记录（不纳入 git 跟踪）
 
 ### 需求与实施
 
-- `docs/prd.md` — 产品需求文档
+- `docs/requirements.md` — 产品需求与版本路线 *
 - `docs/tasks.md` — 实施任务列表及当前进度 *
 
 ### 经验积累
 
-- `docs/learnings/` — 开发过程中沉淀的经验、踩坑记录、需要重复执行的场景应对方式
+- `docs/learnings/` — 踩坑记录、需要重复执行的应对方式
+- `docs/known-issues.md` — 已知问题与根因
+
+### 工作草稿
+
+- `docs/local/` — 个人本地工作区（`.gitignore` 排除，不纳入版本控制）
+  - `inbox/` — 待分析的原始材料、未分类草稿
+  - `notes/` — 个人笔记、非正式记录
 
 <!-- openspec-superpowers-opencode_instructions -->
 <!-- ⛔ 上方 openspec-superpowers-opencode_instructions 区块为自动生成，禁止修改 ⛔ -->
