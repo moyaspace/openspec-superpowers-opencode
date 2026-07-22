@@ -3,3 +3,11 @@ root = true
 [*]
 end_of_line = lf
 insert_final_newline = true
+
+# <!-- openspec-superpowers-opencode_editorconfig -->
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+# <!-- openspec-superpowers-opencode_editorconfig -->
