@@ -18,7 +18,7 @@ npm install -g ./<name>-<version>.tgz
 ### 验证安装
 
 ```bash
-openspec-superpowers-opencode --help
+oso --help                                  # 或: openspec-superpowers-opencode --help
 ```
 
 依赖：`openspec` CLI v1.3+、`opencode` CLI、`git`、Superpowers 插件。
@@ -29,10 +29,10 @@ openspec-superpowers-opencode --help
 ```bash
 # 新项目
 mkdir my-project && cd my-project
-openspec-superpowers-opencode init
+oso init                                    # 或: openspec-superpowers-opencode init
 
 # 或指定目录
-openspec-superpowers-opencode init my-project
+oso init my-project                         # 或: openspec-superpowers-opencode init my-project
 ```
 
 `init` 自动完成：git init → 复制模板 → 安装配置 → 验证 schema → 首次提交。
@@ -78,15 +78,20 @@ main 分支始终保持干净。
 
 | 命令 | 说明 |
 |------|------|
-| `openspec-superpowers-opencode init [目录]` | 初始化项目 |
-| `openspec-superpowers-opencode reset` | 还原到未初始化状态 |
-| `openspec-superpowers-opencode dry-run` | 预览变更 |
-| `openspec-superpowers-opencode ensure-worktree <name>` | 确保 worktree 已创建 |
+| `oso`（别名） | 等价于 `openspec-superpowers-opencode`，所有子命令通用 |
+| `oso init [目录]` | 初始化项目 |
+| `oso --version` / `-v` | 显示版本号 |
+| `oso reset` | 还原到未初始化状态 |
+| `oso dry-run` | 预览变更 |
+| `oso ensure-worktree <name>` | 确保 worktree 已创建 |
+| `oso remove-worktree <name>` | 删除 worktree 和分支 |
+| `oso registry remove <name>` | 从注册表删除变更 |
+| `oso registry list` | 列出所有活跃变更 |
 
 ## 更新
 
 ```bash
 npm update -g @moyaspace/openspec-superpowers-opencode
-openspec-superpowers-opencode reset
-openspec-superpowers-opencode init
+oso reset                                    # 或: openspec-superpowers-opencode reset
+oso init                                     # 或: openspec-superpowers-opencode init
 ```

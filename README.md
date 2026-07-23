@@ -70,7 +70,7 @@ npm install -g @moyaspace/openspec-superpowers-opencode
 
 # 2. Init a project
 mkdir my-project && cd my-project
-openspec-superpowers-opencode init
+oso init                                  # 或: openspec-superpowers-opencode init
 
 # 3. Open in OpenCode, then use the workflow
 /opsx-ff add-user-auth    # create change + generate artifacts
@@ -82,12 +82,12 @@ openspec-superpowers-opencode init
 
 | # | Feature | One-liner |
 |---|---------|-----------|
-| 1 | **12 OPSX commands** | `/opsx-ff` → `/opsx-apply` → `/opsx-finish` — full change lifecycle |
+| 1 | **13 OPSX commands** | `/opsx-ff` → `/opsx-apply` → `/opsx-finish` — full change lifecycle |
 | 2 | **Git worktree isolation** | Each change in its own `.worktrees/<name>/` dir + `feature/<name>` branch |
 | 3 | **One-command init** | `oso init` → deploy templates + config + `git init` + first commit |
 | 4 | **Bridged OpenSpec + Superpowers** | Pre-configured schema + skill mapping + lock verification, one-command deploy |
 | 5 | **Greenfield/brownfield** | Auto-deploy on new projects; safe merge on existing ones |
-| 6 | **Cross-platform + i18n** | Windows `setup.ps1` / Linux `setup.sh`, `--lang zh-CN \| zh-TW \| en` |
+| 6 | **Cross-platform + i18n** | Windows `setup.ps1` / Linux & macOS `setup.sh`, `--lang zh-CN \| zh-TW \| en` |
 | 7 | **SHA-256 lock** | Skill file integrity verified on deploy |
 | 8 | **Layered architecture** | Superpowers (HOW) → OpenSpec (WHAT) → Worktree (WHERE) → Commands (WHEN) |
 | 9 | **Full worktree + openspec change support** | Auto-register on change creation, smart `openspec list` interception, `verify` one-click health check |
