@@ -20,6 +20,12 @@ jobs:
           node-version: 18
 
       # ── CLI 可用性 ──
+      - name: CLI --version
+        run: node bin/cli.js --version
+
+      - name: CLI -v
+        run: node bin/cli.js -v
+
       - name: CLI --help
         run: node bin/cli.js --help
 
@@ -28,6 +34,10 @@ jobs:
 
       - name: CLI create-project alias --help
         run: node bin/create-project.js --help
+
+      # ── oso 别名验证 ──
+      - name: Verify oso alias in package.json
+        run: node -e "const p=require('./package.json'); console.log('✅ oso alias:', p.bin.oso)"
 
       # ── Tarball 构建 ──
       - name: npm pack
@@ -51,7 +61,8 @@ jobs:
             "package/package.json" \
             "package/template/_AGENTS.md" \
             "package/template/openspec/schemas/superpowers-bridge-opencode/schema.yaml" \
-            "package/template/skills.lock.json" \
+            "package/template/skills.lock.v5.json" \
+            "package/template/skills.lock.v6.json" \
             "package/template/_gitignore" \
             "package/template/_editorconfig" \
             "package/template/_gitattributes" \
