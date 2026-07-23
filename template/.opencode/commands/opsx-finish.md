@@ -165,15 +165,19 @@ Read：
 > - Step 3 已测 worktree 自身实现完好
 > - rebase 后再测一次：base 变了，代码基于新基线可能有冲突
 
+**清理注册表**（先于 git 操作，不依赖 worktree 状态）：
+R1. `openspec-superpowers-opencode registry remove <name>`
+R2. `openspec-superpowers-opencode registry list`
+R3. 检查输出中是否包含 `<name>` — 包含则回到 R1
+
 ```bash
 git checkout <feature-branch>
 git rebase <base-branch>            # 线性化到 base 分支最新
 <test command>                       # 自动检测项目类型运行测试
 git checkout <base-branch>
 git merge <feature-branch>          # fast-forward
-git worktree remove .worktrees/<name>  # 先移除 worktree，分支才可删除
+git worktree remove .worktrees/<name>  # 移除 worktree
 git branch -d <feature-branch>
-openspec-superpowers-opencode registry remove <name>
 ```
 
 #### 选项 2: 推送并创建 PR
@@ -184,10 +188,11 @@ gh pr create --title "<title>" --body "## Summary\n..."
 ```
 
 PR 创建后，change 已推送但尚未合入。worktree 和注册表条目均保留。
-用户可在 PR 合入后手动清理：
+用户可在 PR 合入后手动清理（先清理注册表，再删 git 资源）：
+- 清理注册表：`openspec-superpowers-opencode registry remove <name>`（如失败可重试）
+- **验证**：运行 `openspec-superpowers-opencode registry list`，确认输出中不含 `<name>`，包含则重试上一步
 - 删除 worktree：`git worktree remove .worktrees/<name>`
 - 删除分支：`git branch -d <feature-branch>`
-- 清理注册表：`openspec-superpowers-opencode registry remove <name>`
 
 #### 选项 3: 保留分支
 
@@ -197,11 +202,15 @@ PR 创建后，change 已推送但尚未合入。worktree 和注册表条目均�
 
 **要求用户输入 'discard' 确认**后执行：
 
+**清理注册表**（先于 git 操作，不依赖 worktree 状态）：
+R1. `openspec-superpowers-opencode registry remove <name>`
+R2. `openspec-superpowers-opencode registry list`
+R3. 检查输出中是否包含 `<name>` — 包含则回到 R1
+
 ```bash
 git checkout <base-branch>
-git worktree remove .worktrees/<name>  # 先移除 worktree，分支才可删除
+git worktree remove .worktrees/<name>
 git branch -D <feature-branch>
-openspec-superpowers-opencode registry remove <name>
 ```
 
 ---
