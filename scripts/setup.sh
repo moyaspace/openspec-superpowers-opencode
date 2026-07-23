@@ -914,7 +914,11 @@ for file in "${FILES[@]}"; do
     path="$PROJECT_ROOT/$file"
     if [ -f "$path" ]; then
         if grep -q '{{SUPERPOWERS_BASE_PATH}}' "$path" 2>/dev/null; then
-            run_cmd sed -i "s/{{SUPERPOWERS_BASE_PATH}}/$REPLACEMENT/g" "$path"
+            if [ "$(uname -s)" = "Darwin" ]; then
+                run_cmd sed -i '' "s/{{SUPERPOWERS_BASE_PATH}}/$REPLACEMENT/g" "$path"
+            else
+                run_cmd sed -i "s/{{SUPERPOWERS_BASE_PATH}}/$REPLACEMENT/g" "$path"
+            fi
             log "$(t "  ✓ $file" "  ✓ $file")"
         else
             echo "$(t "  - $file (无占位符)" "  - $file (no placeholder)")"

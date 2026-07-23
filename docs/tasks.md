@@ -19,6 +19,7 @@
 |  T9  | registry reset 子命令     |   Registry/CLI    |    T2    |   低   |  ✅  |  小  |
 | T10  | opsx 命令 verify 引用统一 |    Verify/Opsx    |  T4+T8   |   中   |  ✅  |  中  |
 | T11  | /opsx-finish PR 感知与自动清理 |    Opsx/PR   |   T4    |   低   |  🔲  |  中  |
+| T12  | CLI 增强 + remove-worktree + /opsx-remove | CLI/核心 | | 中 | 🔲 | 小 |
 
 ---
 
@@ -368,12 +369,44 @@ exit 1 → 向用户展示诊断报告，按各检查项的修复建议执行
 - [ ] merge 和 discard 分支各自执行 `registry remove`
 - [ ] 无 gh CLI 时降级，不报错
 
+---
+
+## Sprint 2
+
+| 编号 | 任务 | 标签 | 优先级 | 预估 | 状态 |
+|:----:|------|:----:|:----:|:----:|:----:|
+| T12  | CLI 增强 + remove-worktree + /opsx-remove | CLI/核心 | 中 | 小 | 🔲 |
+
+### 任务卡片
+
+#### T12: CLI 增强 + remove-worktree + /opsx-remove
+
+**WHY**：`oso` 长名不便记忆；`--version` 是 CLI 基本能力缺失；已有 `ensure-worktree` 缺少反向操作；已有 `new`/`ff`/`propose` 缺少对称的废弃命令。
+
+**WHAT**：
+- `package.json` `bin` 加 `"oso": "bin/cli.js"`
+- `cli.js` `isHelp` 前加 `--version`/`-v` 检测，输出版本号后 exit(0)
+- `cli.js` 新增 `remove-worktree <name>` 子命令 + `runRemoveWorktree()`
+- `remove-worktree` 执行：`git worktree remove --force .worktrees/<name>` → `git branch -D feature/<name>`，失败不阻塞
+- 新建 `template/.opencode/commands/opsx-remove.md`，执行：`registry remove <name>` → `remove-worktree <name>`
+
+**HOW**：不依赖外部工具。`git worktree remove --force` + `git branch -D` 组合，无需 gh CLI。
+
+**验收标准**：
+- [ ] `oso --version` 输出 `1.0.9`
+- [ ] `oso init` 正常工作
+- [ ] `remove-worktree <name>` 删除 worktree 元数据 + 目录 + 分支，目录删除失败不阻塞
+- [ ] `remove-worktree` 输出三行格式：`✓/✗ worktree 元数据` `✓/✗ worktree 目录` `✓/✗ 分支`
+- [ ] `/opsx-remove <name>` 依次调用 `registry remove` + `remove-worktree`
+- [ ] `/opsx-remove` 不需要用户确认，直接执行
+
 ## 待办
 
 > 高优先级待处理任务速查（自动从任务总览提取）。
 
 | 优先级 | 任务 | 说明 |
 | :----: | ---- | ---- |
+| 中 | T12: CLI 增强 + remove-worktree + /opsx-remove | 别名 oso、--version、remove-worktree 命令、/opsx-remove 命令 |
 
 ## 约束
 
