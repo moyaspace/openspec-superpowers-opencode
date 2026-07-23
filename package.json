@@ -20,7 +20,8 @@
   ],
   "bin": {
     "create-openspec-superpowers-opencode": "bin/create-project.js",
-    "openspec-superpowers-opencode": "bin/cli.js"
+    "openspec-superpowers-opencode": "bin/cli.js",
+    "oso": "bin/cli.js"
   },
   "files": [
     ".gitattributes",

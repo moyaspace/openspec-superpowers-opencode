@@ -25,6 +25,12 @@ if (langIndex >= 0 && args[langIndex + 1] && !args[langIndex + 1].startsWith('-'
     args.splice(langIndex, 2); // 从参数列表中移除，避免干扰子命令解析
 }
 
+const isVersion = args.some(a => a === '--version' || a === '-v');
+if (isVersion) {
+    console.log(require(path.join(toolDir, 'package.json')).version);
+    process.exit(0);
+}
+
 const isHelp = args.length === 0 || args.some(a => a === '--help' || a === '-h');
 
 const subcommand = args[0];
@@ -49,6 +55,7 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode registry verify           轻量验证（仅 oso-change-registry.json + worktree）
     openspec-superpowers-opencode install-shims             安装/修复垫片脚本
     openspec-superpowers-opencode uninstall-shims           卸除垫片脚本，恢复原始 openspec
+    openspec-superpowers-opencode remove-worktree <name>    删除 worktree 和分支
 
   语言:
     --lang zh-CN    简体中文
@@ -85,6 +92,7 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode registry verify           Lightweight verify (only oso-change-registry.json + worktree)
     openspec-superpowers-opencode install-shims             Install/repair shim scripts
     openspec-superpowers-opencode uninstall-shims           Uninstall shim scripts, restore original openspec
+    openspec-superpowers-opencode remove-worktree <name>    Remove worktree and clean branch
 
   Language:
     --lang zh-CN    Simplified Chinese
@@ -137,9 +145,18 @@ if (subcommand === 'init') {
     runInstallShims();
 } else if (subcommand === 'uninstall-shims') {
     runUninstallShims();
+} else if (subcommand === 'remove-worktree') {
+    if (!subarg) {
+        console.error(t(
+            '用法: openspec-superpowers-opencode remove-worktree <name>',
+            'Usage: openspec-superpowers-opencode remove-worktree <name>'
+        ));
+        process.exit(1);
+    }
+    runRemoveWorktree(subarg, process.cwd());
 } else {
     console.error(t(`未知子命令: ${subcommand}`, `Unknown subcommand: ${subcommand}`));
-    console.error(t('可用命令: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims', 'Available commands: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims'));
+    console.error(t('可用命令: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims, remove-worktree', 'Available commands: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims, remove-worktree'));
     process.exit(1);
 }
 
@@ -320,6 +337,34 @@ function runEnsureWorktree(name, cwd) {
 
     console.log(t(`  ✓ worktree 创建完成: .worktrees/${name}/`, `  ✓ Worktree created: .worktrees/${name}/`));
     process.exit(0);
+}
+
+// ---- remove-worktree — 清除变更 worktree 和分支 ----
+function runRemoveWorktree(name, cwd) {
+    const worktreeDir = path.join(cwd, '.worktrees', name);
+    const branch = `feature/${name}`;
+
+    // 1. git worktree remove --force
+    let wktOk = true;
+    try {
+        execSync(`git worktree remove --force "${worktreeDir}"`, { cwd, stdio: 'ignore' });
+        console.log(t(`  ✓ worktree 已移除: .worktrees/${name}/`, `  ✓ Worktree removed: .worktrees/${name}/`));
+    } catch (_) {
+        wktOk = false;
+        console.log(t(`  ✗ worktree 移除失败: .worktrees/${name}/`, `  ✗ Worktree remove failed: .worktrees/${name}/`));
+    }
+
+    // 2. git branch -D
+    let branchOk = true;
+    try {
+        execSync(`git branch -D "${branch}"`, { cwd, stdio: 'ignore' });
+        console.log(t(`  ✓ 分支已删除: ${branch}`, `  ✓ Branch deleted: ${branch}`));
+    } catch (_) {
+        branchOk = false;
+        console.log(t(`  ✗ 分支删除失败: ${branch}`, `  ✗ Branch delete failed: ${branch}`));
+    }
+
+    process.exit((wktOk && branchOk) ? 0 : 1);
 }
 
 // ---- handleRegistry — registry 子命令处理 ----
