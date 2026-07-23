@@ -2,13 +2,14 @@
 
 > Bridges Superpowers + OpenSpec workflows into OpenCode with enforced worktree isolation.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/moyaspace/openspec-superpowers-opencode/ci.yml?style=flat-square&logo=github&color=2ea44f)](https://github.com/moyaspace/openspec-superpowers-opencode/actions)
 [![GitHub last commit](https://img.shields.io/github/last-commit/moyaspace/openspec-superpowers-opencode?style=flat-square&logo=github&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
 [![GitHub Stars](https://img.shields.io/github/stars/moyaspace/openspec-superpowers-opencode?style=flat-square&color=yellow&logo=github)](https://github.com/moyaspace/openspec-superpowers-opencode)
 [![npm Version](https://img.shields.io/npm/v/@moyaspace/openspec-superpowers-opencode?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
 [![npm Total Downloads](https://img.shields.io/npm/dt/@moyaspace/openspec-superpowers-opencode?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
-[![npm Monthly Downloads](https://img.shields.io/npm/dm/@moyaspace/openspec-superpowers-opencode?style=flat-square&logo=npm&color=cb3837)](https://www.npmjs.com/package/@moyaspace/openspec-superpowers-opencode)
 [![License](https://img.shields.io/github/license/moyaspace/openspec-superpowers-opencode?style=flat-square&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
+[![macOS](https://img.shields.io/badge/macOS-000?style=flat-square&logo=apple&logoColor=white)](https://github.com/moyaspace/openspec-superpowers-opencode)
+[![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://github.com/moyaspace/openspec-superpowers-opencode)
+[![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=black)](https://github.com/moyaspace/openspec-superpowers-opencode)
 
 > If you find this useful, consider giving it a ⭐ on GitHub!
 
