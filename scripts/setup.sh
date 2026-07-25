@@ -510,7 +510,8 @@ if [ -d "$OPENCODE_SRC" ]; then
 const fs=require('fs');
 const tmpl=JSON.parse(fs.readFileSync('$OC_JSON_SRC','utf8'));
 const user=JSON.parse(fs.readFileSync('$OC_JSON_DST','utf8'));
-function mergeKeys(a,b){const o={};for(const k of Object.keys(a||{}))o[k]=k in(b||{})?b[k]:a[k];for(const k of Object.keys(b||{})){if(!(k in(a||{})))o[k]=b[k];}return o;}
+function val(v,d){return (v===null||v===undefined||v==='')?d:v;}
+function mergeKeys(a,b){const o={};for(const k of Object.keys(a||{}))o[k]=val(k in(b||{})?b[k]:void 0,a[k]);for(const k of Object.keys(b||{})){if(!(k in(a||{}))){const v=val(b[k]);if(v!==null)o[k]=v;}}return o;}
 const perm=mergeKeys(tmpl.permission,user.permission);
 const required=['.worktrees/**','openspec/changes/**','openspec/specs/**','.opencode/**'];
 const denied=['openspec/schemas/**','openspec/config.yaml'];

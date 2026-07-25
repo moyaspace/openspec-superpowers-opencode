@@ -82,7 +82,7 @@ describe('copyOpenspecToOrig()', () => {
     test('copies openspec to openspec-orig (unix)', () => {
         const dir = tmpDir();
         fs.writeFileSync(path.join(dir, 'openspec'), '#!/bin/sh\necho "openspec"');
-        const result = shimsInstaller.copyOpenspecToOrig(dir, false);
+        const result = shimsInstaller.copyOpenspecToOrig(dir, dir, false);
         assert.strictEqual(result, 'openspec-orig');
         assert.ok(fs.existsSync(path.join(dir, 'openspec-orig')));
         assert.strictEqual(fs.readFileSync(path.join(dir, 'openspec-orig'), 'utf8'), '#!/bin/sh\necho "openspec"');
@@ -91,7 +91,7 @@ describe('copyOpenspecToOrig()', () => {
     test('copies openspec.cmd to openspec-orig.cmd (Windows)', () => {
         const dir = tmpDir();
         fs.writeFileSync(path.join(dir, 'openspec.cmd'), '@echo off');
-        const result = shimsInstaller.copyOpenspecToOrig(dir, true);
+        const result = shimsInstaller.copyOpenspecToOrig(dir, dir, true);
         assert.strictEqual(result, 'openspec-orig.cmd');
         assert.ok(fs.existsSync(path.join(dir, 'openspec-orig.cmd')));
         assert.strictEqual(fs.readFileSync(path.join(dir, 'openspec-orig.cmd'), 'utf8'), '@echo off');
@@ -100,7 +100,7 @@ describe('copyOpenspecToOrig()', () => {
     test('copies openspec.ps1 when that is what exists', () => {
         const dir = tmpDir();
         fs.writeFileSync(path.join(dir, 'openspec.ps1'), 'Write-Output "openspec"');
-        const result = shimsInstaller.copyOpenspecToOrig(dir, true);
+        const result = shimsInstaller.copyOpenspecToOrig(dir, dir, true);
         assert.strictEqual(result, 'openspec-orig.ps1');
         assert.ok(fs.existsSync(path.join(dir, 'openspec-orig.ps1')));
     });
@@ -109,7 +109,7 @@ describe('copyOpenspecToOrig()', () => {
         const dir = tmpDir();
         fs.writeFileSync(path.join(dir, 'openspec'), '#!/bin/sh');
         fs.writeFileSync(path.join(dir, 'openspec.cmd'), '@echo off');
-        const result = shimsInstaller.copyOpenspecToOrig(dir, false);
+        const result = shimsInstaller.copyOpenspecToOrig(dir, dir, false);
         assert.strictEqual(result, 'openspec-orig');
         assert.strictEqual(fs.readFileSync(path.join(dir, 'openspec-orig'), 'utf8'), '#!/bin/sh');
     });
@@ -117,7 +117,7 @@ describe('copyOpenspecToOrig()', () => {
     test('throws when openspec not found in bin dir', () => {
         const dir = tmpDir();
         assert.throws(() => {
-            shimsInstaller.copyOpenspecToOrig(dir, false);
+            shimsInstaller.copyOpenspecToOrig(dir, dir, false);
         }, /openspec CLI not found/);
     });
 
@@ -127,7 +127,7 @@ describe('copyOpenspecToOrig()', () => {
         const targetDir = tmpDir();
         fs.writeFileSync(path.join(targetDir, 'openspec.js'), '#!/usr/bin/env node\nimport "../dist/cli/index.js";');
         fs.symlinkSync(path.join(targetDir, 'openspec.js'), path.join(dir, 'openspec'));
-        const result = shimsInstaller.copyOpenspecToOrig(dir, false);
+        const result = shimsInstaller.copyOpenspecToOrig(dir, dir, false);
         assert.strictEqual(result, 'openspec-orig');
         assert.ok(fs.existsSync(path.join(dir, 'openspec-orig')));
         // 验证 openspec-orig 也是符号链接，指向同一目标
@@ -140,7 +140,7 @@ describe('copyOpenspecToOrig()', () => {
         const dir = tmpDir();
         fs.writeFileSync(path.join(dir, 'openspec'), '#!/bin/sh\nnew version');
         fs.writeFileSync(path.join(dir, 'openspec-orig'), '#!/bin/sh\nold version');
-        const result = shimsInstaller.copyOpenspecToOrig(dir, false);
+        const result = shimsInstaller.copyOpenspecToOrig(dir, dir, false);
         assert.strictEqual(result, 'openspec-orig');
         assert.strictEqual(fs.readFileSync(path.join(dir, 'openspec-orig'), 'utf8'), '#!/bin/sh\nnew version');
     });

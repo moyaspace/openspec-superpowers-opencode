@@ -489,14 +489,24 @@ function ConvertTo-CanonicalJson {
         $val = $Permission.$key
         $comma = if ($pi -lt $permCount - 1) { "," } else { "" }
 
-        if ($key -in "write", "edit" -and $null -ne $val -and $val -isnot [string]) {
+        # 安全取值：避免 $obj[$key] 在 key 为 * 时被 PowerShell 做通配符匹配
+    function SafeGet($obj, $key) {
+        if ($null -eq $obj) { return $null }
+        if ($obj -is [hashtable]) {
+            foreach ($entry in $obj.GetEnumerator()) { if ($entry.Key -eq $key) { return $entry.Value } }
+            return $null
+        }
+        foreach ($prop in $obj.PSObject.Properties) { if ($prop.Name -eq $key) { return $prop.Value } }
+        return $null
+    }
+    if ($key -in "write", "edit" -and $null -ne $val -and $val -isnot [string]) {
             $lines += "$(&$i 4)`"$key`": {"
             $tmplSub = $TemplatePermission.$key
             $subKeys = Get-OrderedKeys $val ($tmplSub.PSObject.Properties.Name)
             $subCount = $subKeys.Count
             for ($si = 0; $si -lt $subCount; $si++) {
                 $sk = $subKeys[$si]
-                $sv = $val.$sk
+                $sv = SafeGet $val $sk
                 $scomma = if ($si -lt $subCount - 1) { "," } else { "" }
                 $lines += "$(&$i 6)`"$sk`": `"$sv`"$scomma"
             }
@@ -508,7 +518,7 @@ function ConvertTo-CanonicalJson {
             $bashCount = $bashKeys.Count
             for ($bi = 0; $bi -lt $bashCount; $bi++) {
                 $bk = $bashKeys[$bi]
-                $bv = $val.$bk
+                $bv = SafeGet $val $bk
                 $bcomma = if ($bi -lt $bashCount - 1) { "," } else { "" }
                 $lines += "$(&$i 6)`"$bk`": `"$bv`"$bcomma"
             }
@@ -566,9 +576,9 @@ if (Test-Path $opencodeSrc) {
                 $actionObj = $mergedPermission[$action]
                 if ($actionObj -is [PSCustomObject]) {
                     $actionHash = @{}
-                    # 保留用户已有条目
-                    foreach ($k in $actionObj.PSObject.Properties.Name) {
-                        $actionHash[$k] = $actionObj.$k
+                    # 保留用户已有条目（通过 PSObject.Properties 枚举，避免特殊键名解析问题）
+                    foreach ($prop in $actionObj.PSObject.Properties) {
+                        $actionHash[$prop.Name] = $prop.Value
                     }
                     # 强制插入 required 路径（allow）
                     foreach ($rPath in $requiredPaths) {
@@ -577,6 +587,15 @@ if (Test-Path $opencodeSrc) {
                     # 强制插入 deny 规则（保护基础设施文件不被 AI 修改）
                     foreach ($dPath in $denyPaths) {
                         $actionHash[$dPath] = "deny"
+                    }
+                    # 补充模板中有但用户没有的路径（含空值覆盖）
+                    $tmplAction = $tmplJson.permission.$action
+                    if ($tmplAction -is [PSCustomObject]) {
+                        foreach ($prop in $tmplAction.PSObject.Properties) {
+                            if (-not $actionHash.ContainsKey($prop.Name) -or [string]::IsNullOrEmpty($actionHash[$prop.Name])) {
+                                $actionHash[$prop.Name] = $prop.Value
+                            }
+                        }
                     }
                     $mergedPermission[$action] = $actionHash
                 }
@@ -588,12 +607,12 @@ if (Test-Path $opencodeSrc) {
             $tmplBash = $tmplJson.permission.bash
             if ($bashObj -is [PSCustomObject]) {
                 $bashHash = @{}
-                foreach ($k in $bashObj.PSObject.Properties.Name) {
-                    $bashHash[$k] = $bashObj.$k
+                foreach ($prop in $bashObj.PSObject.Properties) {
+                    $bashHash[$prop.Name] = $prop.Value
                 }
-                foreach ($k in $tmplBash.PSObject.Properties.Name) {
-                    if (-not $bashHash.ContainsKey($k)) {
-                        $bashHash[$k] = $tmplBash.$k
+                foreach ($prop in $tmplBash.PSObject.Properties) {
+                    if (-not $bashHash.ContainsKey($prop.Name) -or [string]::IsNullOrEmpty($bashHash[$prop.Name])) {
+                        $bashHash[$prop.Name] = $prop.Value
                     }
                 }
                 $mergedPermission["bash"] = $bashHash

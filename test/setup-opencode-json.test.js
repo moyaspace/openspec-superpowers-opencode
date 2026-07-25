@@ -19,18 +19,30 @@ const os = require('os');
 // ============================================================
 
 /**
+ * 值空则回退到默认值。
+ * 空值（null/undefined/""）视为"未提供"，用默认值代替。
+ */
+function val(v, d) {
+    return (v === null || v === undefined || v === '') ? d : v;
+}
+
+/**
  * 合并两个对象，按 a 的 key 序 + 补 b 中 a 没有的 key。
  * 类似于 Object.assign，但 preserves a 的 key 顺序。
+ * 空值（null/undefined/""）回退到模板默认值，不穿透。
  */
 function mergeKeys(a, b) {
     const o = {};
-    // 1. a 的 key 原序，值优先用 b 的
+    // 1. a 的 key 原序，值优先用 b 的（空值回退到 a）
     for (const k of Object.keys(a || {})) {
-        o[k] = (b != null && k in b) ? b[k] : a[k];
+        o[k] = val((b != null && k in b) ? b[k] : undefined, a[k]);
     }
-    // 2. b 中 a 没有的 key，追加末尾
+    // 2. b 中 a 没有的 key，追加末尾（空值不追加）
     for (const k of Object.keys(b || {})) {
-        if (a == null || !(k in a)) o[k] = b[k];
+        if (a == null || !(k in a)) {
+            const v = val(b[k]);
+            if (v !== null) o[k] = v;
+        }
     }
     return o;
 }
@@ -195,6 +207,75 @@ describe('mergeOcodeJson()', () => {
 
         assert.strictEqual(result.permission.edit['*'], 'ask');
         assert.strictEqual(result.permission.edit['AGENTS.md'], 'deny');
+    });
+
+    // ---- Empty/null values fall back to template defaults ----
+
+    test('empty string in edit falls back to template default', () => {
+        const tmpl = {
+            permission: {
+                edit: { '*': 'ask', '**/temp/**': 'allow', '**/tmp/**': 'allow' },
+            },
+        };
+        const user = {
+            permission: {
+                edit: { '*': 'ask', '**/temp/**': '', '**/tmp/**': '' },
+            },
+        };
+
+        const result = mergeOcodeJson(user, tmpl);
+
+        assert.strictEqual(result.permission.edit['**/temp/**'], 'allow');
+        assert.strictEqual(result.permission.edit['**/tmp/**'], 'allow');
+    });
+
+    test('empty string in bash falls back to template default', () => {
+        const tmpl = {
+            permission: { bash: { '*': 'allow', 'some-command': 'deny' } },
+        };
+        const user = {
+            permission: { bash: { '*': '' } },
+        };
+
+        const result = mergeOcodeJson(user, tmpl);
+
+        assert.strictEqual(result.permission.bash['*'], 'allow');
+        assert.strictEqual(result.permission.bash['some-command'], 'deny');
+    });
+
+    test('null value in edit falls back to template default', () => {
+        const tmpl = {
+            permission: {
+                edit: { '*': 'ask', 'opencode.json': 'ask', 'AGENTS.md': 'ask' },
+            },
+        };
+        const user = {
+            permission: {
+                edit: { '*': 'ask', 'opencode.json': null, 'AGENTS.md': undefined },
+            },
+        };
+
+        const result = mergeOcodeJson(user, tmpl);
+
+        assert.strictEqual(result.permission.edit['opencode.json'], 'ask');
+        assert.strictEqual(result.permission.edit['AGENTS.md'], 'ask');
+    });
+
+    test('empty user-only key is dropped from edit', () => {
+        const tmpl = {
+            permission: {
+                edit: { '*': 'ask' },
+            },
+        };
+        const user = {
+            permission: {
+                edit: { '*': 'ask', 'user-only-path/**': '' },
+            },
+        };
+
+        const result = mergeOcodeJson(user, tmpl);
+
+        assert.strictEqual(result.permission.edit['user-only-path/**'], undefined);
     });
 
     // ---- required/deny force insert ----
