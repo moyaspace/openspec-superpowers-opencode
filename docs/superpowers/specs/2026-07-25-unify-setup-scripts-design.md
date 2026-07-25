@@ -117,7 +117,7 @@ await dryRunProject(options);
 
 ## Dry-run 流程
 
-`dry-run` 与 `init` 使用相同的检查、决策和 planner，但不调用 deployer，不运行会改变项目状态的验证命令，也不创建 registry 或 Git commit。
+`dry-run` 与 `init` 使用相同的检查、决策和 planner，但不调用 deployer，不运行会改变项目状态的验证命令，也不创建目标目录、registry 或 Git commit。目标目录不存在时，planner 将其视为一个虚拟的空目录来生成绿地安装计划；命令结束后目标目录必须仍然不存在。
 
 输出应展示实际计划中的创建、覆盖、合并、跳过和保留操作。禁止在 planner 中以 `dryRun` 条件复制另一套部署逻辑。
 
@@ -243,6 +243,7 @@ runner.run('openspec', ['schema', 'validate', 'superpowers-bridge-opencode'], {
 在独立临时目录执行真实 setup API 或 CLI。通过注入 fake process runner 模拟 OpenSpec、OpenCode 和 Git，以确定性验证：
 
 - `init -> dry-run -> reset` 生命周期。
+- 对不存在的目标目录执行 `dry-run` 后，目标目录仍不存在。
 - dirty Git 拒绝。
 - 部署失败不提交 Git。
 - 验证失败仍生成可用 manifest。

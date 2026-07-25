@@ -10,7 +10,7 @@ jobs:
   check:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -39,6 +39,9 @@ jobs:
       - name: Verify oso alias in package.json
         run: node -e "const p=require('./package.json'); console.log('✅ oso alias:', p.bin.oso)"
 
+      - name: Run tests
+        run: npm test
+
       # ── Tarball 构建 ──
       - name: npm pack
         run: npm pack
@@ -66,14 +69,26 @@ jobs:
             "package/template/_gitignore" \
             "package/template/_editorconfig" \
             "package/template/_gitattributes" \
-            "package/scripts/setup.sh" \
-            "package/scripts/setup.ps1" \
+            "package/lib/setup/index.js" \
+            "package/lib/setup/planner.js" \
+            "package/lib/setup/deploy.js" \
+            "package/lib/setup/reset.js" \
+            "package/lib/setup/verify.js" \
             "package/docs/QUICKSTART.md" \
             "package/LICENSE"; do
             if grep -q "$file" /tmp/tarlist.txt; then
               echo "  ✅ $file"
             else
               echo "  ❌ $file"
+              errors=$((errors + 1))
+            fi
+          done
+
+          for removed in \
+            "package/scripts/setup.sh" \
+            "package/scripts/setup.ps1"; do
+            if grep -q "$removed" /tmp/tarlist.txt; then
+              echo "  ❌ removed file is still packaged: $removed"
               errors=$((errors + 1))
             fi
           done
@@ -90,17 +105,3 @@ jobs:
           fi
           echo ""
           echo "✅ All critical files present"
-
-      # ── CRLF 检查（仅 Linux，Windows 上 xxd 不可用）──
-      - name: CRLF check (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          PACKAGE=$(ls *.tgz)
-          tar -xzf "$PACKAGE" -C /tmp package/scripts/setup.sh
-          if xxd /tmp/package/scripts/setup.sh | head -1 | grep -q "0d 0a"; then
-            echo "❌ scripts/setup.sh has CRLF — check .gitattributes"
-            exit 1
-          else
-            echo "✅ scripts/setup.sh is LF only"
-          fi

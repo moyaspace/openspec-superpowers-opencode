@@ -36,7 +36,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "install": "node scripts/shims-installer.js install"
+    "install": "node scripts/shims-installer.js install",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=16"

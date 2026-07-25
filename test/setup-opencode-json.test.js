@@ -13,68 +13,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-
-// ============================================================
-// 从 setup.sh 提取的 merge 逻辑（Node.js inline script 版本）
-// ============================================================
-
-/**
- * 值空则回退到默认值。
- * 空值（null/undefined/""）视为"未提供"，用默认值代替。
- */
-function val(v, d) {
-    return (v === null || v === undefined || v === '') ? d : v;
-}
-
-/**
- * 合并两个对象，按 a 的 key 序 + 补 b 中 a 没有的 key。
- * 类似于 Object.assign，但 preserves a 的 key 顺序。
- * 空值（null/undefined/""）回退到模板默认值，不穿透。
- */
-function mergeKeys(a, b) {
-    const o = {};
-    // 1. a 的 key 原序，值优先用 b 的（空值回退到 a）
-    for (const k of Object.keys(a || {})) {
-        o[k] = val((b != null && k in b) ? b[k] : undefined, a[k]);
-    }
-    // 2. b 中 a 没有的 key，追加末尾（空值不追加）
-    for (const k of Object.keys(b || {})) {
-        if (a == null || !(k in a)) {
-            const v = val(b[k]);
-            if (v !== null) o[k] = v;
-        }
-    }
-    return o;
-}
-
-/**
- * 棕地合并 opencode.json。
- * @param {object} userJson — 用户已存在的 .opencode/opencode.json
- * @param {object} tmplJson — 模板 .opencode/opencode.json
- * @returns {{permission: object}} 合并结果
- */
-function mergeOcodeJson(userJson, tmplJson) {
-    const perm = mergeKeys(tmplJson.permission, userJson.permission);
-
-    const required = ['.worktrees/**', 'openspec/changes/**', 'openspec/specs/**', '.opencode/**'];
-    const denied = ['openspec/schemas/**', 'openspec/config.yaml'];
-
-    for (const action of ['write', 'edit']) {
-        const obj = perm[action];
-        if (obj && typeof obj === 'object') {
-            const sub = mergeKeys(tmplJson.permission?.[action], obj);
-            for (const r of required) sub[r] = 'allow';
-            for (const d of denied) sub[d] = 'deny';
-            perm[action] = sub;
-        }
-    }
-
-    if (perm.bash && typeof perm.bash === 'object' && tmplJson.permission?.bash) {
-        perm.bash = mergeKeys(tmplJson.permission.bash, perm.bash);
-    }
-
-    return { permission: perm };
-}
+const { mergeOcodeJson } = require('../lib/setup/merge');
 
 // ============================================================
 // 测试
