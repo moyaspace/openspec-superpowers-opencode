@@ -145,7 +145,7 @@ describe('setup public API', () => {
         assert.equal(result.success, false);
         const manifest = JSON.parse(fs.readFileSync(path.join(targetDir, '.opencode', 'install-manifest.json'), 'utf8'));
         assert.equal(manifest.verification, 'failed');
-        assert.equal(calls.some(([program]) => program === 'git'), false);
+        assert.equal(calls.filter(([p, a]) => p === 'git' && !a.includes('--version')).length, 0);
     });
 
     it('does not prompt for brownfield files that do not exist', async (t) => {

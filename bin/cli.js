@@ -15,6 +15,7 @@ const toolDir = path.resolve(__dirname, '..');          // 工具安装根目录
 const { findProjectRoot, getChangeRegistryPath } = require(path.join(toolDir, 'lib', 'registry-utils'));
 const setupApi = require(path.join(toolDir, 'lib', 'setup'));
 const { runSetupCommand } = require(path.join(toolDir, 'lib', 'setup', 'cli-adapter'));
+const { createConsoleReporter, progressFromReporter } = require(path.join(toolDir, 'lib', 'setup', 'console-reporter'));
 
 const args = process.argv.slice(2);
 const isWin = process.platform === 'win32';
@@ -174,26 +175,18 @@ function ask(query) {
 }
 
 async function runSetupCli(subcommand, targetDir, lang) {
+    const reporter = createConsoleReporter({ mode: subcommand === 'dry-run' ? 'dry-run' : 'init' });
+    const progress = progressFromReporter(reporter);
     const result = await runSetupCommand(subcommand, {
         targetDir,
         lang,
         env: process.env,
         prompt: ask,
+        progress,
     }, setupApi);
     if (result.error) console.error(result.error.message || result.error);
     if (result.value && result.value.verification && result.value.verification.error) {
         console.error(result.value.verification.error.message);
-    }
-    if (subcommand === 'dry-run' && result.value && Array.isArray(result.value.operations)) {
-        for (const operation of result.value.operations) {
-            console.log(`  ${operation.type}: ${operation.target || operation.path}`);
-        }
-    } else if (result.code === 0 && result.value && result.value.cancelled) {
-        console.log(t('  已取消', '  Cancelled'));
-    } else if (result.code === 0 && subcommand === 'init') {
-        console.log(t('  初始化完成', '  Initialization complete'));
-    } else if (result.code === 0 && subcommand === 'reset') {
-        console.log(t('  重置完成', '  Reset complete'));
     }
     process.exitCode = result.code;
 }
