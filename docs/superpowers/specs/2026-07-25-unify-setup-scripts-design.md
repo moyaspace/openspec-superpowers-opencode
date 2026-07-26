@@ -1,7 +1,7 @@
-# 统一 Setup Scripts 为 JavaScript 设计
+# 统一 Setup Scripts 设计（含棕地流程）
 
 日期：2026-07-25
-状态：已确认，待实施计划
+状态：已实施
 
 ## 背景
 
@@ -10,7 +10,7 @@
 这种结构已经产生行为漂移：
 
 - Windows 与 Linux 对无效 `BROWN_OVERRIDE_*` 值的处理不同。
-- Linux schema 验证失败后仍可能输出“验证通过”，Windows 会记录失败。
+- Linux schema 验证失败后仍可能输出"验证通过"，Windows 会记录失败。
 - `BROWN_OVERRIDE_OCODEJSON` 只存在于 PowerShell 实现。
 - 路径分隔符、JSON 处理、hash 工具和命令转义依赖不同平台工具。
 - setup 测试大量复制脚本逻辑，而不是直接测试生产实现。
@@ -54,9 +54,9 @@ CLI 直接导入 setup API。规划、合并、部署、验证和 reset 分成�
 
 ## 总体架构
 
-建议模块结构：
+模块结构：
 
-```text
+```
 bin/cli.js                 参数解析、用户输出、退出码
 bin/create-project.js      init 命令别名
 
@@ -88,21 +88,22 @@ await dryRunProject(options);
 
 ## Init 流程
 
-```text
+```
 解析参数
   -> 解析并校验目标目录
   -> 目标不存在时创建目录
-  -> Git dirty 检查
-  -> 前置工具检查
+  -> Git dirty 检查（目录有 .git 时执行 git status --porcelain，非空则终止）
+  -> 前置工具检查（openspec、opencode、git 版本）
   -> Superpowers 路径和版本发现
   -> 判断绿地或棕地
-  -> 收集覆盖决策
-  -> 生成部署计划
-  -> 执行计划
-  -> 写入 manifest
+  -> 收集覆盖决策（仅棕地）
+  -> 生成部署计划（planner）
+  -> 执行计划（deployer：逐文件原子写入）
+  -> 写入 manifest（verification=pending）
   -> schema/workflow 验证
-  -> 创建 registry
-  -> Git 初始化、暂存和首次提交
+  -> 更新 manifest 状态（passed/failed）
+  -> 创建 registry（oso-change-registry.json）
+  -> Git 初始化、暂存和首次提交（验证失败则不提交）
 ```
 
 部署计划使用结构化操作，不存储拼接后的 shell 命令。例如：
@@ -115,11 +116,155 @@ await dryRunProject(options);
 
 在写入前必须完成目标路径检查、JSON 解析、marker 分析和合并内容计算。单个生成文件通过同目录临时文件写入后 rename，避免留下截断内容。
 
+### 实际写入（原子性）
+
+写入逻辑在 `lib/setup/deploy.js:21`：
+
+1. 在写入任何文件前，先校验所有目标路径。
+2. 拒绝项目目录外路径。
+3. 拒绝经过符号链接或 Windows junction 的路径。
+4. `preserve` 操作不做任何写入。
+5. `copy`/`write` 先写同目录临时文件，再用 `rename` 原子替换目标文件。
+
+这是逐文件原子写入，不是整个部署事务。如果后面的文件发生 I/O 错误，前面已经成功写入的文件不会自动回滚。
+
+### 部署后流程
+
+```
+执行部署（逐文件）
+→ 写 verification=pending 的 manifest
+→ 执行 OpenSpec 完整验证（schema + workflow）
+→ 更新 manifest 为 passed/failed
+→ 验证成功后创建 registry（oso-change-registry.json）
+→ git init（如需要）
+→ git add
+→ 有变更时自动 commit
+```
+
+验证失败不会回滚已经部署的文件，也不会创建 registry 或提交 Git。
+
+## 棕地判断
+
+判断代码在 `lib/setup/context.js:13`。
+
+| 条件 | 判定 |
+|------|------|
+| 目录不存在 | greenfield |
+| 目录存在但为空 | greenfield |
+| 目录存在且有任意内容 | brownfield |
+
+当前实现比较宽泛：不检查 Git，也不要求存在 `openspec/config.yaml`。因此只有一个 `.git/`、README 或任意隐藏文件，也会被判为棕地。
+
+> **注意：** 即使非空目录里根本没有 `openspec/`，它仍被判为棕地，并要求允许覆盖 OpenSpec。选择 `no` 会导致整个 `openspec/` 不部署，后续验证通常会失败。
+
+如果目录已有 `.git`，初始化前还会执行 `git status --porcelain`。工作区不干净则立即终止，不进入覆盖询问。
+
+## 棕地决策
+
+决策逻辑在 `lib/setup/index.js`（`collectBrownfieldDecisions` 和 `initProject` 两部分）。
+
+首先询问：
+
+```
+BROWN_OVERRIDE_INIT
+Brownfield project. Continue with full init?
+```
+
+不是 `yes` 就取消，不写文件。
+
+继续后依次处理：
+
+| 范围 | 环境变量 | 行为 |
+|------|----------|------|
+| 整个 `openspec/`（config + schemas） | `BROWN_OVERRIDE_OPENSPEC` | `yes` 部署并覆盖；否则全部跳过 |
+| `.opencode/opencode.json` | `BROWN_OVERRIDE_OCODEJSON` | 文件存在时询问；`yes` 合并，否则保留 |
+| `.opencode/commands/` | `BROWN_OVERRIDE_COMMANDS` | `yes`/`no`/`ask`，`ask` 时逐个冲突文件询问 |
+| `.opencode/skills/` | `BROWN_OVERRIDE_SKILLS` | 同上 |
+| `AGENTS.md` 托管区块 | `BROWN_OVERRIDE_AGENTS` | 已有完整 marker 时询问是否替换 |
+| `.gitignore` 托管区块 | `BROWN_OVERRIDE_GITIGNORE` | 同上 |
+| `.gitattributes` 托管区块 | `BROWN_OVERRIDE_GITATTR` | 同上 |
+| `.editorconfig` 托管区块 | `BROWN_OVERRIDE_EDITORCONFIG` | 同上 |
+| `oso-change-registry.json` | `BROWN_OVERRIDE_REGISTRY` | 存在时询问；默认 `no` 不做覆盖 |
+
+没有环境变量且没有 prompt 时，默认决策是 `no`，见 `lib/setup/prompt.js:20`。
+
+所有 `BROWN_OVERRIDE_*` 值由 `prompt.js` 统一规范化。支持 `yes`、`no`，commands/skills 额外支持 `ask`；无效值回退到交互询问，不把原始无效值当成决策。
+
+## 文件部署规则（棕地）
+
+计划生成在 `lib/setup/planner.js:52`。
+
+- `skills.lock.json`：棕地也会直接覆盖，没有单独询问。
+- `openspec/**`（config.yaml + schemas/）：只有 `BROWN_OVERRIDE_OPENSPEC=yes` 才部署；否则全部跳过。
+  - 棕地下 `openspec/changes/**` 和 `openspec/specs/**` 永远 preserve（见 changes/specs 保护章节）。
+  - schemas/ 复制时按语言过滤（见 "Schema 复制时的语言过滤"）。
+- `.opencode/opencode.json`：
+  - 原文件不存在：直接创建。
+  - 原文件存在且选择 `no`：保留。
+  - 选择 `yes`：结构化合并（见 `opencode.json` 合并节）。
+- `.opencode/commands/**` 和 `.opencode/skills/**`：
+  - 只对已经存在的同名文件应用覆盖决策（`yes`/`no`/`ask`）。
+  - 模板中新增、目标中不存在的文件会直接部署。
+- 其他 `.opencode/**` 模板文件：没有独立棕地保护，存在时直接覆盖。
+- `AGENTS.md`、`.gitignore`、`.gitattributes`、`.editorconfig`：
+  - 文件不存在：创建。
+  - 文件存在但没有 marker：自动追加托管区块，不询问。
+  - 正好有一对 marker：`yes` 替换托管区块，`no` 保留。
+  - marker 不完整或数量异常：抛错终止。
+
+### 棕地下 `openspec/` 部署范围
+
+棕地模式下 `deployOpenspec()` 只复制两个内容：
+1. `openspec/config.yaml`
+2. `openspec/schemas/`（按语言过滤）
+
+不会复制其他 `openspec/` 子目录。`openspec/changes/` + `openspec/specs/` 显式跳过（受棕地保护），不受 `BROWN_OVERRIDE_OPENSPEC=yes` 影响。
+
+### Schema 复制时的语言过滤
+
+`openspec/schemas/` 目录中有按语言区分的 schema 文件（`.zh-CN.`、`.zh-TW.` 后缀）。
+复制时按目标语言自动过滤：
+
+- 文件包含 `.zh-CN.` → 仅 `--lang zh-CN` 时部署
+- 文件包含 `.zh-TW.` → 仅 `--lang zh-TW` 时部署
+- 其余文件 → 始终部署
+
+该逻辑在 `planner.js:selectedLanguageFile()` 和 `index.js:deployOpenspec()` 的 langFilter 中实现，棕地和绿地均生效。
+
+## opencode.json 合并
+
+合并实现在 `lib/setup/merge.js:mergeOcodeJson()`。
+
+必须：
+
+- 保持模板 key 顺序。
+- 在模板 key 后追加用户自定义 key。
+- 空值回退到模板默认值，用户独有的空 key 不写入结果。
+- 保留用户其他 permission 分组和自定义设置。
+- **模板 `.opencode/opencode.json` 是 permission 的单一权威来源**：不再硬编码 `allow`/`deny` 覆写列表。
+  - 原设计要求的"强制 required edit paths 为 allow / schema paths 为 deny"已在实现中移除。
+  - 用户编辑配置文件即可调整权限，无需修改合并代码。
+
+`AGENTS.md`、`.gitignore`、`.gitattributes` 和 `.editorconfig` 使用各自 marker 识别 bridge 管理区段：不存在目标时创建；目标存在但没有 marker 时追加；存在完整 marker 时根据决策替换或跳过。异常或不完整 marker 必须明确报错或走已定义的保守分支，不能静默截断用户文件。
+
+核心合并逻辑：
+
+```js
+function mergeOcodeJson(userJson = {}, templateJson = {}) {
+    const result = mergeKeys(templateJson, userJson);
+    // ...逐层 mergeKeys，保持模板 key 顺序
+    // 无硬编码 allow/deny 覆写
+    return result;
+}
+```
+
 ## Dry-run 流程
 
 `dry-run` 与 `init` 使用相同的检查、决策和 planner，但不调用 deployer，不运行会改变项目状态的验证命令，也不创建目标目录、registry 或 Git commit。目标目录不存在时，planner 将其视为一个虚拟的空目录来生成绿地安装计划；命令结束后目标目录必须仍然不存在。
 
 输出应展示实际计划中的创建、覆盖、合并、跳过和保留操作。禁止在 planner 中以 `dryRun` 条件复制另一套部署逻辑。
+
+dry-run 下 `collectBrownfieldDecisions()` 同样会被调用，确保棕地 dry-run 的决策收集与实际 init 一致。
 
 ## Reset 流程
 
@@ -133,29 +278,29 @@ await dryRunProject(options);
 - 不跟随目录符号链接递归删除。
 - 只删除 manifest 记录的可卸载文件。
 - 仅在目录为空时删除父目录。
-- 永远不删除 `openspec/changes/` 和 `openspec/specs/`。
+- 永远不删除 `openspec/changes/`、`openspec/specs/`、`AGENTS.md`、`.opencode/opencode.json`、`.gitignore`、`.gitattributes`、`.editorconfig`。
 - 保持现有受保护文件语义：不自动回滚 `AGENTS.md`、`opencode.json`、`.gitignore`、`.gitattributes` 和 `.editorconfig` 中的合并内容，而是输出人工处理提示。
 
-## 棕地合并
+受保护文件列表在 `reset.js:PROTECTED_FILES` 和 `protectedManifestPath()` 中定义。
 
-所有 `BROWN_OVERRIDE_*` 值由 `prompt.js` 统一规范化。支持 `yes`、`no`，commands/skills 额外支持 `ask`；无效值回退到交互询问，不把原始无效值当成决策。
+## changes/specs 保护
 
-`opencode.json` 合并必须：
+棕地下 `openspec/changes/**` 和 `openspec/specs/**` 永远 preserve，即使用户选择 `BROWN_OVERRIDE_OPENSPEC=yes`。
 
-- 保持模板 key 顺序。
-- 在模板 key 后追加用户自定义 key。
-- 空值回退到模板默认值，用户独有的空 key 不写入结果。
-- 强制 required edit paths 为 `allow`。
-- 强制 schema/config paths 为 `deny`。
-- 保留用户其他 permission 分组和自定义设置。
+实现规则（`planner.js` 中在通用 `openspec/` 判断之前）：如果模板文件路径以 `openspec/changes/` 或 `openspec/specs/` 开头，则无论棕地决策如何都跳过。
 
-`AGENTS.md`、`.gitignore`、`.gitattributes` 和 `.editorconfig` 使用各自 marker 识别 bridge 管理区段：不存在目标时创建；目标存在但没有 marker 时追加；存在完整 marker 时根据决策替换或跳过。异常或不完整 marker 必须明确报错或走已定义的保守分支，不能静默截断用户文件。
+| 场景 | 状态 |
+|------|------|
+| 棕地下现有 changes/specs 内容 | 保护，不受 `BROWN_OVERRIDE_OPENSPEC=yes` 影响 |
+| 棕地下模板新增同名文件 | 保护，永远 preserve |
+| Reset 执行 | 保护，不删除 |
+| 绿地 | 创建空目录 |
 
 ## Superpowers 发现与 Skill Lock
 
 使用 `os.homedir()`、`path.join()` 和 Node 目录遍历查找：
 
-```text
+```
 <home>/.cache/opencode/packages/superpowers@*/.../node_modules/superpowers/skills
 ```
 
@@ -167,7 +312,7 @@ await dryRunProject(options);
 
 manifest 在文件部署完成后、workflow 验证前写入。验证结束后更新状态，使失败安装仍能执行 `oso reset`。
 
-建议字段：
+字段：
 
 ```json
 {
@@ -186,16 +331,16 @@ manifest 在文件部署完成后、workflow 验证前写入。验证结束后�
 
 ## Workflow 验证
 
-验证继续覆盖：
+验证覆盖：
 
 1. `openspec schema validate superpowers-bridge-opencode`
-2. project 源模板数量
-3. 创建测试 change
-4. change list 可见性
-5. artifact 依赖链
-6. brainstorm instructions 生成
+2. `openspec templates --json`：解析 project 源模板数量（≥8）
+3. `openspec new change <名称>`：创建测试 change
+4. `openspec list --json`：验证 change 可见
+5. `openspec status --change <名称> --json`：验证 artifact 依赖链完整
+6. `openspec instructions brainstorm --change <名称>`：验证指令生成
 
-测试 change 使用 `oso-verify-<pid>-<random>` 格式。验证代码记录 change 是否由本次执行成功创建；清理位于 `finally`，且只有在创建成功时执行。这样后续验证失败仍会清理临时数据，也不会删除用户已有同名 change。
+测试 change 使用 `oso-verify-<pid>-<随机hex>` 格式（`verify.js:53`）。验证代码记录 change 是否由本次执行成功创建；清理位于 `finally`，且只有在创建成功时执行。这样后续验证失败仍会清理临时数据，也不会删除用户已有同名 change。
 
 ## 外部命令执行
 
