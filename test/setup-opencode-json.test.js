@@ -217,9 +217,9 @@ describe('mergeOcodeJson()', () => {
         assert.strictEqual(result.permission.edit['user-only-path/**'], undefined);
     });
 
-    // ---- required/deny force insert ----
+    // ---- no hardcoded override lists ----
 
-    test('required paths are always allow', () => {
+    test('no hardcoded required/deny override lists', () => {
         const tmpl = {
             permission: { edit: { '*': 'ask' } },
         };
@@ -227,13 +227,11 @@ describe('mergeOcodeJson()', () => {
 
         const result = mergeOcodeJson(user, tmpl);
 
-        assert.strictEqual(result.permission.edit['.worktrees/**'], 'allow');
-        assert.strictEqual(result.permission.edit['openspec/changes/**'], 'allow');
-        assert.strictEqual(result.permission.edit['openspec/specs/**'], 'allow');
-        assert.strictEqual(result.permission.edit['.opencode/**'], 'allow');
+        assert.strictEqual(result.permission.edit['*'], 'deny');
+        assert.strictEqual(result.permission.edit['.worktrees/**'], undefined);
     });
 
-    test('deny paths are always deny', () => {
+    test('user values are preserved without hardcoded deny override', () => {
         const tmpl = {
             permission: { edit: { '*': 'ask' } },
         };
@@ -245,8 +243,8 @@ describe('mergeOcodeJson()', () => {
 
         const result = mergeOcodeJson(user, tmpl);
 
-        assert.strictEqual(result.permission.edit['openspec/schemas/**'], 'deny');
-        assert.strictEqual(result.permission.edit['openspec/config.yaml'], 'deny');
+        assert.strictEqual(result.permission.edit['openspec/schemas/**'], 'allow');
+        assert.strictEqual(result.permission.edit['openspec/config.yaml'], 'allow');
     });
 
     // ---- End-to-end with real template ----
