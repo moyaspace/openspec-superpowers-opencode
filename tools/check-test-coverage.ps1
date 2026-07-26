@@ -1,9 +1,9 @@
-# scripts/check-test-coverage.ps1
+# tools/check-test-coverage.ps1
 # 验证 TESTING.md 与当前代码的同步完整性
 #
 # 用法:
-#   pwsh -NoProfile scripts\check-test-coverage.ps1
-#   pwsh -NoProfile scripts\check-test-coverage.ps1 -ProjectRoot "C:\path\to\project"
+#   pwsh -NoProfile tools\check-test-coverage.ps1
+#   pwsh -NoProfile tools\check-test-coverage.ps1 -ProjectRoot "C:\path\to\project"
 #
 # exit code: 0 = 全部通过, 1 = 发现问题
 #

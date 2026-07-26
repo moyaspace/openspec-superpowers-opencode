@@ -30,7 +30,7 @@ TESTING.md 中不硬编码以下内容：
 测试执行前运行以下脚本验证覆盖完整性：
 
 ```powershell
-pwsh -NoProfile scripts\check-test-coverage.ps1
+pwsh -NoProfile tools\check-test-coverage.ps1
 ```
 
 脚本功能：
