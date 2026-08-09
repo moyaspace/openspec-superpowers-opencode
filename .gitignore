@@ -29,6 +29,9 @@ Thumbs.db
 # Local test records
 docs/test-records/
 !docs/test-records/.gitkeep
+
+# Serena tool data
+.serena/
 # ↑ Manual gitignore entries go ABOVE this line (outside auto-generated block) ↑
 
 # <!-- openspec-superpowers-opencode_gitignore -->
