@@ -88,7 +88,7 @@ oso init                                  # 或: openspec-superpowers-opencode i
 | 3 | **One-command init** | `oso init` → deploy templates + config + `git init` + first commit |
 | 4 | **Bridged OpenSpec + Superpowers** | Pre-configured schema + skill mapping + lock verification, one-command deploy |
 | 5 | **Greenfield/brownfield** | Auto-deploy on new projects; safe merge on existing ones |
-| 6 | **Cross-platform + i18n** | Windows `setup.ps1` / Linux & macOS `setup.sh`, `--lang zh-CN \| zh-TW \| en` |
+| 6 | **Cross-platform + i18n** | Unifed JS installer (`lib/setup/`) on Windows/Linux/macOS, `--lang zh-CN \| zh-TW \| en` |
 | 7 | **SHA-256 lock** | Skill file integrity verified on deploy |
 | 8 | **Layered architecture** | Superpowers (HOW) → OpenSpec (WHAT) → Worktree (WHERE) → Commands (WHEN) |
 | 9 | **Full worktree + openspec change support** | Auto-register on change creation, smart `openspec list` interception, `verify` one-click health check |

@@ -227,3 +227,60 @@ main 目录（仓库）                 worktree（AI 办公室）
 - **额外防御**: setup 脚本添加 fallback 逻辑，如果源文件复制失败则直接通过 echo/Set-Content 创建 `.gitignore`，不依赖 npm 版本行为。
 - **验证**: test Phase 13 覆盖文件存在性、grep 模式匹配、以及 `git diff --cached` 确认基础设施文件不被 stage。
 - **参考**: 无官方 issue — 此为经验发现。当前 npm 11.9.0 行为，未来版本可能修复。重新启用 `template/.gitignore` 前需验证目标 npm 版本无此 bug。
+
+#### ADR-11: 统一 setup 实现——从双脚本迁移到单一 JavaScript
+
+- **决策**: 删除 `scripts/setup.ps1`（PowerShell）和 `scripts/setup.sh`（Bash），统一为 `lib/setup/` 下的纯 JavaScript 模块化实现。
+- **背景**: 自项目创建以来，`oso init`、`oso reset` 和 `oso dry-run` 一直由两套独立的 shell 脚本驱动。一开始是对称实现，随着迭代出现行为分叉：
+
+  | 差异 | PowerShell | Bash |
+  |------|-----------|------|
+  | `BROWN_OVERRIDE_OCODEJSON` | ✅ 支持 | ❌ 不存在 |
+  | Schema 验证失败处理 | ✅ 正确上报 | ❌ 可能输出"验证通过" |
+  | 无效 `BROWN_OVERRIDE_*` 值 | 回退交互 | 静默跳过 |
+  | 字符串转义、路径拼接、JSON 解析 | 各自实现 | 各自实现 |
+
+  每个命令执行时 `bin/cli.js` 先检测操作系统，再 `execSync` 启动对应的 shell 脚本。测试也在复制脚本逻辑——没有直接测试生产实现的模块。
+
+- **方案比较**:
+
+  | 方案 | 做法 | 成本 | 收益 |
+  |------|------|------|------|
+  | A. 单文件 `scripts/setup.js` | 直译双脚本为 1 个千行 JS | 低 | 最低：进程转发仍在，模块边界差 |
+  | **B. 模块化 `lib/setup/` ⬅ 已实施** | **拆分为 context/discovery/planner/deploy/merge/manifest/verify/prompt/reset 模块** | **中** | **测试直接覆盖生产代码，跨平台统一，隔离跨平台差异** |
+  | C. 声明式引擎 | 操作描述 → 通用引擎解释执行 | 高 | 扩展性最好，但当前只有一套安装模板 |
+
+- **决策理由**:
+  1. **消除行为漂移** — 一套实现，一个行为，不再有平台条件编译式的 if-OS-then 脚本选择
+  2. **测试直接覆盖生产代码** — 导入 `lib/setup/*` 即可测试，不再复制脚本逻辑或在 CI 跨平台验证行为一致性
+  3. **跨平台差异隔离到单模块** — 路径分隔、外部进程调用、npm `.cmd` shim 适配统一收在 `process-runner.js`，业务模块不感知平台
+  4. **结构化操作计划** — 部署不再拼接 shell 命令字符串，改用 `{ type, source, target, content }` 对象；dry-run 与真实部署共享同一份计划生成代码
+  5. **原子写入** — 通过同目录临时文件 + `rename` 实现逐文件原子写入，避免 I/O 中断留下截断文件
+- **结构**: `bin/cli.js` 只做参数解析与结果映射，不承载 setup 业务逻辑，也不在内部模块中调用 `process.exit()`。
+
+  ```
+  bin/cli.js                  参数解析、用户输出、退出码
+  lib/setup/
+    index.js                  initProject/resetProject/dryRunProject（编排）
+    context.js                目标目录、模板目录、语言、模式判定
+    discovery.js              外部 CLI 与 Superpowers 发现
+    planner.js                生成结构化安装/删除操作计划
+    deploy.js                 执行目录和文件操作（原子写入）
+    merge.js                  JSON 与 marker 文件合并
+    manifest.js               manifest 生成、兼容读取、根目录逃逸校验
+    reset.js                  按 manifest 生成并执行删除计划
+    verify.js                 schema、模板和 workflow 验证
+    prompt.js                 交互询问与环境变量覆盖（`resolveDecision`）
+    process-runner.js         跨平台外部命令执行（统一 shell 转义）
+    cli-adapter.js            CLI 与 API 的适配层
+    console-reporter.js       控制台输出格式化
+  ```
+
+- **保留的 CLI 契约**: `oso init [dir] [--lang zh-CN|zh-TW|en]`、`oso reset [dir]`、`oso dry-run [dir] [--lang ...]`、`create-openspec-superpowers-opencode [dir]`——所有公开入口行为不变。
+- **影响**:
+  - `scripts/setup.ps1` 和 `scripts/setup.sh` 从仓库和 npm tarball 中删除
+  - 不再有操作系统条件分发——`bin/cli.js` 直接 `require('lib/setup')`
+  - `dry-run` 与 `init` 共享同一份 `createInitPlan()`，不维护两份部署逻辑
+  - `.gitattributes` 中为两个 shell 脚本保留的 CRLF 约束一并删除
+  - 测试可以注入 fake prompt、fake process runner、fake filesystem 来确定性验证棕地决策路径
+- **详细设计**: `docs/designs/unify-setup-scripts.md`

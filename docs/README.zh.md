@@ -86,7 +86,7 @@ oso init                                  # 或: openspec-superpowers-opencode i
 | 3 | **一键初始化** | `oso init` → 部署模板 + 配置 + `git init` + 首次提交 |
 | 4 | **桥接 OpenSpec + Superpowers** | 预配置 schema + skill 映射 + 锁校验，一条命令部署 |
 | 5 | **绿地/棕地双模式** | 新项目自动部署；已有项目安全合并 |
-| 6 | **跨平台 + 多语言** | Windows `setup.ps1` / Linux & macOS `setup.sh`，`--lang zh-CN \| zh-TW \| en` |
+| 6 | **跨平台 + 多语言** | Unified JS 安装器（`lib/setup/`）支持 Windows/Linux/macOS，`--lang zh-CN \| zh-TW \| en` |
 | 7 | **SHA-256 锁** | 部署时自动校验 skill 文件完整性 |
 | 8 | **多层架构** | Superpowers（HOW）→ OpenSpec（WHAT）→ Worktree（WHERE）→ 命令（WHEN） |
 | 9 | **worktree + openspec change 全面支持** | 创建变更自动注册、`openspec list` 智能拦截、`verify` 一键健康检查 |
