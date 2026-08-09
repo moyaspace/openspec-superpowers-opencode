@@ -12,10 +12,15 @@
 
 | 命令 | 功能 |
 |------|------|
-| `init [目录]` | 一键初始化：`git init` → 复制模板 → setup 脚本 → 首次提交 |
+| `init [目录]` | 一键初始化：`git init` → 模板部署 → 验证 → 首次提交 |
 | `reset` | 按安装清单精确卸载，只删自己装过的文件 |
 | `dry-run` | 预览变更，不实际写入 |
+| `verify` | 5 项系统完整性检查（垫片、注册表、worktree） |
+| `registry <add\|remove\|list\|verify\|reset>` | 活跃变更注册表管理 |
+| `install-shims` | 安装 openspec 垫片脚本（拦截 list 实现跨 worktree 合并） |
+| `uninstall-shims` | 恢复原版 openspec |
 | `ensure-worktree <name>` | 确保变更的 git worktree 已创建 |
+| `remove-worktree <name>` | 删除 worktree 目录 + 分支 |
 | `create-openspec-superpowers-opencode` | 别名，等同于 `init` |
 
 **多语言支持**：`--lang zh-CN | zh-TW | en`，帮助文本、错误消息、安装日志全部本地化。
@@ -24,7 +29,7 @@
 
 ## 二、OPSX 命令（OpenCode 内使用）
 
-初始化后，项目内可通过 12 个 `/opsx-*` 命令驱动完整工作流：
+初始化后，项目内可通过 13 个 `/opsx-*` 命令驱动完整工作流：
 
 | 命令 | 功能 | 阶段 |
 |------|------|:----:|
@@ -35,6 +40,7 @@
 | `/opsx-apply` | **实现阶段** — 进入 worktree → 子 Agent TDD 编码 → 审查 → 提交 | 🟢 实现 |
 | `/opsx-verify` | 验证实现 vs 规格（7 项检查清单） | 🟡 验证 |
 | `/opsx-finish` | **收尾阶段** — 测试 → retrospective → archive → 合并/PR/清理 | 🔴 收尾 |
+| `/opsx-remove <name>` | 取消变更 — 删除注册表条目 + worktree 目录 + 分支 | 🔴 收尾 |
 | `/opsx-archive` | 同步 delta spec + 归档变更目录 | 🔴 收尾 |
 | `/opsx-explore` | 纯思考模式，不创建变更 | 🔍 探索 |
 | `/opsx-onboard` | 引导式入门 | 🚀 引导 |
@@ -117,18 +123,25 @@ OPSX 命令 (WHEN - 流程编排)
 
 | 模式 | 检测条件 | 行为 |
 |------|---------|------|
-| **绿地基**（新项目） | `openspec/` 不存在 | 自动部署全部文件，无需询问 |
-| **棕地基**（已有项目） | `openspec/` 或 `.opencode/` 已存在 | 门控询问 + 逐项决策 |
+| **绿地基**（新项目） | 目标目录不存在 或 为空 | 全自动部署全部文件，无需任何询问 |
+| **棕地基**（已有项目） | 目标目录存在且有文件 | 门控询问 → 8 类棕地覆盖决策 |
 
 ### 5.2 棕地覆盖决策系统
 
-通过 `BROWN_OVERRIDE_*` 环境变量支持自动化测试：
+通过 `BROWN_OVERRIDE_*` 环境变量支持无交互自动化测试：
 
 | 变量 | 控制对象 | 可选值 |
 |------|---------|--------|
+| `BROWN_OVERRIDE_INIT` | 是否继续完整初始化棕地项目 | yes / no |
 | `BROWN_OVERRIDE_OPENSPEC` | 是否覆盖 `openspec/config.yaml + schemas/` | yes / no |
+| `BROWN_OVERRIDE_OCODEJSON` | 是否合并 `.opencode/opencode.json` | yes / no |
 | `BROWN_OVERRIDE_COMMANDS` | 是否覆盖 `.opencode/commands/` | yes / no / ask |
 | `BROWN_OVERRIDE_SKILLS` | 是否覆盖 `.opencode/skills/` | yes / no / ask |
+| `BROWN_OVERRIDE_AGENTS` | 是否替换 AGENTS.md 托管区块 | yes / no |
+| `BROWN_OVERRIDE_GITIGNORE` | 是否替换 `.gitignore` 托管区块 | yes / no |
+| `BROWN_OVERRIDE_GITATTR` | 是否替换 `.gitattributes` 托管区块 | yes / no |
+| `BROWN_OVERRIDE_EDITORCONFIG` | 是否替换 `.editorconfig` 托管区块 | yes / no |
+| `BROWN_OVERRIDE_REGISTRY` | 注册表初始策略（创建空注册表 or 跳过） | create / skip |
 
 三种决策模式：
 - **yes** — 全量覆盖
@@ -137,7 +150,7 @@ OPSX 命令 (WHEN - 流程编排)
 
 ### 5.3 智能合并
 
-`opencode.json` 使用 **union merge** — 用户已有权限保留，模板的 required 路径（`.worktrees/**`、`openspec/**`、`.opencode/**`）强制补入。AGENTS.md 已有则追加 bridge 内容，不覆盖。
+`opencode.json` 不再使用硬编码的 allow/deny 列表（如 `.worktrees/**` 权限），改为**模板 authority 模式** — 由 `template/.opencode/opencode.json` 定义完整的安全策略，所有覆盖决策通过棕地门控系统（`BROWN_OVERRIDE_OCODEJSON`）逐项确认。AGENTS.md 已有则追加 bridge 内容，不覆盖。
 
 ---
 
@@ -169,7 +182,7 @@ setup 脚本执行 **6 项端到端验证**：
 
 | 特性 | 说明 |
 |------|------|
-| **跨平台** | Windows（`setup.ps1`）+ Linux（`setup.sh`），共享同一套模板 |
+| **跨平台** | Windows + Linux + macOS，通过 unified JS 安装器（`lib/setup/`）统一实现，输出完全一致 |
 | **路径自适应** | `{{SUPERPOWERS_BASE_PATH}}` 占位符在安装时替换为实际路径 |
 | **权限约束** | `opencode.json` 限制 AI 写入范围，防止污染 main 分支 |
 | **占位符替换** | 4 个文件（schema.yaml、AGENTS.md、opsx-apply.md、opsx-finish.md）自动替换 |
@@ -337,4 +350,5 @@ openspec-superpowers-opencode uninstall-shims
 | `/opsx-apply` | 执行前先跑 `verify` | 7 个 opsx 命令在 listing 前插入 verify 步骤 |
 | `/opsx-ff` / `/opsx-new` / `/opsx-propose` | `registry add` | 创建变更后自动注册 |
 | `/opsx-finish` | `registry remove` | 归档后移除注册表条目 |
+| `/opsx-remove` | `registry remove` + 清理 worktree | 删除注册表条目，再删除 worktree 目录 + 分支 |
 | `/opsx-verify` / `/opsx-explore` / `/opsx-continue` / `/opsx-archive` / `/opsx-bulk-archive` / `/opsx-sync` | 执行前先跑 `verify` | 系统闸门，确保垫片和注册表正常 |

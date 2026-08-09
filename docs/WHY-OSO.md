@@ -60,7 +60,7 @@ openspec instructions specs --change X
 
 每次都要手动敲命令、读 skill、写文件。**7 个 artifact 就要 7 轮手动操作。**
 
-12 个 OPSX 命令就是为了解决这个——每条命令封装一个完整阶段（创建/实现/验证/收尾），用户一个 `/opsx-ff` 走完所有 7 个 artifact 的生成。
+13 个 OPSX 命令就是为了解决这个——每条命令封装一个完整阶段（创建/实现/验证/收尾），用户一个 `/opsx-ff` 走完所有 7 个 artifact 的生成。
 
 ## 鸿沟 5：没有版本兼容性保障
 

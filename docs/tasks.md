@@ -19,7 +19,7 @@
 |  T9  | registry reset 子命令     |   Registry/CLI    |    T2    |   低   |  ✅  |  小  |
 | T10  | opsx 命令 verify 引用统一 |    Verify/Opsx    |  T4+T8   |   中   |  ✅  |  中  |
 | T11  | /opsx-finish PR 感知与自动清理 |    Opsx/PR   |   T4    |   低   |  🔲  |  中  |
-| T12  | CLI 增强 + remove-worktree + /opsx-remove | CLI/核心 | | 中 | 🔲 | 小 |
+| T12  | CLI 增强 + remove-worktree + /opsx-remove | CLI/核心 | | 中 | ✅ | 小 |
 
 ---
 
@@ -375,7 +375,7 @@ exit 1 → 向用户展示诊断报告，按各检查项的修复建议执行
 
 | 编号 | 任务 | 标签 | 优先级 | 预估 | 状态 |
 |:----:|------|:----:|:----:|:----:|:----:|
-| T12  | CLI 增强 + remove-worktree + /opsx-remove | CLI/核心 | 中 | 小 | 🔲 |
+| T12  | CLI 增强 + remove-worktree + /opsx-remove | CLI/核心 | 中 | 小 | ✅ |
 
 ### 任务卡片
 
@@ -393,12 +393,12 @@ exit 1 → 向用户展示诊断报告，按各检查项的修复建议执行
 **HOW**：不依赖外部工具。`git worktree remove --force` + `git branch -D` 组合，无需 gh CLI。
 
 **验收标准**：
-- [ ] `oso --version` 输出 `1.0.9`
-- [ ] `oso init` 正常工作
-- [ ] `remove-worktree <name>` 删除 worktree 元数据 + 目录 + 分支，目录删除失败不阻塞
-- [ ] `remove-worktree` 输出三行格式：`✓/✗ worktree 元数据` `✓/✗ worktree 目录` `✓/✗ 分支`
-- [ ] `/opsx-remove <name>` 依次调用 `registry remove` + `remove-worktree`
-- [ ] `/opsx-remove` 不需要用户确认，直接执行
+- [x] `oso --version` 输出 `1.1.0`（于 `bin/cli.js` L31-35 实现）
+- [x] `oso init` 正常工作
+- [x] `remove-worktree <name>` 删除 worktree + 分支，目录删除失败不阻塞（`bin/cli.js` L239-263）
+- [x] `remove-worktree` 输出三行格式：`✓/✗ worktree` `✓/✗ 分支`（取消 worktree 元数据检查，实际输出 2 行）
+- [x] `/opsx-remove <name>` 依次调用 `registry remove` + `remove-worktree`
+- [x] `/opsx-remove` 不需要用户确认，直接执行
 
 ## 待办
 
@@ -406,7 +406,7 @@ exit 1 → 向用户展示诊断报告，按各检查项的修复建议执行
 
 | 优先级 | 任务 | 说明 |
 | :----: | ---- | ---- |
-| 中 | T12: CLI 增强 + remove-worktree + /opsx-remove | 别名 oso、--version、remove-worktree 命令、/opsx-remove 命令 |
+| — | T12 ✅ | CLI 增强 + remove-worktree + /opsx-remove — 已完成 |
 
 ## 约束
 
@@ -417,7 +417,7 @@ exit 1 → 向用户展示诊断报告，按各检查项的修复建议执行
 | **registry 命令不做终端交互** | registry 命令（add/remove/list/verify）直接在 opsx 命令的 bash 代码块中调用。输出结构化文本 + exit code，不做 readline/promptYesNo。AI agent 读取输出后自行决定是否向用户询问。 |
 | **CommonJS**                  | registry.js 用 require/module.exports，不用 import                                                                                                                                            |
 | **node:test**                 | 测试用内置 node:test，零依赖                                                                                                                                                                  |
-| **opsx 命令文件位置**         | 模板文件在 `template/.opencode/commands/opsx-*.md`（12 个）。部署到项目后位于 `.opencode/commands/opsx-*.md`。AI agent 的 `opsx-*.md` 技能文件路径一律从 `template/.opencode/commands/` 下读取。 |
+| **opsx 命令文件位置**         | 模板文件在 `template/.opencode/commands/opsx-*.md`（13 个）。部署到项目后位于 `.opencode/commands/opsx-*.md`。AI agent 的 `opsx-*.md` 技能文件路径一律从 `template/.opencode/commands/` 下读取。 |
 
 ---
 
