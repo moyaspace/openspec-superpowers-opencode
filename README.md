@@ -124,6 +124,49 @@ node bin/cli.js init test-project   # test locally
 npm publish                         # publish to npm
 ```
 
+## Community
+
+Join the oso WeChat community to connect with developers using oso, OpenSpec, Superpowers, and OpenCode.
+
+**In the group you can:**
+
+- Get hands-on help and setup guidance for oso
+- Stay up to date with releases and feature announcements
+- Share AI-assisted development workflow practices
+- Report issues and shape the roadmap with your feedback
+
+**How to join: add the maintainer**
+
+Scan the QR code below to add the maintainer on WeChat with the note **"oso"**, and you will be invited to the group. Please be patient if there are many pending requests.
+
+<div align="center">
+  <img src="docs/images/wechat-group-join-qrcode.png" alt="oso maintainer WeChat" width="200">
+</div>
+
+**Group guidelines:**
+
+- Be respectful. No spam, self-promotion, or off-topic content.
+
+## Partners
+
+<div align="center">
+  <img src="https://moyaspace.com/home/favicon.png" alt="MoyaAI" width="120">
+</div>
+
+> **MoyaAI** ([moyaspace.com](https://moyaspace.com)) is a partner of oso, providing an OpenAI-compatible AI API relay that puts mainstream models behind a single API key.
+
+One key, every mainstream model. MoyaAI aggregates GPT, DeepSeek, GLM, Kimi, Qwen, Grok and more, backed by multi-node load balancing and automatic failover for stable, low-latency access. Pay-as-you-go with transparent per-token billing (Alipay supported, no credit card needed), and track every request in real time on the dashboard.
+
+**Get started in 3 steps:**
+
+1. **Register and create a token** — Sign up at [moyaspace.com](https://moyaspace.com), open the **API Keys** page, and generate an API key (starts with `sk-`).
+2. **Get the Base URL** — OpenAI-compatible endpoint: `https://moyaspace.com/v1`
+3. **Configure your tool** — Paste the Base URL and API key into Claude Code, Cursor, Codex, NextChat, etc. and start using it.
+
+> **Keep your key safe.** Never commit real API keys to this or any repository — use placeholders or environment variables.
+
+**Questions or feedback about MoyaAI?** Discussions are welcome in the [oso community group](#community) above.
+
 ---
 
 **GitHub**: https://github.com/moyaspace/openspec-superpowers-opencode<br>

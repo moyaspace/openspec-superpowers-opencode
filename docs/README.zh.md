@@ -122,6 +122,49 @@ node bin/cli.js init test-project   # 本地测试
 npm publish                         # 发布到 npm
 ```
 
+## 社区
+
+欢迎加入 oso 微信交流群，与使用 oso、OpenSpec、Superpowers 和 OpenCode 的开发者一起交流。
+
+**在群里你可以：**
+
+- 获得 oso 的使用帮助与配置答疑
+- 第一时间获取版本更新与功能公告
+- 交流 AI 辅助开发工作流的实践心得
+- 反馈问题与建议，参与 roadmap 讨论
+
+**进群方式：添加维护者微信**
+
+扫描下方二维码添加维护者微信，备注 **oso**，由维护者邀请进群。好友申请较多时请耐心等待。
+
+<div align="center">
+  <img src="images/wechat-group-join-qrcode.png" alt="oso 维护者微信" width="200">
+</div>
+
+**进群须知：**
+
+- 请友善交流，禁止广告、拉群与无关话题
+
+## 合作伙伴
+
+<div align="center">
+  <img src="https://moyaspace.com/home/favicon.png" alt="MoyaAI" width="120">
+</div>
+
+> **MoyaAI**（[moyaspace.com](https://moyaspace.com)）是 oso 的合作伙伴，提供兼容 OpenAI 协议的 AI API 中转服务——一个 Key 即可使用主流大模型。
+
+一个 Key，解锁全部主流模型。MoyaAI 聚合 GPT、DeepSeek、GLM、Kimi、Qwen、Grok 等模型，多节点负载均衡与自动故障转移保障稳定低延迟。按量计费、价格透明，支持支付宝（无需信用卡），仪表盘实时展示余额与消耗明细。
+
+**三步接入：**
+
+1. **注册并创建令牌** — 访问 [moyaspace.com](https://moyaspace.com) 注册账号，在「API 密钥」页面创建并生成 API Key（`sk-` 开头）。
+2. **获取接入地址** — OpenAI 兼容接口 Base URL：`https://moyaspace.com/v1`
+3. **配置你的工具** — 在 Claude Code、Cursor、Codex、NextChat 等工具中填入 Base URL 与 API Key，即可开始使用。
+
+> **注意保护密钥。** 切勿将真实 API Key 提交到本仓库或任何仓库——请使用占位符或环境变量。
+
+**想了解或反馈 MoyaAI？** 欢迎在上方[社区](#社区)微信交流群中讨论。
+
 ---
 
 **GitHub**：https://github.com/moyaspace/openspec-superpowers-opencode<br>
