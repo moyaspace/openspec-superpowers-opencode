@@ -203,6 +203,10 @@ function run(cmd, cwd) {
 
 // ---- ensure-worktree — 确保变更的隔离 worktree 已创建 ----
 function runEnsureWorktree(name, cwd) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+        console.error(t('  ✗ 无效的变更名（仅允许字母、数字、- 和 _）', '  ✗ Invalid name (only alphanumeric, - and _ are allowed)'));
+        process.exit(1);
+    }
     const worktreeDir = path.join(cwd, '.worktrees', name);
 
     if (fs.existsSync(worktreeDir)) {
