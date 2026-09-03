@@ -23,6 +23,18 @@
 
 ---
 
+## OSO V1 实施跟踪
+
+> 本区只保存跨阶段进度摘要，不复制实施方案正文。私有设计与阶段验收记录由根目录 `local/` 中的独立 Git 仓库跟踪；下表中的路径是本地定位文本，不是公开 Markdown 链接。
+
+| 阶段 | Change | 状态 | `IMP-*` 进度 | 实际基线 | Gate | 私有阶段报告 | 阻塞 Decision | 允许进入下一阶段 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | `oso-typescript-esm-foundation-and-host-feasibility` | 尚未开始 | 已完成 0；剩余阶段 0 全部任务 | TypeScript 7.0.2；Node 和 OpenCode 待 0A 确认 | `npm run test:phase-0`：尚未执行 | `local/implementation/oso-v1/stages/stage-0-typescript-esm-and-host-feasibility/stage-gate-report.md` | 无 | 不允许 |
+
+状态只使用：尚未开始、进行中、已通过、失败、已阻塞。开始阶段 0 时，将本行改为“进行中”并在私有报告填写 `started_at`；只有 Gate 全部通过且私有报告已提交，才能改为“已通过”并允许进入阶段 1。
+
+---
+
 ## Sprint 1
 
 | 编号 | 任务                      |       标签        | 优先级 | 预估 | 状态 |
