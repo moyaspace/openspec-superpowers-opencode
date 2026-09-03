@@ -7,14 +7,14 @@
 ```
 docs/
   TESTING.md                 ← 测试计划（稳定）
-  test-records/              ← 测试执行记录（每轮一次）
-    YYYY-MM-DD.md
+test-runs/                   ← 本地测试运行记录（与 docs/ 平级，不纳入 Git）
+  YYYY-MM-DD.md
 ```
 
 | 文件 | 内容 | 变更频率 |
 |------|------|---------|
 | `TESTING.md` | 测什么、怎么测、如何验证 | 低（功能变化时） |
-| `test-records/*.md` | 执行结果、实测日志、✅/❌ 记录 | 高（每次测试） |
+| `../test-runs/*.md` | 本地执行结果、实测日志、✅/❌ 记录 | 高（每次测试，不纳入 Git） |
 
 ### 预期值从代码源提取
 
@@ -3003,9 +3003,9 @@ Remove-Item -Recurse -Force "$p17Dir"
 
 ## 执行记录指引
 
-测试完成后，将结果记录到 `docs/test-records/`：
+测试完成后，将本地原始结果记录到仓库根目录的 `test-runs/`：
 
-1. 复制 `docs/test-records/_template.md`（如不存在则创建新文件）
+1. 复制 `test-runs/_template.md`（如不存在则创建新文件）
 2. 填写：测试日期、平台、测试人员
 3. 逐项记录 ✅/❌
 4. 附上异常情况的实测日志

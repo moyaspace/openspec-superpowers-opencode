@@ -81,7 +81,7 @@ Superpowers 技能（TDD、brainstorming 等）是文件系统上的 `.md` 文�
 - `docs/how-it-works.md` — 工作原理（高层面）
 - `docs/testing.md` — 测试规范与运行方式 *
 - `docs/cli-commands.md` — 命令行参考
-- `docs/test-runs/` — 本地测试运行记录（不纳入 git 跟踪）
+- `test-runs/` — 本地测试运行记录（不纳入主仓库 Git 跟踪）
 
 ### 需求与实施
 
@@ -95,7 +95,7 @@ Superpowers 技能（TDD、brainstorming 等）是文件系统上的 `.md` 文�
 
 ### 工作草稿
 
-- `docs/local/` — 个人本地工作区（`.gitignore` 排除，不纳入版本控制）
+- `local/` — 私有设计与实施资料（被主仓库 `.gitignore` 排除；如需版本历史，由该目录内的独立私有 Git 仓库跟踪）
   - `inbox/` — 待分析的原始材料、未分类草稿
   - `notes/` — 个人笔记、非正式记录
 

@@ -1,14 +1,6 @@
 # npm pack artifact
 *.tgz
 
-# 可能因在项目目录中测试产生，或作为本地 OpenSpec workspace 存在
-# 本项目的 openspec/ 和 .opencode/ 均在 template/ 中
-openspec/
-.opencode/
-
-# OpenCode session persistence
-.omo/
-
 # database
 data/
 
@@ -16,19 +8,11 @@ data/
 Thumbs.db
 .DS_Store
 
-
-# Worktree isolation
-.worktrees/
-
 # CodeGraph index cache
 .codegraph/
 
 # Playwright MCP
 .playwright-mcp/
-
-# Local test records
-docs/test-records/
-!docs/test-records/.gitkeep
 
 # Serena tool data
 .serena/
@@ -37,44 +21,35 @@ docs/test-records/
 # <!-- openspec-superpowers-opencode_gitignore -->
 
 # Worktree isolation
-
 .worktrees/
 
 # OpenCode session/plugin data
-
 .omo/
 
 # CodeGraph index cache
-
 .codegraph/
 
 # OpenCode tool-generated artifacts — track only opencode.json
-
 .opencode/*
 !.opencode/opencode.json
 
 # Skills lock — global Superpowers version pinning, not project code
-
 skills.lock.json
 
 # OpenSpec Schema — do not track
-
 openspec/schemas/
 
 # OpenSpec config — do not track
-
 openspec/config.yaml
 
 # OpenSpec change registry — local dev state only
-
 openspec/oso-change-registry.json
 
-# Local test records
-
-docs/test-records/*
-!docs/test-records/.gitkeep
+# Local test runs
+/test-runs/*
+!/test-runs/.gitkeep
 
 # Personal local workspace (do not track)
-docs/local/
+/local/
 
 # <!-- openspec-superpowers-opencode_gitignore -->
