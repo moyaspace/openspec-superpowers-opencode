@@ -1,0 +1,31 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "webfetch": "allow",
+    "question": "allow",
+    "edit": {
+      "*": "ask",
+      ".worktrees/**": "allow",
+      "openspec/**": "allow",
+      "openspec/changes/**": "allow",
+      "openspec/specs/**": "allow",
+      "openspec/schemas/**": "deny",
+      "openspec/config.yaml": "deny",
+      ".opencode/**": "ask",
+      "AGENTS.md": "ask",
+      "opencode.json": "ask",
+      "**/temp/**": "allow",
+      "**/temp/opencode/**": "allow",
+      "**/tmp/**": "allow",
+      "**/tmp/opencode/**": "allow"
+    },
+    "bash": {
+      "*": "allow"
+    },
+    "skill": "allow",
+    "task": "allow"
+  }
+}
