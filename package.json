@@ -18,18 +18,19 @@
     "cross-platform",
     "code-generation"
   ],
+  "type": "module",
   "bin": {
-    "create-openspec-superpowers-opencode": "bin/create-project.js",
-    "openspec-superpowers-opencode": "bin/cli.js",
-    "oso": "bin/cli.js"
+    "create-openspec-superpowers-opencode": "dist/cli/create-project.js",
+    "openspec-superpowers-opencode": "dist/cli/index.js",
+    "oso": "dist/cli/index.js"
   },
   "files": [
     ".gitattributes",
-    "bin/",
+    "assets/",
+    "dist/",
     "template/",
     "template/_gitignore",
     "template/.gitattributes",
-    "lib/",
     "test/",
     "scripts/",
     "docs/QUICKSTART.md",
@@ -37,7 +38,7 @@
   ],
   "scripts": {
     "install": "node scripts/shims-installer.js install",
-    "test": "npm run build && node --test",
+    "test": "npm run typecheck && npm run build && node --test",
     "typecheck": "tsc -p tsconfig.json",
     "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/post-build.mjs"
   },

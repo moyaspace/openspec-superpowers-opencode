@@ -11,8 +11,12 @@
  *   node scripts/shims-installer.js uninstall  manual-only; npm will never call this
  */
 
-const path = require('path');
-const toolDir = path.resolve(__dirname, '..');
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { installShims, uninstallShims } from '../dist/shims-installer.js';
+
+const toolDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const isWin = process.platform === 'win32';
 const action = process.argv[2];
 
@@ -21,21 +25,13 @@ if (!action || (action !== 'install' && action !== 'uninstall')) {
     process.exit(1);
 }
 
-let lib;
-try {
-    lib = require(path.join(toolDir, 'lib', 'shims-installer'));
-} catch (e) {
-    console.error(`Failed to load shims-installer: ${e.message}`);
-    process.exit(1);
-}
-
 if (action === 'install') {
-    const result = lib.installShims(toolDir, isWin);
+    const result = installShims(toolDir, isWin);
     for (const d of result.details) console.log(`  ${d}`);
     process.exit(result.success ? 0 : 1);
 } else {
     // manual uninstall only — npm never calls this on v7+
-    const result = lib.uninstallShims(toolDir, isWin);
+    const result = uninstallShims(toolDir, isWin);
     for (const d of result.details) console.log(`  ${d}`);
     process.exit(result.success ? 0 : 1);
 }
