@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Phase 0A isolated TypeScript + ESM probe package (not published)",
+  "files": [
+    "dist/"
+  ],
   "exports": {
     ".": {
       "types": "./dist/oso-core/index.d.ts",
@@ -28,7 +31,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "build": "node ../scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
-    "test": "echo \"probe tests run from repo root\" && exit 0"
+    "test": "node --import tsx test/run.mjs"
   },
   "dependencies": {
     "@opencode-ai/plugin": "1.14.48",
