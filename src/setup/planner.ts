@@ -25,7 +25,7 @@ const MANAGED_DECISIONS: Record<ManagedFileName, string> = {
     '_editorconfig': 'editorconfig',
 };
 
-interface PlanOperation {
+export interface PlanOperation {
     type: string;
     target?: string;
     path?: string;
@@ -34,17 +34,17 @@ interface PlanOperation {
     decision?: string | undefined;
 }
 
-interface InitDecisions {
-    openspec?: string;
-    opencodeJson?: string;
-    commands?: string;
-    skills?: string;
-    commandFiles?: Record<string, string>;
-    skillFiles?: Record<string, string>;
-    agents?: string;
-    gitignore?: string;
-    gitattr?: string;
-    editorconfig?: string;
+export interface InitDecisions {
+    openspec?: string | undefined;
+    opencodeJson?: string | undefined;
+    commands?: string | undefined;
+    skills?: string | undefined;
+    commandFiles?: Record<string, string> | undefined;
+    skillFiles?: Record<string, string> | undefined;
+    agents?: string | undefined;
+    gitignore?: string | undefined;
+    gitattr?: string | undefined;
+    editorconfig?: string | undefined;
     [key: string]: string | Record<string, string> | undefined;
 }
 
@@ -60,7 +60,7 @@ interface InitContext {
     decisions?: InitDecisions;
 }
 
-interface InitPlan {
+export interface InitPlan {
     mode: string;
     projectKind: 'greenfield' | 'brownfield';
     operations: PlanOperation[];

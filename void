@@ -1,0 +1,6 @@
+TC: 1
+src/registry-utils.ts(151,53): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/registry-utils.ts(152,39): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+src/setup/index.ts(386,10): error TS2339: Property 'lockVerification' does not exist on type 'InitPlan'.
+src/setup/index.ts(771,31): error TS2454: Variable 'plan' is used before being assigned.
+src/setup/index.ts(794,31): error TS2454: Variable 'plan' is used before being assigned.

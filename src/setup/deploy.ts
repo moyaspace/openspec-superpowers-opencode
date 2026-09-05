@@ -1,15 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { assertSafeProjectTarget } from './manifest.js';
+import { assertSafeProjectTarget, type SetupOperation } from './manifest.js';
 
-interface DeployOperation {
-    type: string;
-    target?: string;
-    path?: string;
-    source?: string;
-    content?: string;
-    decision?: string | undefined;
-}
+type DeployOperation = SetupOperation;
 
 interface DeployOptions {
     projectRoot: string;

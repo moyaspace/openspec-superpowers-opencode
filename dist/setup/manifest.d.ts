@@ -1,4 +1,4 @@
-interface SetupOperation {
+export interface SetupOperation {
     type: string;
     target?: string;
     path?: string;
@@ -6,7 +6,7 @@ interface SetupOperation {
     content?: string;
     decision?: string | undefined;
 }
-interface Manifest {
+export interface Manifest {
     project: string;
     installedAt: string;
     language: string;

@@ -1,11 +1,5 @@
-interface DeployOperation {
-    type: string;
-    target?: string;
-    path?: string;
-    source?: string;
-    content?: string;
-    decision?: string | undefined;
-}
+import { type SetupOperation } from './manifest.js';
+type DeployOperation = SetupOperation;
 interface DeployOptions {
     projectRoot: string;
 }
