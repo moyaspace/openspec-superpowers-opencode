@@ -29,7 +29,7 @@
 
 | 阶段 | Change | 状态 | `IMP-*` 进度 | 实际基线 | Gate | 私有阶段报告 | 阻塞 Decision | 允许进入下一阶段 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | `oso-typescript-esm-foundation-and-host-feasibility` | 尚未开始 | 已完成 0；剩余阶段 0 全部任务 | TypeScript 7.0.2；Node 和 OpenCode 待 0A 确认 | `npm run test:phase-0`：尚未执行 | `local/implementation/oso-v1/stages/stage-0-typescript-esm-and-host-feasibility/stage-gate-report.md` | 无 | 不允许 |
+| 0 | `oso-typescript-esm-foundation-and-host-feasibility` | 已通过 | 已完成 IMP-0001–IMP-0015 全部（0A 9 项 + 0B 7 项）；阶段 Gate 通过 | TypeScript 7.0.2；Node 24.14.0（最低冻结 >=22.9.0）；OpenCode 1.18.29；@opencode-ai/plugin 1.14.48 | `npm run typecheck`=0；`npm run build`=0；`npm test` 205/204/1（唯一失败为 pre-existing Windows symlink EPERM，main 同样失败）；探针 tarball 双入口=pass；真实 OpenCode Host Probe=pass | `local/implementation/oso-v1/stages/stage-0-typescript-esm-and-host-feasibility/stage-gate-report.md` | D-1（plugin 固定 1.14.48 + 开发期本地桥加载）；D-2（headless 下 chat.message 无 messageID）——均非阻塞 | 允许（能力矩阵无 required-missing） |
 
 状态只使用：尚未开始、进行中、已通过、失败、已阻塞。开始阶段 0 时，将本行改为“进行中”并在私有报告填写 `started_at`；只有 Gate 全部通过且私有报告已提交，才能改为“已通过”并允许进入阶段 1。
 
