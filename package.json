@@ -19,6 +19,12 @@
     "code-generation"
   ],
   "type": "module",
+  "exports": {
+    "./cli": {
+      "types": "./dist/cli/index.d.ts",
+      "default": "./dist/cli/index.js"
+    }
+  },
   "bin": {
     "create-openspec-superpowers-opencode": "dist/cli/create-project.js",
     "openspec-superpowers-opencode": "dist/cli/index.js",
