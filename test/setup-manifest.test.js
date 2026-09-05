@@ -1,16 +1,15 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const path = require('node:path');
+import { normalizeManifestPath, resolveManifestTarget, buildManifest } from '../dist/setup/manifest.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
 
 describe('setup manifest paths', () => {
     it('normalizes legacy Windows separators to portable paths', () => {
-        const { normalizeManifestPath } = require('../lib/setup/manifest');
 
         assert.equal(normalizeManifestPath('.opencode\\commands\\opsx-ff.md'), '.opencode/commands/opsx-ff.md');
     });
 
     it('rejects absolute and parent-traversal paths', () => {
-        const { normalizeManifestPath } = require('../lib/setup/manifest');
 
         for (const unsafe of ['/tmp/file', 'C:\\temp\\file', '../file', 'a/../../file']) {
             assert.throws(() => normalizeManifestPath(unsafe), /unsafe manifest path/i);
@@ -18,7 +17,6 @@ describe('setup manifest paths', () => {
     });
 
     it('resolves a normalized path inside the project root', () => {
-        const { resolveManifestTarget } = require('../lib/setup/manifest');
         const root = path.resolve('project-root');
 
         assert.equal(
@@ -28,7 +26,6 @@ describe('setup manifest paths', () => {
     });
 
     it('records overwrite and skip decisions from the production plan', () => {
-        const { buildManifest } = require('../lib/setup/manifest');
         const root = path.resolve('project-root');
 
         const manifest = buildManifest({

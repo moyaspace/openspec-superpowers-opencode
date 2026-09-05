@@ -14,7 +14,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 test("create-project: --help 委托到 cli 的 init 用法（退出码 0 且不真正初始化）", () => {
   const project = mkdtempSync(join(tmpdir(), "createproj-"));
-  const r = spawnSync(process.execPath, [join(root, "bin", "create-project.js"), "--help"], {
+  const r = spawnSync(process.execPath, [join(root, "dist", "cli", "create-project.js"), "--help"], {
     cwd: project,
     encoding: "utf8",
     timeout: 120_000,
@@ -28,7 +28,7 @@ test("create-project: --help 委托到 cli 的 init 用法（退出码 0 且不�
 
 test("create-project: 非交互环境下新项目初始化失败路径可观察（不挂起、退出码非零或输出错误说明）", () => {
   const project = mkdtempSync(join(tmpdir(), "createproj-"));
-  const r = spawnSync(process.execPath, [join(root, "bin", "create-project.js"), "some-target"], {
+  const r = spawnSync(process.execPath, [join(root, "dist", "cli", "create-project.js"), "some-target"], {
     cwd: project,
     encoding: "utf8",
     timeout: 120_000,

@@ -22,12 +22,12 @@ function Cleanup {
         Remove-Item -Recurse -Force $TestDir -ErrorAction SilentlyContinue
     }
     if (-not $UninstallOnly) {
-        & node "$ToolDir\bin\cli.js" uninstall-shims 2>&1 | Out-Null
+        & node "$ToolDir\dist\cli\index.js" uninstall-shims 2>&1 | Out-Null
     }
 }
 
 if ($UninstallOnly) {
-    & node "$ToolDir\bin\cli.js" uninstall-shims 2>&1
+    & node "$ToolDir\dist\cli\index.js" uninstall-shims 2>&1
     return
 }
 
@@ -44,7 +44,7 @@ try {
         Set-Content openspec\oso-change-registry.json -NoNewline
 
     Write-Host "=== 3. 安装垫片 ==="
-    $installResult = & node "$ToolDir\bin\cli.js" install-shims 2>&1
+    $installResult = & node "$ToolDir\dist\cli\index.js" install-shims 2>&1
     Write-Host "  $($installResult -join "`n  ")"
 
     Write-Host "`n=== 4. 测试: openspec list 拦截 ==="

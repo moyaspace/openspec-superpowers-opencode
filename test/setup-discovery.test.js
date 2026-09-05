@@ -1,20 +1,19 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const crypto = require('node:crypto');
+import { parseMajorVersion, selectLockFile, findSuperpowersSkills, verifySkillLock } from '../dist/setup/discovery.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
 
 describe('Superpowers discovery', () => {
     it('parses a semantic version major', () => {
-        const { parseMajorVersion } = require('../lib/setup/discovery');
 
         assert.equal(parseMajorVersion('6.1.1'), '6');
         assert.equal(parseMajorVersion('6-beta'), null);
     });
 
     it('selects the matching lock and otherwise falls back deterministically', (t) => {
-        const { selectLockFile } = require('../lib/setup/discovery');
         const templateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-lock-'));
         t.after(() => fs.rmSync(templateDir, { recursive: true, force: true }));
         fs.writeFileSync(path.join(templateDir, 'skills.lock.v6.json'), '{}');
@@ -25,7 +24,6 @@ describe('Superpowers discovery', () => {
     });
 
     it('chooses the first valid skills directory in deterministic order', (t) => {
-        const { findSuperpowersSkills } = require('../lib/setup/discovery');
         const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-cache-'));
         t.after(() => fs.rmSync(cacheDir, { recursive: true, force: true }));
         for (const packageName of ['superpowers@z', 'superpowers@a']) {
@@ -39,7 +37,6 @@ describe('Superpowers discovery', () => {
     });
 
     it('reports lock hash mismatches as warnings without throwing', (t) => {
-        const { verifySkillLock } = require('../lib/setup/discovery');
         const skillsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-skills-'));
         t.after(() => fs.rmSync(skillsDir, { recursive: true, force: true }));
         const skillPath = path.join(skillsDir, 'brainstorming', 'SKILL.md');

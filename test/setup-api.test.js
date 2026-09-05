@@ -1,12 +1,15 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+import * as setup from '../dist/setup/index.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe('setup public API', () => {
     it('exports init, reset, and dry-run entry points', () => {
-        const setup = require('../lib/setup');
 
         assert.equal(typeof setup.dryRunProject, 'function');
         assert.equal(typeof setup.initProject, 'function');
@@ -14,7 +17,6 @@ describe('setup public API', () => {
     });
 
     it('plans a greenfield init without creating a missing target directory', async (t) => {
-        const setup = require('../lib/setup');
         const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-dry-run-'));
         const targetDir = path.join(parentDir, 'new-project');
         const superpowersRoot = path.join(parentDir, 'superpowers');
@@ -44,7 +46,6 @@ describe('setup public API', () => {
     });
 
     it('initializes a greenfield project through the shared plan', async (t) => {
-        const setup = require('../lib/setup');
         const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-init-'));
         const targetDir = path.join(parentDir, 'project');
         const superpowersRoot = path.join(parentDir, 'superpowers');
@@ -93,7 +94,6 @@ describe('setup public API', () => {
     });
 
     it('cancels a brownfield init before writing when the global override is no', async (t) => {
-        const setup = require('../lib/setup');
         const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-cancel-'));
         t.after(() => fs.rmSync(targetDir, { recursive: true, force: true }));
         fs.mkdirSync(path.join(targetDir, 'openspec'), { recursive: true });
@@ -135,7 +135,7 @@ describe('setup public API', () => {
             },
         };
 
-        const result = await require('../lib/setup').initProject({
+        const result = await setup.initProject({
             targetDir,
             templateDir: path.resolve(__dirname, '..', 'template'),
             superpowersPath,
@@ -158,7 +158,7 @@ describe('setup public API', () => {
         fs.mkdirSync(superpowersPath, { recursive: true });
         fs.writeFileSync(path.join(path.dirname(superpowersPath), 'package.json'), JSON.stringify({ version: '6.1.1' }));
 
-        const result = await require('../lib/setup').dryRunProject({
+        const result = await setup.dryRunProject({
             targetDir,
             templateDir: path.resolve(__dirname, '..', 'template'),
             superpowersPath,
@@ -186,7 +186,7 @@ describe('setup public API', () => {
         fs.mkdirSync(superpowersPath, { recursive: true });
         fs.writeFileSync(path.join(path.dirname(superpowersPath), 'package.json'), JSON.stringify({ version: '6.1.1' }));
 
-        const result = await require('../lib/setup').dryRunProject({
+        const result = await setup.dryRunProject({
             targetDir,
             templateDir: path.resolve(__dirname, '..', 'template'),
             superpowersPath,

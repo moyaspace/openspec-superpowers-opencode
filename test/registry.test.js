@@ -1,11 +1,11 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import { test, describe } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 
 // registry 模块（测试前还不存在——RED）
-const registry = require('../lib/registry');
+import * as registry from '../dist/registry.js';
 
 /** 创建临时目录用于每个测试 */
 function tmpDir() {

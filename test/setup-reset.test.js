@@ -1,12 +1,12 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+import { resetProject } from '../dist/setup/index.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 describe('resetProject', () => {
     it('deletes manifest-owned files but preserves user data and protected files', async (t) => {
-        const { resetProject } = require('../lib/setup');
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-reset-'));
         t.after(() => fs.rmSync(root, { recursive: true, force: true }));
         for (const relative of ['managed.txt', '.opencode/commands/managed.md', 'AGENTS.md', 'openspec/specs/user.md']) {
@@ -32,7 +32,6 @@ describe('resetProject', () => {
     });
 
     it('refuses to delete through a directory symlink', async (t) => {
-        const { resetProject } = require('../lib/setup');
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-reset-link-root-'));
         const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-reset-link-outside-'));
         t.after(() => fs.rmSync(root, { recursive: true, force: true }));

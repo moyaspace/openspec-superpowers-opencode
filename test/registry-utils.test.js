@@ -1,11 +1,11 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const child_process = require('child_process');
+import { test, describe } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import child_process from 'node:child_process';
 
-const registryUtils = require('../lib/registry-utils');
+import * as registryUtils from '../dist/registry-utils.js';
 
 /** 创建临时项目目录（含 git init） */
 function tmpProject() {

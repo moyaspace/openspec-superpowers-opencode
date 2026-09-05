@@ -1,9 +1,9 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
+import { runSetupCommand } from '../dist/setup/cli-adapter.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 describe('setup CLI adapter', () => {
     it('routes setup commands to the matching API and maps success', async () => {
-        const { runSetupCommand } = require('../lib/setup/cli-adapter');
         const calls = [];
         const api = {
             initProject: async options => calls.push(['init', options]),
@@ -18,7 +18,6 @@ describe('setup CLI adapter', () => {
     });
 
     it('maps a structured setup failure to exit code 1', async () => {
-        const { runSetupCommand } = require('../lib/setup/cli-adapter');
         const api = { initProject: async () => ({ success: false }) };
 
         const result = await runSetupCommand('init', {}, api);

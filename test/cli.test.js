@@ -1,9 +1,11 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert');
-const child_process = require('child_process');
-const path = require('path');
+import { test, describe } from 'node:test';
+import assert from 'node:assert';
+import child_process from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const cliPath = path.resolve(__dirname, '..', 'bin', 'cli.js');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const cliPath = path.resolve(__dirname, '..', 'dist', 'cli', 'index.js');
 
 function runCli(...args) {
     try {

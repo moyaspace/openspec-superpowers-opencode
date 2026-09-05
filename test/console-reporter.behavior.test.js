@@ -1,12 +1,9 @@
 /**
- * lib/setup/console-reporter.js 行为刻画（IMP-48：迁移前无覆盖，先补基线）。
+ * src/setup/console-reporter.ts 行为刻画（IMP-48：迁移前无覆盖，先补基线）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
-const { createConsoleReporter, progressFromReporter } = require("../lib/setup/console-reporter.js");
+import { createConsoleReporter, progressFromReporter } from "../dist/setup/console-reporter.js";
 
 test("createConsoleReporter: 暴露计划中的报告方法且调用不抛异常", () => {
   const reporter = createConsoleReporter({ quiet: true });

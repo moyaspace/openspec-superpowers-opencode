@@ -1,12 +1,12 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+import { executeOperations } from '../dist/setup/deploy.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 describe('executeOperations', () => {
     it('executes mkdir, copy, and atomic write operations inside the project', (t) => {
-        const { executeOperations } = require('../lib/setup/deploy');
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-deploy-'));
         t.after(() => fs.rmSync(root, { recursive: true, force: true }));
         const source = path.join(root, 'source.txt');
@@ -24,7 +24,6 @@ describe('executeOperations', () => {
     });
 
     it('rejects write targets outside the project root', (t) => {
-        const { executeOperations } = require('../lib/setup/deploy');
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-deploy-root-'));
         t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
@@ -35,7 +34,6 @@ describe('executeOperations', () => {
     });
 
     it('rejects targets below a directory symlink', (t) => {
-        const { executeOperations } = require('../lib/setup/deploy');
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-deploy-link-root-'));
         const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-deploy-link-outside-'));
         t.after(() => fs.rmSync(root, { recursive: true, force: true }));

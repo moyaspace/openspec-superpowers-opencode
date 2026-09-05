@@ -1,12 +1,12 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+import { createProcessRunner } from '../dist/setup/process-runner.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 describe('process runner', () => {
     it('executes a program with an argument array and captures output', () => {
-        const { createProcessRunner } = require('../lib/setup/process-runner');
         const runner = createProcessRunner();
 
         const result = runner.run(process.execPath, ['-e', 'process.stdout.write(process.argv[1])', 'hello world']);
@@ -17,7 +17,6 @@ describe('process runner', () => {
     });
 
     it('invokes Windows command shims through ComSpec without shell mode', () => {
-        const { createProcessRunner } = require('../lib/setup/process-runner');
         const calls = [];
         const runner = createProcessRunner({
             platform: 'win32',
@@ -38,7 +37,6 @@ describe('process runner', () => {
     });
 
     it('preserves arguments passed through a Windows command shim', { skip: process.platform !== 'win32' }, (t) => {
-        const { createProcessRunner } = require('../lib/setup/process-runner');
         const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-runner-'));
         const shim = path.join(tempDir, 'with space', 'echo-argument.cmd');
         t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }));

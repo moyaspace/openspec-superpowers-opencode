@@ -8,12 +8,15 @@
  * RED 阶段：这些测试目前会失败。
  */
 
-const { describe, test } = require('node:test');
-const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { mergeOcodeJson } = require('../lib/setup/merge');
+import { mergeOcodeJson } from '../dist/setup/merge.js';
+import { describe, test } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ============================================================
 // 测试

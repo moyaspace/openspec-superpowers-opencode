@@ -1,9 +1,9 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
+import { changeListed, parseStatusOutput, parseTemplateOutput, verifyProject } from '../dist/setup/verify.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 describe('verifyProject', () => {
     it('parses structured template, change list, and status output', () => {
-        const { changeListed, parseStatusOutput, parseTemplateOutput } = require('../lib/setup/verify');
         const templates = Object.fromEntries(Array.from({ length: 8 }, (_, index) => [
             `template-${index}`,
             { source: 'project' },
@@ -18,7 +18,6 @@ describe('verifyProject', () => {
     });
 
     it('cleans a uniquely named change in finally after a later failure', async () => {
-        const { verifyProject } = require('../lib/setup/verify');
         const calls = [];
         const cleaned = [];
         let createdName;

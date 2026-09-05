@@ -1,11 +1,14 @@
-const { describe, it } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+import { createContext } from '../dist/setup/context.js';
+import { createInitPlan } from '../dist/setup/planner.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const { createContext } = require('../lib/setup/context');
-const { createInitPlan } = require('../lib/setup/planner');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 
 describe('createInitPlan', () => {
     it('plans all greenfield template and managed files from one source', (t) => {
