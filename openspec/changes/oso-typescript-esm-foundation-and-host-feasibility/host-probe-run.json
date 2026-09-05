@@ -6,12 +6,12 @@
   "plugin_called_count": 1,
   "tool_call_count": 1,
   "first_tool_call": {
-    "ts": "2026-09-05T13:12:11.649Z",
+    "ts": "2026-09-05T16:05:13.119Z",
     "variant": "typed",
     "type": "tool-call",
     "tool": "probe_typed_echo",
     "message": "phase-0a-host-check",
-    "tool_directory": "C:\\Users\\rloessplateau\\AppData\\Local\\Temp\\oso-hostprobe-project-qSNFXz",
+    "tool_directory": "C:\\Users\\rloessplateau\\AppData\\Local\\Temp\\oso-hostprobe-project-TKKRkE",
     "tool_worktree": "/"
   },
   "unique_host_event_names": [

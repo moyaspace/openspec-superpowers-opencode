@@ -7,7 +7,8 @@ describe('setup package surface', () => {
     it('exposes the Node test suite as the package test command', () => {
         const pkg = require('../package.json');
 
-        assert.equal(pkg.scripts.test, 'node --test');
+        // 阶段 0 规范固定：test 先 typecheck/build 再跑 node 测试
+        assert.match(pkg.scripts.test, /node --test/);
     });
 
     it('ships the JavaScript setup modules instead of platform scripts', () => {

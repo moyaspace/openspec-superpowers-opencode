@@ -1,0 +1,9 @@
+
+> @moyaspace/openspec-superpowers-opencode@1.1.1 install
+> node scripts/shims-installer.js install
+
+  found openspec at: C:\Program Files\nodejs
+  openspec-orig: openspec-orig.cmd (file)
+  installed shim scripts: openspec.cmd, openspec.ps1
+
+up to date in 4s

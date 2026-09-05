@@ -1,0 +1,4 @@
+
+> @moyaspace/openspec-superpowers-opencode@1.1.1 typecheck
+> tsc -p tsconfig.json
+
