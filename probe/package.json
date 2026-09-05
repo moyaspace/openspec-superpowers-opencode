@@ -1,0 +1,45 @@
+{
+  "name": "oso-probe",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Phase 0A isolated TypeScript + ESM probe package (not published)",
+  "exports": {
+    ".": {
+      "types": "./dist/oso-core/index.d.ts",
+      "default": "./dist/oso-core/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli/index.d.ts",
+      "default": "./dist/cli/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/opencode-plugin/index.d.ts",
+      "default": "./dist/opencode-plugin/index.js"
+    },
+    "./plugin/typed": {
+      "types": "./dist/opencode-plugin/typed.d.ts",
+      "default": "./dist/opencode-plugin/typed.js"
+    }
+  },
+  "bin": {
+    "oso-probe": "dist/cli/index.js"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "node ../scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
+    "test": "echo \"probe tests run from repo root\" && exit 0"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "1.14.48",
+    "yaml": "2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.1",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  }
+}
