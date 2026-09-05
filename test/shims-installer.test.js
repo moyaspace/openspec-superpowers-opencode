@@ -1,11 +1,11 @@
-const { test, describe } = require('node:test');
-const assert = require('node:assert');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const child_process = require('child_process');
+import { test, describe } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import child_process from 'node:child_process';
 
-const shimsInstaller = require('../lib/shims-installer');
+import * as shimsInstaller from '../dist/shims-installer.js';
 
 function tmpDir() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'shims-installer-test-'));
@@ -151,7 +151,7 @@ describe('copyOpenspecToOrig()', () => {
 // ============================================================
 describe('installShimScripts()', () => {
     function setupToolDir(base) {
-        const shimsDir = path.join(base, 'lib', 'shims');
+        const shimsDir = path.join(base, 'assets', 'shims');
         fs.mkdirSync(shimsDir, { recursive: true });
         fs.writeFileSync(path.join(shimsDir, 'openspec'), '#!/bin/sh\n# shim for {{TOOL_DIR}}');
         fs.writeFileSync(path.join(shimsDir, 'openspec.cmd'), '@echo off\nrem tool dir: {{TOOL_DIR}}');
@@ -191,7 +191,7 @@ describe('installShimScripts()', () => {
 
     test('skips missing template files', () => {
         const base = tmpDir();
-        const shimsDir = path.join(base, 'lib', 'shims');
+        const shimsDir = path.join(base, 'assets', 'shims');
         fs.mkdirSync(shimsDir, { recursive: true });
         fs.writeFileSync(path.join(shimsDir, 'openspec'), '#!/bin/sh\n# {{TOOL_DIR}}');
         const binDir = path.join(base, 'bin');
@@ -204,7 +204,7 @@ describe('installShimScripts()', () => {
 
     test('returns empty array when no templates in shims dir', () => {
         const base = tmpDir();
-        const shimsDir = path.join(base, 'lib', 'shims');
+        const shimsDir = path.join(base, 'assets', 'shims');
         fs.mkdirSync(shimsDir, { recursive: true });
         const binDir = path.join(base, 'bin');
         fs.mkdirSync(binDir);
@@ -215,7 +215,7 @@ describe('installShimScripts()', () => {
 
     test('replaces multiple {{TOOL_DIR}} occurrences in same file', () => {
         const base = tmpDir();
-        const shimsDir = path.join(base, 'lib', 'shims');
+        const shimsDir = path.join(base, 'assets', 'shims');
         fs.mkdirSync(shimsDir, { recursive: true });
         fs.writeFileSync(path.join(shimsDir, 'openspec'),
             'TOOL_DIR={{TOOL_DIR}}\nPATH=$PATH:{{TOOL_DIR}}/bin');
@@ -245,7 +245,7 @@ describe('setExecutable()', () => {
 // ============================================================
 describe('installShims()', () => {
     function setupEnvironment(base) {
-        const shimsDir = path.join(base, 'lib', 'shims');
+        const shimsDir = path.join(base, 'assets', 'shims');
         fs.mkdirSync(shimsDir, { recursive: true });
         fs.writeFileSync(path.join(shimsDir, 'openspec'), '#!/bin/sh\n# shim for {{TOOL_DIR}}');
         fs.writeFileSync(path.join(shimsDir, 'openspec.cmd'), '@echo off\nrem {{TOOL_DIR}}');

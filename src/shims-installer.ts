@@ -1,11 +1,11 @@
 /**
- * shims-installer.js — 在 openspec CLI 所在目录安装/卸除垫片脚本。
+ * shims-installer.ts — 在 openspec CLI 所在目录安装/卸除垫片脚本。
  *
  * 工作流：
  * === 安装 ===
  * 1. 定位 openspec CLI bin 目录
  * 2. openspec-orig 不存在时复制 openspec → openspec-orig
- * 3. 从 lib/shims/ 读取平台垫片模板，替换 {{TOOL_DIR}}，写入同名文件
+ * 3. 从 assets/shims/ 读取平台垫片模板，替换 {{TOOL_DIR}}，写入同名文件
  * 4. 设置可执行权限
  *
  * === 卸除 ===
@@ -16,9 +16,9 @@
  * 被 `openspec-superpowers-opencode install-shims` 和 `uninstall-shims` 调用。
  */
 
-const fs = require('fs');
-const path = require('path');
-const child_process = require('child_process');
+import fs from 'node:fs';
+import path from 'node:path';
+import child_process from 'node:child_process';
 
 /**
  * 从工具安装目录推算 npm prefix bin 目录。
@@ -30,11 +30,10 @@ const child_process = require('child_process');
  *   td = .../node_modules/@scope/pkg  →  ...               (Windows)
  *   td = .../node_modules/pkg         →  .../bin            (Unix)
  *
- * @param {string} td — 工具安装根目录（package dir in node_modules）
- * @param {boolean} isWin
- * @returns {string}
+ * @param td — 工具安装根目录（package dir in node_modules）
+ * @param isWin
  */
-function binDirFromToolDir(td, isWin) {
+function binDirFromToolDir(td: string, isWin: boolean): string {
     const nmDir = path.resolve(td, '..');
     const isScoped = path.basename(path.dirname(td)).startsWith('@');
 
@@ -44,22 +43,22 @@ function binDirFromToolDir(td, isWin) {
     //   Unix    non-scoped: nmDir = {prefix}/lib/node_modules → 2 up
     //   Unix    scoped:     nmDir = {prefix}/lib/node_modules/@scope → 3 up
     const levelsUp = (isScoped ? 1 : 0) + (isWin ? 1 : 2);
-    const ups = Array.from({ length: levelsUp }, () => '..');
+    const ups: string[] = Array.from({ length: levelsUp }, () => '..');
     const prefix = path.resolve(nmDir, ...ups);
     return isWin ? prefix : path.join(prefix, 'bin');
 }
 
 /**
  * 查找 openspec CLI 的 bin 目录。
- * @param {boolean} isWin
- * @returns {string|null}
+ * @param isWin
+ * @returns string|null
  */
-function findOpenspecBinDir(isWin) {
+function findOpenspecBinDir(isWin: boolean): string | null {
     try {
         const whichCmd = isWin ? 'where openspec' : 'which openspec';
         const output = child_process.execSync(whichCmd, { stdio: 'pipe', encoding: 'utf8' }).trim();
         // where 可能返回多行，取第一行
-        const firstLine = output.split('\n')[0].trim();
+        const firstLine = output.split('\n')[0]?.trim() ?? '';
         if (!firstLine) return null;
         return path.dirname(firstLine);
     } catch {
@@ -69,11 +68,10 @@ function findOpenspecBinDir(isWin) {
 
 /**
  * 检测 openspec-orig 是否已存在于 bin 目录。
- * @param {string} binDir
- * @param {boolean} isWin
- * @returns {boolean}
+ * @param binDir
+ * @param isWin
  */
-function openspecOrigExists(binDir, isWin) {
+function openspecOrigExists(binDir: string, isWin: boolean): boolean {
     const candidates = isWin
         ? ['openspec-orig.cmd', 'openspec-orig.ps1', 'openspec-orig']
         : ['openspec-orig', 'openspec-orig.cmd', 'openspec-orig.ps1'];
@@ -87,14 +85,14 @@ function openspecOrigExists(binDir, isWin) {
  * 在 npm 全局安装中找到真正的 openspec 文件路径。
  * 当 openspec 已被垫片覆盖时，无法从 bin 目录获取原版信息，
  * 需要通过 npm 全局安装目录定位。
- * @param {string} toolDir — 工具安装根目录（package dir in node_modules）
- * @param {string} binDir — openspec CLI bin 目录
- * @param {boolean} isWin
- * @returns {string|null}  openspec.js 的绝对路径，找不到返回 null
+ * @param toolDir — 工具安装根目录（package dir in node_modules）
+ * @param binDir — openspec CLI bin 目录
+ * @param isWin
+ * @returns string|null  openspec.js 的绝对路径，找不到返回 null
  */
-function findRealOpenspec(toolDir, binDir, isWin) {
+function findRealOpenspec(toolDir: string, binDir: string, isWin: boolean): string | null {
     // 工具函数：在给定 node_modules 根下搜索 openspec.js
-    function searchInNmRoot(nmRoot) {
+    function searchInNmRoot(nmRoot: string): string | null {
         if (!nmRoot || !fs.existsSync(nmRoot)) return null;
         for (const rel of [
             '@fission-ai/openspec/bin/openspec.js',
@@ -119,7 +117,9 @@ function findRealOpenspec(toolDir, binDir, isWin) {
         const npmRoot = child_process.execSync('npm root -g', { stdio: 'pipe', encoding: 'utf8' }).trim();
         found = searchInNmRoot(npmRoot);
         if (found) return found;
-    } catch { }
+    } catch {
+        // npm root -g 失败时继续后续回退
+    }
 
     // 3. 回退：从 binDir 推算
     //    Unix: binDir = /usr/local/bin  → prefix = /usr/local →  lib/node_modules
@@ -134,24 +134,26 @@ function findRealOpenspec(toolDir, binDir, isWin) {
             found = searchInNmRoot(dir);
             if (found) return found;
         }
-    } catch { }
+    } catch {
+        // 路径推算失败时放弃回退
+    }
 
     return null;
 }
 
 /**
  * 复制 openspec 为 openspec-orig。
- * @param {string} toolDir — 工具安装根目录（用于 findRealOpenspec 定位 openspec.js）
- * @param {string} binDir
- * @param {boolean} isWin
- * @returns {string} 复制的目标文件名
+ * @param toolDir — 工具安装根目录（用于 findRealOpenspec 定位 openspec.js）
+ * @param binDir
+ * @param isWin
+ * @returns string 复制的目标文件名
  */
-function copyOpenspecToOrig(toolDir, binDir, isWin) {
+function copyOpenspecToOrig(toolDir: string, binDir: string, isWin: boolean): string {
     // 找出实际的 openspec 文件名
     const candidates = isWin
         ? ['openspec.cmd', 'openspec.ps1', 'openspec']
         : ['openspec', 'openspec.cmd', 'openspec.ps1'];
-    let srcFile = null;
+    let srcFile: string | null = null;
     for (const c of candidates) {
         const p = path.join(binDir, c);
         if (fs.existsSync(p)) { srcFile = c; break; }
@@ -160,13 +162,13 @@ function copyOpenspecToOrig(toolDir, binDir, isWin) {
 
     // 目标文件名：openspec → openspec-orig（保持后缀一致）
     const ext = path.extname(srcFile);
-    const destName = `openspec-orig${ext}` || 'openspec-orig';
+    const destName = `openspec-orig${ext}`;
     const destPath = path.join(binDir, destName);
 
     const srcPath = path.join(binDir, srcFile);
 
     // 工具函数：Windows 上创建 .cmd 包装器（替代符号链接到 .js）
-    function writeWinCmdWrapper(jsAbsPath) {
+    function writeWinCmdWrapper(jsAbsPath: string): void {
         // 统一正斜杠，避免 cmd 中转义问题
         const normalized = jsAbsPath.replace(/\\/g, '/');
         const wrapper = '@echo off\r\nnode "' + normalized + '" %*\r\n';
@@ -174,7 +176,7 @@ function copyOpenspecToOrig(toolDir, binDir, isWin) {
     }
 
     // 工具函数：获取 realOrig 的绝对路径，Windows 上写 .cmd 包装器
-    function createWinSafeOrig(jsPath) {
+    function createWinSafeOrig(jsPath: string): void {
         if (isWin) {
             writeWinCmdWrapper(jsPath);
         } else {
@@ -208,7 +210,7 @@ function copyOpenspecToOrig(toolDir, binDir, isWin) {
             return destName;
         }
     } catch (e) {
-        if (e.message.includes('openspec is already a shim')) throw e;
+        if ((e as NodeJS.ErrnoException).message?.includes('openspec is already a shim')) throw e;
         // 读取失败（二进制文件等）则继续走正常流程
     }
     // 如果 openspec 是符号链接（npm -g 安装的典型情况），
@@ -230,18 +232,18 @@ function copyOpenspecToOrig(toolDir, binDir, isWin) {
 
 /**
  * 安装垫片脚本（替换 TOOL_DIR 占位符 + 写入 bin 目录）。
- * @param {string} toolDir — 工具安装根目录（替换 {{TOOL_DIR}}）
- * @param {string} binDir — openspec CLI 所在 bin 目录
- * @param {boolean} isWin
- * @returns {string[]} 写入的文件名列表
+ * @param toolDir — 工具安装根目录（替换 {{TOOL_DIR}}）
+ * @param binDir — openspec CLI 所在 bin 目录
+ * @param isWin
+ * @returns string[] 写入的文件名列表
  */
-function installShimScripts(toolDir, binDir, isWin) {
-    const shimsDir = path.join(toolDir, 'lib', 'shims');
+function installShimScripts(toolDir: string, binDir: string, isWin: boolean): string[] {
+    const shimsDir = path.join(toolDir, 'assets', 'shims');
     const templates = isWin
         ? ['openspec.cmd', 'openspec.ps1']
         : ['openspec', 'openspec.cmd', 'openspec.ps1'];
 
-    const written = [];
+    const written: string[] = [];
 
     for (const tmpl of templates) {
         const tmplPath = path.join(shimsDir, tmpl);
@@ -263,10 +265,10 @@ function installShimScripts(toolDir, binDir, isWin) {
 
 /**
  * 设置可执行权限。
- * @param {string} binDir
- * @param {string[]} files
+ * @param binDir
+ * @param files
  */
-function setExecutable(binDir, files) {
+function setExecutable(binDir: string, files: string[]): void {
     if (process.platform === 'win32') return; // Windows 不需要 chmod
     for (const f of files) {
         const p = path.join(binDir, f);
@@ -283,11 +285,11 @@ function setExecutable(binDir, files) {
  * 优先顺序取决于平台：
  * - Unix: openspec-orig → openspec-orig.cmd → openspec-orig.ps1
  * - Windows: openspec-orig.cmd → openspec-orig.ps1 → openspec-orig
- * @param {string} binDir
- * @param {boolean} isWin
- * @returns {string|null} 找到的文件名，null 表示不存在
+ * @param binDir
+ * @param isWin
+ * @returns string|null 找到的文件名，null 表示不存在
  */
-function findOpenspecOrigFile(binDir, isWin) {
+function findOpenspecOrigFile(binDir: string, isWin: boolean): string | null {
     const candidates = isWin
         ? ['openspec-orig.cmd', 'openspec-orig.ps1', 'openspec-orig']
         : ['openspec-orig', 'openspec-orig.cmd', 'openspec-orig.ps1'];
@@ -300,33 +302,40 @@ function findOpenspecOrigFile(binDir, isWin) {
 /**
  * 解析目标 openspec 文件名（还原目标）。
  * 由 openspec-orig 文件名推导：去掉 -orig 后缀。
- * @param {string} origFile — openspec-orig 文件名
- * @returns {string} 还原后的目标文件名
+ * @param origFile — openspec-orig 文件名
+ * @returns string 还原后的目标文件名
  */
-function getRestoreTarget(origFile) {
+function getRestoreTarget(origFile: string): string {
     // openspec-orig → openspec, openspec-orig.cmd → openspec.cmd
     return 'openspec' + path.extname(origFile);
 }
 
 /**
  * 获取平台对应的垫片文件列表。
- * @param {boolean} isWin
- * @returns {string[]}
+ * @param isWin
+ * @returns string[]
  */
-function getShimFiles(isWin) {
+function getShimFiles(isWin: boolean): string[] {
     return isWin
         ? ['openspec.cmd', 'openspec.ps1']
         : ['openspec', 'openspec.cmd', 'openspec.ps1'];
 }
 
+/** installShims / uninstallShims 的统一返回结构。 */
+interface ShimOperationResult {
+    success: boolean;
+    binDir: string | null;
+    details: string[];
+}
+
 /**
  * 主入口：安装垫片脚本。
- * @param {string} toolDir — 工具安装根目录
- * @param {boolean} isWin
- * @returns {{success: boolean, binDir: string|null, details: string[]}}
+ * @param toolDir — 工具安装根目录
+ * @param isWin
+ * @returns ShimOperationResult
  */
-function installShims(toolDir, isWin) {
-    const details = [];
+function installShims(toolDir: string, isWin: boolean): ShimOperationResult {
+    const details: string[] = [];
 
     // 1. 定位 bin 目录
     const binDir = findOpenspecBinDir(isWin);
@@ -351,12 +360,12 @@ function installShims(toolDir, isWin) {
         return {
             success: false,
             binDir,
-            details: [...details, `failed to create openspec-orig: ${e.message}`]
+            details: [...details, `failed to create openspec-orig: ${(e as NodeJS.ErrnoException).message}`]
         };
     }
 
     // 3. 安装垫片脚本
-    let written;
+    let written: string[];
     try {
         written = installShimScripts(toolDir, binDir, isWin);
         details.push(`installed shim scripts: ${written.join(', ')}`);
@@ -364,7 +373,7 @@ function installShims(toolDir, isWin) {
         return {
             success: false,
             binDir,
-            details: [...details, `failed to install shim scripts: ${e.message}`]
+            details: [...details, `failed to install shim scripts: ${(e as NodeJS.ErrnoException).message}`]
         };
     }
 
@@ -376,12 +385,12 @@ function installShims(toolDir, isWin) {
 
 /**
  * 卸除垫片脚本。
- * @param {string} toolDir — 工具安装根目录（当前仅用于日志）
- * @param {boolean} isWin
- * @returns {{success: boolean, binDir: string|null, details: string[]}}
+ * @param toolDir — 工具安装根目录（当前仅用于日志）
+ * @param isWin
+ * @returns ShimOperationResult
  */
-function uninstallShims(toolDir, isWin) {
-    const details = [];
+function uninstallShims(toolDir: string, isWin: boolean): ShimOperationResult {
+    const details: string[] = [];
 
     // 1. 定位 bin 目录：优先 PATH，失败时用 toolDir 推算（npm uninstall 场景 PATH 不可靠）
     let binDir = findOpenspecBinDir(isWin);
@@ -405,7 +414,7 @@ function uninstallShims(toolDir, isWin) {
 
     // 3. 删除垫片文件
     const shimFiles = getShimFiles(isWin);
-    const deleted = [];
+    const deleted: string[] = [];
     for (const sf of shimFiles) {
         const p = path.join(binDir, sf);
         if (fs.existsSync(p)) {
@@ -426,4 +435,17 @@ function uninstallShims(toolDir, isWin) {
     return { success: true, binDir, details };
 }
 
-module.exports = { installShims, uninstallShims, findOpenspecBinDir, openspecOrigExists, copyOpenspecToOrig, installShimScripts, setExecutable, findOpenspecOrigFile, getRestoreTarget, getShimFiles, binDirFromToolDir, findRealOpenspec };
+export {
+    installShims,
+    uninstallShims,
+    findOpenspecBinDir,
+    openspecOrigExists,
+    copyOpenspecToOrig,
+    installShimScripts,
+    setExecutable,
+    findOpenspecOrigFile,
+    getRestoreTarget,
+    getShimFiles,
+    binDirFromToolDir,
+    findRealOpenspec,
+};

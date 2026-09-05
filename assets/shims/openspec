@@ -3,7 +3,7 @@
 TOOL_DIR="{{TOOL_DIR}}"
 
 # Self-heal: package was removed, restore original openspec
-if [ ! -f "$TOOL_DIR/lib/registry-utils.js" ]; then
+if [ ! -f "$TOOL_DIR/dist/registry-utils.js" ]; then
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd 2>/dev/null || echo "$(dirname "$0")")"
     if [ -f "$SCRIPT_DIR/openspec-orig" ]; then
         mv -f "$SCRIPT_DIR/openspec-orig" "$SCRIPT_DIR/openspec" 2>/dev/null
@@ -12,7 +12,7 @@ if [ ! -f "$TOOL_DIR/lib/registry-utils.js" ]; then
 fi
 
 if [ "$1" = "list" ] && [ -n "$TOOL_DIR" ]; then
-    exec node "$TOOL_DIR/lib/registry-utils.js" "$@"
+    exec node "$TOOL_DIR/dist/registry-utils.js" "$@"
 fi
 
 exec openspec-orig "$@"

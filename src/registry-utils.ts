@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import child_process from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 import type { RegistryEntry } from './registry.js';
+
+// ESM 具名绑定是不可变快照——测试通过 t.mock.method(child_process,
+// 'execSync', ...) 在命名空间对象上打补丁，只有属性访问形式才能观测到，
+// 故保持 child_process.execSync 调用形式而非解构具名导入。
 
 /**
  * 通过 git rev-parse 定位项目根目录。
@@ -13,7 +17,7 @@ import type { RegistryEntry } from './registry.js';
  */
 function findProjectRoot(cwd: string): string | null {
     try {
-        const result = execSync('git rev-parse --git-common-dir', {
+        const result = child_process.execSync('git rev-parse --git-common-dir', {
             cwd,
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe']
@@ -109,7 +113,7 @@ function mergeList(entries: RegistryEntry[], projectRoot: string | null): string
 
         let output = '';
         try {
-            output = execSync('openspec-orig list', {
+            output = child_process.execSync('openspec-orig list', {
                 encoding: 'utf8',
                 stdio: ['ignore', 'pipe', 'pipe'],
                 cwd: wtPath
@@ -139,7 +143,7 @@ function mergeList(entries: RegistryEntry[], projectRoot: string | null): string
 
     if (projectRoot) {
         try {
-            const rootOutput = execSync('openspec-orig list', {
+            const rootOutput = child_process.execSync('openspec-orig list', {
                 encoding: 'utf8',
                 stdio: ['ignore', 'pipe', 'pipe'],
                 cwd: projectRoot
@@ -188,7 +192,7 @@ function handleList(registryPath: string | null, projectRoot: string | null): Li
  */
 function execOpenspecOrig(args: string[]): never {
     try {
-        execSync('openspec-orig ' + args.join(' '), { stdio: 'inherit' });
+        child_process.execSync('openspec-orig ' + args.join(' '), { stdio: 'inherit' });
     } catch (error) {
         process.exit((error as NodeJS.ErrnoException & { status?: number }).status || 1);
     }
@@ -236,7 +240,7 @@ function mergeListJson(entries: RegistryEntry[], projectRoot: string | null): st
 
         let output = '';
         try {
-            output = execSync('openspec-orig list --json', {
+            output = child_process.execSync('openspec-orig list --json', {
                 encoding: 'utf8',
                 stdio: ['ignore', 'pipe', 'pipe'],
                 cwd: wtPath
@@ -274,7 +278,7 @@ function mergeListJson(entries: RegistryEntry[], projectRoot: string | null): st
 
     if (projectRoot) {
         try {
-            const rootOutput = execSync('openspec-orig list --json', {
+            const rootOutput = child_process.execSync('openspec-orig list --json', {
                 encoding: 'utf8',
                 stdio: ['ignore', 'pipe', 'pipe'],
                 cwd: projectRoot
