@@ -1,0 +1,33 @@
+{
+  "opencode_version": "1.18.29",
+  "node_version": "v24.14.0",
+  "model": "routez-ai/glm-5.3-flash",
+  "platform": "win32",
+  "plugin_called_count": 1,
+  "tool_call_count": 1,
+  "first_tool_call": {
+    "ts": "2026-09-05T12:09:06.983Z",
+    "variant": "typed",
+    "type": "tool-call",
+    "tool": "probe_typed_echo",
+    "message": "phase-0a-host-check",
+    "tool_directory": "C:\\Users\\rloessplateau\\AppData\\Local\\Temp\\oso-hostprobe-project-vp26zq",
+    "tool_worktree": "/"
+  },
+  "unique_host_event_names": [
+    "catalog.updated",
+    "integration.updated",
+    "message.part.delta",
+    "message.part.updated",
+    "message.updated",
+    "plugin.added",
+    "reference.updated",
+    "session.created",
+    "session.diff",
+    "session.idle",
+    "session.status",
+    "session.updated",
+    "tui.toast.show"
+  ],
+  "session_idle_observed": true
+}

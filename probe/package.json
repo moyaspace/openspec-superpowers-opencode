@@ -9,6 +9,10 @@
   ],
   "exports": {
     ".": {
+      "types": "./dist/opencode-plugin/index.d.ts",
+      "default": "./dist/opencode-plugin/index.js"
+    },
+    "./core": {
       "types": "./dist/oso-core/index.d.ts",
       "default": "./dist/oso-core/index.js"
     },

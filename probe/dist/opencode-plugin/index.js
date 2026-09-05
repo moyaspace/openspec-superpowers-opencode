@@ -62,6 +62,28 @@ export const osoProbePlugin = async (ctx) => {
                 },
             },
         },
+        "chat.message": async (input, output) => {
+            // 时序与 await 验证：宿主若等待本 Promise，sleep 500ms 会推迟后续事件
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            recordEvent({
+                type: "chat-message-hook",
+                session_id: input.sessionID,
+                agent: input.agent ?? null,
+                model: input.model ?? null,
+                message_id: input.messageID ?? null,
+                variant: input.variant ?? null,
+                message_id_present: input.messageID !== undefined && input.messageID !== "",
+                part_count: output.parts.length,
+            });
+        },
+        "tool.execute.after": async (input, output) => {
+            recordEvent({
+                type: "tool-execute-after-hook",
+                tool: input.tool,
+                session_id: input.sessionID,
+                call_id: input.callID,
+            });
+        },
         event: async ({ event }) => {
             recordEvent({ type: "host-event", name: event.type });
             // session.idle / message.updated 等事件到达即记录，供能力矩阵统计真实事件名

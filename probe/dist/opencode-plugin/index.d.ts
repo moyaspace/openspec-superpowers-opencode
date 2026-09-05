@@ -24,6 +24,29 @@ export declare const osoProbePlugin: (ctx: OsoProbePluginContext) => Promise<{
             }): Promise<string>;
         };
     };
+    "chat.message": (input: {
+        sessionID: string;
+        agent?: string;
+        model?: {
+            providerID: string;
+            modelID: string;
+        };
+        messageID?: string;
+        variant?: string;
+    }, output: {
+        message: unknown;
+        parts: unknown[];
+    }) => Promise<void>;
+    "tool.execute.after": (input: {
+        tool: string;
+        sessionID: string;
+        callID: string;
+        args: unknown;
+    }, output: {
+        title: string;
+        output: string;
+        metadata: unknown;
+    }) => Promise<void>;
     event: ({ event }: {
         event: {
             type: string;
