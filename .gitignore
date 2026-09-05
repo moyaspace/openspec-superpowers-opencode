@@ -58,3 +58,8 @@ openspec/oso-change-registry.json
 node_modules/
 # Probe temp event logs
 probe-events/
+
+# Probe temp logs
+probe/*.log
+probe/probe-*.txt
+
