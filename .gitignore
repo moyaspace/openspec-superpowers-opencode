@@ -53,3 +53,8 @@ openspec/oso-change-registry.json
 /local/
 
 # <!-- openspec-superpowers-opencode_gitignore -->
+
+# Node modules (all packages)
+node_modules/
+# Probe temp event logs
+probe-events/
