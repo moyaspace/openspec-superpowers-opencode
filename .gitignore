@@ -63,3 +63,6 @@ probe-events/
 probe/*.log
 probe/probe-*.txt
 
+
+# process logs must go to test-runs/ or %TEMP%, never repo root
+*.log
