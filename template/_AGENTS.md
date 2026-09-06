@@ -79,7 +79,7 @@ Superpowers 技能（TDD、brainstorming 等）是文件系统上的 `.md` 文�
 
 - `docs/development.md` — 开发环境、构建命令、代码风格 *
 - `docs/how-it-works.md` — 工作原理（高层面）
-- `docs/testing.md` — 测试规范与运行方式 *
+- `docs/testing.md` — 测试规范与运行方式 *（命令速查、分层矩阵、「改 X 跑 Y」映射、编写约定；测试问题先查此文档）
 - `docs/cli-commands.md` — 命令行参考
 - `test-runs/` — 本地测试运行记录（不纳入主仓库 Git 跟踪）
 

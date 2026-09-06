@@ -102,7 +102,7 @@ oso init                                  # 或: openspec-superpowers-opencode i
 | [工作原理](HOW-IT-WORKS.md) | 命令执行链路详解 |
 | [Worktree 创建机制](WORKTREE-CREATION.md) | 三层代码级保障 |
 | [设计决策](DESIGN.md) | ADR：架构权衡记录 |
-| [测试说明](TESTING.md) | 17 阶段测试套件 |
+| [测试说明](testing.md) | 测试分层、命令与约定 |
 | [为什么用 oso](WHY-OSO.md) | 深度分析：OpenSpec 和 Superpowers 之间的 6 道鸿沟 |
 
 ## 前置条件

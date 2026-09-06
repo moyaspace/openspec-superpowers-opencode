@@ -104,7 +104,7 @@ oso init                                  # 或: openspec-superpowers-opencode i
 | [How it works](docs/HOW-IT-WORKS.md) | Command execution chain explained |
 | [Worktree creation](docs/WORKTREE-CREATION.md) | Three-layer code-level guarantees |
 | [Design decisions](docs/DESIGN.md) | ADRs: architecture tradeoffs |
-| [Testing](docs/TESTING.md) | 17-phase test suite |
+| [Testing](docs/testing.md) | Test layers, commands, and conventions |
 | [Why oso](docs/WHY-OSO.md) | Deep dive: 6 gaps between OpenSpec and Superpowers |
 
 ## Prerequisites
