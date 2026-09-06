@@ -2,7 +2,7 @@
 
 > 本文档是 OSO 测试体系的单一事实来源：怎么跑、分几层、改了什么代码跑什么、写测试遵循什么约定。人类与 AI agent 共同使用（AGENTS.md「项目文档参考」链接本文档）。
 >
-> 原则：**测试即规范**——行为基线固化在 `test/` 的自动化用例中，Gate 必须能通过仓库命令重新执行；人工步骤书形态已废弃（原 17-Phase TESTING.md 于 2026-09-06 删除，其有效场景由 `local/` 的 E2E 清单继任，见文末指针区）。
+> 原则：**测试即规范**——行为基线固化在 `test/` 的自动化用例中，Gate 必须能通过仓库命令重新执行；人工步骤书不维护，真实终端链路的人工检查用清单管理（见 §5）。
 
 ## 1. 命令速查
 
@@ -22,7 +22,7 @@
 |---|---|---|---|---|
 | **自动化单测**（205 用例） | `test/*.test.js`（node:test，import dist 产物） | 全部模块行为基线 + CommonJS 禁用扫描 + tarball 行为等价 | 无（临时目录夹具） | 每次 `npm test` |
 | **宿主探针**（probe/） | `probe/test/`（npm pack + 真实 opencode run） | 真实 tarball 双入口隔离、真实 OpenCode 加载/Hook/工具链路 | npm registry、opencode CLI、模型 API | **仅版本组合变化时**（换 opencode 或 @opencode-ai/plugin 版本必跑，规范 IMP-0510）；运行方法见 `local/.../probe-usage-guide.md` |
-| **E2E 人工清单** | `local/.../openspec-e2e-verification.md` | shim 全链路拦截、真实 openspec CLI 集成、全生命周期串联 | 真实全局 shim 环境 | 发布前（阶段 10 发布门起）；shim/schema 变更后对应条目 |
+| **E2E 人工清单** | 本地实施文档（见 §5） | shim 全链路拦截、真实 openspec CLI 集成、全生命周期串联 | 真实全局 shim 环境 | npm publish 前必跑；shim/schema 变更后对应条目 |
 
 ## 3. 「改 X 跑 Y」映射
 
@@ -41,7 +41,7 @@
 | `src/cli/index.ts` / `cli/create-project.ts` | `node --test test/cli.test.js test/create-project.behavior.test.js` | |
 | `package.json`（files/exports/bin/engines） | `node --test test/setup-package.test.js test/no-cjs.test.js test/imp16-tarball-equivalence.test.js` | 发布相关，建议全量 |
 | 任何 `src/**`（收尾） | `npm test` | 提交前标准动作 |
-| 换 opencode / @opencode-ai/plugin 版本 | probe 全跑（见 §2）+ E2E 清单 | IMP-0510 闸门 |
+| 换 opencode / @opencode-ai/plugin 版本 | probe 全跑（见 §2）+ E2E 清单 | 换版本必过探针 |
 
 ## 4. 编写约定
 
@@ -52,11 +52,14 @@
 - **安全防护用例不可删**：`setup-deploy`/`setup-reset` 的 symlink 穿越、路径逃逸拒绝用例是安全基线。
 - **失败纪律**：不得删除失败测试求绿；先判断是环境问题（如 EPERM→gsudo）还是回归。
 
-## 5. 指针区（不复制正文）
+## 5. 指针区
 
-| 主题 | 位置 |
+以下为实施期附加文档，保存在本地私有目录（`local/implementation/oso-v1/stages/`，不进 GitHub，随实施阶段流转；当前定位见 `docs/tasks.md` 的实施跟踪表）：
+
+| 主题 | 文件 |
 |---|---|
-| probe/ 结构、触发矩阵、plugin 版本切换操作序 | `local/implementation/oso-v1/stages/stage-0-typescript-esm-and-host-feasibility/probe-usage-guide.md` |
-| E2E 人工验证清单（shim/CLI/生命周期） | 同目录 `openspec-e2e-verification.md` |
-| 运行时模型与宿主环境坑（Bun panic、TEMP 短名、BatBadBut） | 同目录 `node-opencode-plugin-runtime-model.md` |
-| 本地运行记录 | `test-runs/YYYY-MM-DD.md`（不进 Git） |
+| probe/ 结构、触发矩阵、plugin 版本切换操作序 | `probe-usage-guide.md` |
+| E2E 人工验证清单（shim/CLI/生命周期） | `openspec-e2e-verification.md` |
+| 运行时模型与宿主环境坑（Bun panic、TEMP 短名、BatBadBut） | `node-opencode-plugin-runtime-model.md` |
+
+本地运行记录：`test-runs/YYYY-MM-DD.md`（不进 Git，仅供本机排查）。
