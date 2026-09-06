@@ -63,4 +63,5 @@ unresolved: []
 - 已验证的插件与 CLI 入口：bin 三命令名指向 dist/cli/index.js；exports 登记 `./cli`；插件入口形态（async 插件函数 + tool + event + chat.message hooks）已由探针证明；正式 `src/opencode-plugin/` 与 `src/oso-core/` 随阶段 1+ 落地。
 - 宿主上下文字段：plugin ctx = { project, client, $, directory, worktree }；工具 ctx 含 directory/worktree（普通项目目录下 worktree="/"）。
 - 必需/可选 Hook 边界及支持版本矩阵：capability-matrix.md（OpenCode 1.18.29 / Node 24.14.0 / plugin 1.14.48 / TS 7.0.2）。
+- **长期回归资产 `probe/`**：阶段 0A 探针包，规范 IMP-0510 的执行载体（更换 opencode/plugin 版本必先过探针）；运行方法、触发矩阵与版本切换操作序见同目录 `probe-usage-guide.md`。阶段 5 切换 plugin 1.18.29 时按其第五节操作序执行。
 - 阶段 1 以后不得重新引入 CommonJS 业务模块（test/no-cjs.test.js 已固化）。

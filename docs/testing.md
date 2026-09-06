@@ -47,7 +47,7 @@
 
 - **框架与形态**：node:test + node:assert/strict；测试文件 `test/<模块>.test.js`，行为测试以 `<模块>.behavior.test.js` 命名；ESM——测试直接 `import` `dist/` 编译产物（先 build 再 test，`npm test` 已保证顺序）。
 - **夹具**：一律临时目录（`mkdtempSync` + try/finally 清理）；不写入仓库工作区、不依赖固定路径；预期值从代码/模板提取，不硬编码 hash 与绝对路径。
-- **提权边界（全仓库唯一）**：`test/shims-installer.test.js` 的 symlink 夹具用例需要管理员权限（Windows 建链为特权操作；产品代码在 Windows 不走 symlink 分支，与此用例无关）。非提权 `npm test` 报 199/200 + 1 EPERM 属合法结果；满绿用 `gsudo node --test`（用法见 `local/.../openspec-e2e-verification.md`）。Unix/CI 天然 200/200。
+- **提权边界（全仓库唯一）**：`test/shims-installer.test.js` 的 symlink 夹具用例需要管理员权限（Windows 建链为特权操作；产品代码在 Windows 不走 symlink 分支，与此用例无关）。非提权 `npm test` 报 199/200 + 1 EPERM 属合法结果；满绿用 `gsudo node --test`（用法见 §5 本地文档）。Unix/CI 天然 200/200。
 - **红线**：`test/no-cjs.test.js` 固化扫描——`dist/` 禁止 require/module.exports/`__dirname`；新业务代码不得引入 CommonJS。
 - **安全防护用例不可删**：`setup-deploy`/`setup-reset` 的 symlink 穿越、路径逃逸拒绝用例是安全基线。
 - **失败纪律**：不得删除失败测试求绿；先判断是环境问题（如 EPERM→gsudo）还是回归。
@@ -59,7 +59,7 @@
 | 主题 | 文件 |
 |---|---|
 | test/host-probe/ 结构、触发矩阵、plugin 版本切换操作序 | `probe-usage-guide.md` |
-| E2E 人工验证清单（shim/CLI/生命周期） | `openspec-e2e-verification.md` |
+| E2E 人工验证清单（shim/CLI/生命周期） | `2026-09-06-e2e-real-value-testing-gaps.md` |
 | 运行时模型与宿主环境坑（Bun panic、TEMP 短名、BatBadBut） | `node-opencode-plugin-runtime-model.md` |
 
 本地运行记录：`test-runs/YYYY-MM-DD.md`（不进 Git，仅供本机排查）。
