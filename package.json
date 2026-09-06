@@ -43,7 +43,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "install": "node scripts/shims-installer.js install",
+    "install": "node scripts/shims-installer.mjs install",
     "test": "npm run typecheck && npm run build && node --test",
     "typecheck": "tsc -p tsconfig.json",
     "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/post-build.mjs"

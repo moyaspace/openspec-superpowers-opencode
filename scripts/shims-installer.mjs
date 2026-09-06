@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * shims-installer.js — npm install lifecycle hook.
+ * shims-installer.mjs — npm install lifecycle hook.
  *
  * npm v7+ does NOT run preuninstall/uninstall/postuninstall scripts during
  * `npm uninstall` (by design).  Uninstall cleanup is handled by the shims
  * themselves — they detect when the package is gone and self-restore.
  *
  * Usage:
- *   node scripts/shims-installer.js install    install shims (called by npm install)
- *   node scripts/shims-installer.js uninstall  manual-only; npm will never call this
+ *   node scripts/shims-installer.mjs install    install shims (called by npm install)
+ *   node scripts/shims-installer.mjs uninstall  manual-only; npm will never call this
  */
 
 import path from 'node:path';
@@ -21,7 +21,7 @@ const isWin = process.platform === 'win32';
 const action = process.argv[2];
 
 if (!action || (action !== 'install' && action !== 'uninstall')) {
-    console.error('Usage: node scripts/shims-installer.js <install|uninstall>');
+    console.error('Usage: node scripts/shims-installer.mjs <install|uninstall>');
     process.exit(1);
 }
 
