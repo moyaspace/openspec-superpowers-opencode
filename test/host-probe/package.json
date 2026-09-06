@@ -34,7 +34,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
+    "build": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "test": "node --import tsx test/run.mjs"
   },
   "dependencies": {
