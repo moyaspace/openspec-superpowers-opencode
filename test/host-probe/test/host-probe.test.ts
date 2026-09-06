@@ -119,6 +119,7 @@ test("真实 OpenCode：加载 ESM 插件、typed 工具调用、session.idle", 
     const matrixDir = resolve(
       probeRoot,
       "..",
+      "..",
       "openspec",
       "changes",
       "oso-typescript-esm-foundation-and-host-feasibility",
