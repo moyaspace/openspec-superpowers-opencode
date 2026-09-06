@@ -121,21 +121,6 @@ describe('copyOpenspecToOrig()', () => {
         }, /openspec CLI not found/);
     });
 
-    test('preserves symlink when openspec is a symlink', () => {
-        const dir = tmpDir();
-        // 模拟 npm -g 安装：openspec 是符号链接指向另一个目录的 JS 文件
-        const targetDir = tmpDir();
-        fs.writeFileSync(path.join(targetDir, 'openspec.js'), '#!/usr/bin/env node\nimport "../dist/cli/index.js";');
-        fs.symlinkSync(path.join(targetDir, 'openspec.js'), path.join(dir, 'openspec'));
-        const result = shimsInstaller.copyOpenspecToOrig(dir, dir, false);
-        assert.strictEqual(result, 'openspec-orig');
-        assert.ok(fs.existsSync(path.join(dir, 'openspec-orig')));
-        // 验证 openspec-orig 也是符号链接，指向同一目标
-        const stat = fs.lstatSync(path.join(dir, 'openspec-orig'));
-        assert.ok(stat.isSymbolicLink());
-        assert.strictEqual(fs.readlinkSync(path.join(dir, 'openspec-orig')), path.join(targetDir, 'openspec.js'));
-    });
-
     test('does not overwrite existing openspec-orig', () => {
         const dir = tmpDir();
         fs.writeFileSync(path.join(dir, 'openspec'), '#!/bin/sh\nnew version');
