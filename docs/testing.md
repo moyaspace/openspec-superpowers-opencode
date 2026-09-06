@@ -21,7 +21,7 @@
 | 层 | 位置 | 验证什么 | 外部依赖 | 何时跑 |
 |---|---|---|---|---|
 | **自动化单测**（205 用例） | `test/*.test.js`（node:test，import dist 产物） | 全部模块行为基线 + CommonJS 禁用扫描 + tarball 行为等价 | 无（临时目录夹具） | 每次 `npm test` |
-| **宿主探针**（probe/） | `probe/test/`（npm pack + 真实 opencode run） | 真实 tarball 双入口隔离、真实 OpenCode 加载/Hook/工具链路 | npm registry、opencode CLI、模型 API | **仅版本组合变化时**（换 opencode 或 @opencode-ai/plugin 版本必跑，规范 IMP-0510）；运行方法见 `local/.../probe-usage-guide.md` |
+| **宿主探针**（probe/） | `probe/test/`（npm pack + 真实 opencode run） | 真实 tarball 双入口隔离、真实 OpenCode 加载/Hook/工具链路 | npm registry、opencode CLI、模型 API | **仅版本组合变化时**（换 opencode 或 @opencode-ai/plugin 版本必跑）；运行方法见 §5 本地文档 |
 | **E2E 人工清单** | 本地实施文档（见 §5） | shim 全链路拦截、真实 openspec CLI 集成、全生命周期串联 | 真实全局 shim 环境 | npm publish 前必跑；shim/schema 变更后对应条目 |
 
 ## 3. 「改 X 跑 Y」映射
