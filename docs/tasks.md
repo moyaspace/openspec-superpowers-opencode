@@ -29,7 +29,8 @@
 
 | 阶段 | Change | 状态 | `IMP-*` 进度 | 实际基线 | Gate | 私有阶段报告 | 阻塞 Decision | 允许进入下一阶段 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | `oso-typescript-esm-foundation-and-host-feasibility` | 已通过 | 已完成 IMP-0001–IMP-0015 全部（0A 9 项 + 0B 7 项）；阶段 Gate 通过 | TypeScript 7.0.2；Node 24.14.0（最低冻结 >=22.9.0）；OpenCode 1.18.29；@opencode-ai/plugin 1.14.48 | `npm run typecheck`=0；`npm run build`=0；`npm test` 205/204/1（唯一失败为 pre-existing Windows symlink EPERM，main 同样失败）；探针 tarball 双入口=pass；真实 OpenCode Host Probe=pass | `local/implementation/oso-v1/stages/stage-0-typescript-esm-and-host-feasibility/stage-gate-report.md` | D-1（plugin 固定 1.14.48 + 开发期本地桥加载）；D-2（headless 下 chat.message 无 messageID）——均非阻塞 | 允许（能力矩阵无 required-missing） |
+| 0 | `oso-typescript-esm-foundation-and-host-feasibility` | 已通过 | 已完成 IMP-0001–IMP-0015 全部（0A 9 项 + 0B 7 项）；阶段 Gate 通过 | TypeScript 7.0.2；Node 24.14.0（最低冻结 >=22.9.0）；OpenCode 1.18.29；@opencode-ai/plugin 1.14.48 | `npm run typecheck`=0；`npm run build`=0；`npm test` 205/204/1（唯一失败为 pre-existing Windows symlink EPERM，main 同样失败）；探针 tarball 双入口=pass；真实 OpenCode Host Probe=pass | `local/implementation/oso-v1/stages/stage-0-typescript-esm-and-host-feasibility/stage-gate-report.md`（change 目录保留同步拷贝） | D-1（Gate 时固定 plugin 1.14.48；Gate 后评审已定案阶段 5 切换 1.18.29，见演进注记）；D-2（headless 下 chat.message 无 messageID）——均非阻塞 | 允许（能力矩阵无 required-missing） |
+| 5 | （阶段 5 Change 待 `/opsx-propose` 创建） | 尚未开始 | 未开工。**开工前置四项（规范阶段 5 节"开工前置"闸门，2026-09-06 登记）**：A) 真实 TUI 会话实测 `chat.message` 的 `messageID` 行为（D-2）；B) 实测 opencode 内嵌 Bun 对 plugin 1.18.29 依赖链（ini@7 engines `^24.15.0`）的原生安装处理；C) 排查"项目无 node_modules 时 `opencode run` 启动即 Bun panic"环境 bug 并重验 bare name 路径；D) 已定案：部署模板 plugin 切换 1.18.29（exp118 实证行为等价），随阶段 5 Adapter 实现与探针回归执行 | 待阶段 5 开工时冻结 | 未执行 | （阶段 5 报告待创建） | 前置 A/B/C 未完成前不得开工 `IMP-IMP-0501`–`IMP-IMP-0512` | 不允许（前置四项未完成） |
 
 状态只使用：尚未开始、进行中、已通过、失败、已阻塞。开始阶段 0 时，将本行改为“进行中”并在私有报告填写 `started_at`；只有 Gate 全部通过且私有报告已提交，才能改为“已通过”并允许进入阶段 1。
 
