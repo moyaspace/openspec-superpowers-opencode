@@ -8,9 +8,9 @@
 
 | 命令 | 权限 | 耗时 | 覆盖 |
 |---|---|---|---|
-| `npm test` | 普通用户 | ~4 分钟（含构建） | typecheck + build + 全部 205 用例（标准 Gate） |
-| `node --test` | 普通用户 | ~3.5 分钟 | 204/205（需提权的 symlink 用例报 1 EPERM，合法结果） |
-| `gsudo node --test` | 管理员 | ~3.5 分钟 | **205/205 全绿**（唯一提权项见 §4） |
+| `npm test` | 普通用户 | ~4 分钟（含构建） | typecheck + build + 全部 200 用例（标准 Gate） |
+| `node --test` | 普通用户 | ~3.5 分钟 | 199/200（需提权的 symlink 用例报 1 EPERM，合法结果） |
+| `gsudo node --test` | 管理员 | ~3.5 分钟 | **200/200 全绿**（唯一提权项见 §4） |
 | `node --test test/<file>.test.js` | 普通用户 | 秒级 | 单文件（改哪跑哪，见 §3） |
 | 宿主探针（见 §2 探针层） | 普通用户 | 1-2 分钟 + 模型调用 | 宿主兼容性（仅版本组合变化时） |
 
@@ -20,7 +20,7 @@
 
 | 层 | 位置 | 验证什么 | 外部依赖 | 何时跑 |
 |---|---|---|---|---|
-| **自动化单测**（205 用例） | `test/*.test.js`（node:test，import dist 产物） | 全部模块行为基线 + CommonJS 禁用扫描 + tarball 行为等价 | 无（临时目录夹具） | 每次 `npm test` |
+| **自动化单测**（200 用例） | `test/*.test.js`（node:test，import dist 产物；显式 glob 限定主包，`test/host-probe/` 由自己的 runner 跑） | 全部模块行为基线 + CommonJS 禁用扫描 + tarball 行为等价 | 无（临时目录夹具） | 每次 `npm test` |
 | **宿主探针**（test/host-probe/） | `test/host-probe/test/`（npm pack + 真实 opencode run） | 真实 tarball 双入口隔离、真实 OpenCode 加载/Hook/工具链路 | npm registry、opencode CLI、模型 API | **仅版本组合变化时**（换 opencode 或 @opencode-ai/plugin 版本必跑）；运行方法见 §5 本地文档 |
 | **E2E 人工清单** | 本地实施文档（见 §5） | shim 全链路拦截、真实 openspec CLI 集成、全生命周期串联 | 真实全局 shim 环境 | npm publish 前必跑；shim/schema 变更后对应条目 |
 
@@ -47,7 +47,7 @@
 
 - **框架与形态**：node:test + node:assert/strict；测试文件 `test/<模块>.test.js`，行为测试以 `<模块>.behavior.test.js` 命名；ESM——测试直接 `import` `dist/` 编译产物（先 build 再 test，`npm test` 已保证顺序）。
 - **夹具**：一律临时目录（`mkdtempSync` + try/finally 清理）；不写入仓库工作区、不依赖固定路径；预期值从代码/模板提取，不硬编码 hash 与绝对路径。
-- **提权边界（全仓库唯一）**：`test/shims-installer.test.js` 的 symlink 夹具用例需要管理员权限（Windows 建链为特权操作；产品代码在 Windows 不走 symlink 分支，与此用例无关）。非提权 `npm test` 报 204/205 + 1 EPERM 属合法结果；满绿用 `gsudo node --test`（用法见 `local/.../openspec-e2e-verification.md`）。Unix/CI 天然 205/205。
+- **提权边界（全仓库唯一）**：`test/shims-installer.test.js` 的 symlink 夹具用例需要管理员权限（Windows 建链为特权操作；产品代码在 Windows 不走 symlink 分支，与此用例无关）。非提权 `npm test` 报 199/200 + 1 EPERM 属合法结果；满绿用 `gsudo node --test`（用法见 `local/.../openspec-e2e-verification.md`）。Unix/CI 天然 200/200。
 - **红线**：`test/no-cjs.test.js` 固化扫描——`dist/` 禁止 require/module.exports/`__dirname`；新业务代码不得引入 CommonJS。
 - **安全防护用例不可删**：`setup-deploy`/`setup-reset` 的 symlink 穿越、路径逃逸拒绝用例是安全基线。
 - **失败纪律**：不得删除失败测试求绿；先判断是环境问题（如 EPERM→gsudo）还是回归。
