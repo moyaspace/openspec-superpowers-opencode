@@ -1,4 +1,0 @@
-
-> oso-probe@0.0.0 build
-> node ../scripts/clean-dist.mjs && tsc -p tsconfig.build.json
-

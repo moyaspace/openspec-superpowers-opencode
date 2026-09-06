@@ -1,4 +1,0 @@
-
-> @moyaspace/openspec-superpowers-opencode@1.1.1 build
-> node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && node scripts/post-build.mjs
-
