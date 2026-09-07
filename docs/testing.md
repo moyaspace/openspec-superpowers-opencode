@@ -8,8 +8,8 @@
 
 | 命令 | 权限 | 耗时 | 覆盖 |
 |---|---|---|---|
-| `npm test` | 普通用户（首次弹一次 UAC，`gsudo cache on` 可缓存） | ~4 分钟（含构建） | typecheck + build + **199 主套件 + 1 提权用例（经 gsudo 自动提权）**，一遍全绿（标准 Gate） |
-| `node --test "test/*.test.js"` | 普通用户 | ~3.5 分钟 | 仅 199 主套件（跳过提权用例） |
+| `npm test` | 普通用户（首次弹一次 UAC，`gsudo cache on` 可缓存） | ~5 分钟（含构建与 E2E） | typecheck + build + **199 主套件 + elevated 套件**（shim 端到端 3 + 真实 CLI 集成 3 + 生命周期 4），一遍全绿（标准 Gate） |
+| `node --test "test/*.test.js"` | 普通用户 | ~3.5 分钟 | 仅 199 主套件（跳过 elevated） |
 | `node --test test/<file>.test.js` | 普通用户 | 秒级 | 单文件（改哪跑哪，见 §3） |
 | 宿主探针（见 §2 探针层） | 普通用户 | 1-2 分钟 + 模型调用 | 宿主兼容性（仅版本组合变化时） |
 
@@ -19,9 +19,9 @@
 
 | 层 | 位置 | 验证什么 | 外部依赖 | 何时跑 |
 |---|---|---|---|---|
-| **自动化单测**（199+1） | `test/*.test.js`（主套件）+ `test/elevated/`（提权套件，经 gsudo 自动提权跑） | 全部模块行为基线 + CommonJS 禁用扫描 + tarball 行为等价 | 无（临时目录夹具） | 每次 `npm test` 一遍跑完 |
+| **自动化单测**（199 主套件） | `test/*.test.js`（node:test，import dist 产物） | 全部模块行为基线 + CommonJS 禁用扫描 + tarball 行为等价 | 无（临时目录夹具） | 每次 `npm test` |
+| **E2E 端到端**（10 用例，提权套件） | `test/elevated/`（npm test 尾声经 gsudo 自动提权；npm pack→install -g→init 真实链路） | shim 全链路拦截（3）、真实 openspec CLI 集成（3）、全生命周期串联（4） | 真实全局 shim 环境、openspec CLI | 每次 `npm test`（同一遍）；无 gsudo 时 SKIPPED |
 | **宿主探针**（test/host-probe/） | `test/host-probe/test/`（npm pack + 真实 opencode run） | 真实 tarball 双入口隔离、真实 OpenCode 加载/Hook/工具链路 | npm registry、opencode CLI、模型 API | **仅版本组合变化时**（换 opencode 或 @opencode-ai/plugin 版本必跑）；运行方法见 §5 本地文档 |
-| **E2E 人工清单** | 本地实施文档（见 §5） | shim 全链路拦截、真实 openspec CLI 集成、全生命周期串联 | 真实全局 shim 环境 | npm publish 前必跑；shim/schema 变更后对应条目 |
 
 ## 3. 「改 X 跑 Y」映射
 
@@ -36,11 +36,11 @@
 | `src/setup/discovery.ts` | `node --test test/setup-discovery.test.js` | skills.lock 哈希告警逻辑 |
 | `src/registry.ts` / `registry-utils.ts` | `node --test test/registry.test.js test/registry-utils.test.js` | 57 用例 |
 | `src/verify.ts` | `node --test test/verify.test.js` | 37 用例 |
-| `src/shims-installer.ts` | `node --test test/shims-installer.test.js`（满绿需 `gsudo`） | shim 变更后跑 E2E-1 |
+| `src/shims-installer.ts` | `node --test test/shims-installer.test.js test/elevated/shims-installer.elevated.test.js test/openspec-shim-e2e.test.js` | shim 变更后 elevated 套件由 `npm test` 自动覆盖 |
 | `src/cli/index.ts` / `cli/create-project.ts` | `node --test test/cli.test.js test/create-project.behavior.test.js` | |
 | `package.json`（files/exports/bin/engines） | `node --test test/setup-package.test.js test/no-cjs.test.js test/imp16-tarball-equivalence.test.js` | 发布相关，建议全量 |
 | 任何 `src/**`（收尾） | `npm test` | 提交前标准动作 |
-| 换 opencode / @opencode-ai/plugin 版本 | host-probe 全跑（见 §2）+ E2E 清单 | 换版本必过探针 |
+| 换 opencode / @opencode-ai/plugin 版本 | host-probe 全跑（见 §2） | 换版本必过探针 |
 
 ## 4. 编写约定
 
@@ -58,7 +58,6 @@
 | 主题 | 文件 |
 |---|---|
 | test/host-probe/ 结构、触发矩阵、plugin 版本切换操作序 | `probe-usage-guide.md` |
-| E2E 人工验证清单（shim/CLI/生命周期） | `openspec-release-verification.md` |
 | 运行时模型与宿主环境坑（Bun panic、TEMP 短名、BatBadBut） | `node-opencode-plugin-runtime-model.md` |
 
 本地运行记录：`test-runs/YYYY-MM-DD.md`（不进 Git，仅供本机排查）。
