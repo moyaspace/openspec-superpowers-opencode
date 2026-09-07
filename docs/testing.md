@@ -53,11 +53,11 @@
 
 ## 5. 指针区
 
-以下为实施期附加文档，保存在本地私有目录（`local/implementation/oso-v1/stages/`，不进 GitHub，随实施阶段流转；当前定位见 `docs/tasks.md` 的实施跟踪表）：
+长期参考文档（本地私有，`local/docs/`，不进 GitHub，随 local 私有 Git 版本化）：
 
 | 主题 | 文件 |
 |---|---|
-| test/host-probe/ 结构、触发矩阵、plugin 版本切换操作序 | `probe-usage-guide.md` |
-| 运行时模型与宿主环境坑（Bun panic、TEMP 短名、BatBadBut） | `node-opencode-plugin-runtime-model.md` |
+| test/host-probe/ 结构、触发矩阵、plugin 版本切换操作序 | `local/docs/2026-09-06-host-probe-usage-guide.md` |
+| 运行时模型与宿主环境坑（Bun panic、TEMP 短名、BatBadBut） | `local/docs/2026-09-06-node-opencode-plugin-runtime-model.md` |
 
 本地运行记录：`test-runs/YYYY-MM-DD.md`（不进 Git，仅供本机排查）。
