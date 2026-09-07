@@ -58,7 +58,7 @@
 | 主题 | 文件 |
 |---|---|
 | test/host-probe/ 结构、触发矩阵、plugin 版本切换操作序 | `probe-usage-guide.md` |
-| E2E 人工验证清单（shim/CLI/生命周期） | `2026-09-06-e2e-real-value-testing-gaps.md` |
+| E2E 人工验证清单（shim/CLI/生命周期） | `openspec-release-verification.md` |
 | 运行时模型与宿主环境坑（Bun panic、TEMP 短名、BatBadBut） | `node-opencode-plugin-runtime-model.md` |
 
 本地运行记录：`test-runs/YYYY-MM-DD.md`（不进 Git，仅供本机排查）。
