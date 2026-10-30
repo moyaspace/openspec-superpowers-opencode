@@ -157,6 +157,32 @@ exit 1
 | 全量跑时 30+ 文件集体 `spawn UNKNOWN` | 机器上已有 40 个 node 进程（用户 OpenCode/MCP）+ 默认并发 | 单文件跑全绿；`--test-concurrency=2` 后仅剩真实失败 |
 | `tarball: CLI 版本输出…` 失败，`npm pack` 退出码 `3221226505`（Windows STATUS_STACK_BUFFER_OVERRUN） | `npm pack` 进程在负载下崩溃，非断言失败 | 单文件复跑 → pass；`--test-concurrency=1` 全量 → 240/240 |
 
+### 8.4 `npm test` 环境类失败（9009, spawn）→ 改用等价全量入口通过
+
+**finish 阶段（Step 3b / Step 7 阶段二）批准的测试口径。**
+
+```text
+npm test
+→ typecheck ✓  build ✓  node --test "test/*.test.js"
+→ tests 240 / suites 47 / pass 239 / fail 1 / skipped 0
+→ 失败项：openspec new change applies OSO schema to the change
+→ 实际值 9009（Windows cmd「命令未找到」= 子进程 spawn 失败，非断言失败）
+→ 链式 && 被前段打断，elevated 未跑到
+```
+
+**判定：环境类失败，不是回归。** `9009` 是 cmd 层的「命令未找到」，说明测试真正要断言的内容根本没执行到；同一失败项单文件复跑通过，且项目自带入口未做任何代码改动。
+
+**改用等价全量入口后通过（本变更唯一的权威测试口径）：**
+
+```text
+node --test --test-concurrency=1 "test/*.test.js"
+→ tests 240 / suites 47 / pass 240 / fail 0 / skipped 0 / exit 0
+```
+
+同口径在 merge 前的临时测试台（`.worktrees/_merge-test-oso-v1-defect-backport/`，干净检出 + `npm ci`）上重跑一次，结果一致 —— 证明结论不依赖开发 worktree 的残留环境。
+
+**偏差记录**：`npm test`（`package.json` 里的声明入口）在本机（Windows + 常驻约 40 个 node 进程）并行 spawn 偶发 `9009`，不可稳定复现。改用 `--test-concurrency=1` 的等价全量入口，并由用户在本轮 finish 指令中明确批准（「不要用 npm test，改用 node --test --test-concurrency=1」）。此项不改变任何用例的断言与数量，仅改变并发度。
+
 ---
 
 ## Overall Decision
