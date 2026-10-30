@@ -14,7 +14,7 @@ description: Continue working on a change - create the next artifact (Experiment
 openspec-superpowers-opencode verify
 ```
 
-- **成功（exit 0）** → 执行 `openspec list --json` → 获取活动 changes → 使用 **AskUserQuestion** 工具让用户选择
+- **成功（exit 0）** → 执行 `openspec list --json` → 获取活动 changes → 使用 **question** 工具让用户选择
 - **失败（exit 1）** →
   - 向用户展示 verify 的输出结果（诊断报告和修复建议）
   - 用 `question` 工具询问用户：**修复** 或者 **停止**
@@ -52,7 +52,7 @@ openspec status --change "<name>" --json
 **全部 blocked**：
 - 展示状态供用户检查
 
-### Step 5: 回 main
+### Step 5: 退出 worktree 回项目根（不切换分支）
 
 ```bash
 cd <project-root>

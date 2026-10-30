@@ -1,22 +1,27 @@
 ## ADDED Requirements
 
-### Requirement: Propose records the base branch in the registry
+### Requirement: Creating commands record the base branch in the registry
 
-When `ensure-worktree` creates a change worktree, the CLI SHALL record the current branch (the branch from which the worktree was cut) as `baseBranch` on that change's registry entry. The base SHALL be read at the project root immediately after `git worktree add` succeeds, because that is the only point where the current HEAD reflects the true base.
+The change-creating workflows `opsx-propose`, `opsx-ff`, and `opsx-new` SHALL read the current branch at the project root before any worktree exists (propose 2d, ff 2d, new 3d), carry that value through worktree creation, and write it into the change's registry entry via `registry add <name> .worktrees/<name> --base <BASE_BRANCH>` (propose 4a, ff 4a, new 5a). Each SHALL display it in its `Output` as the base branch. `ensure-worktree` SHALL NOT read or write the base. The recorded value SHALL NOT be derived from the worktree's own HEAD, which is `feature/<name>` at that point.
 
-#### Scenario: worktree created on release/1.1 records baseBranch
+#### Scenario: propose writes baseBranch via registry add
 
-- **WHEN** the repository is on `release/1.1` and `ensure-worktree <name>` runs successfully
+- **WHEN** the repository is on `release/1.1` and propose reaches Step 4a
 - **THEN** the entry for `<name>` in `openspec/oso-change-registry.json` contains `"baseBranch": "release/1.1"`
 
-#### Scenario: base is not read from inside the worktree
+#### Scenario: ff and new record the base too
 
-- **WHEN** a subsequent `registry add <name> .worktrees/<name>` runs from inside the worktree without `--base`
-- **THEN** it MUST NOT overwrite the previously recorded `baseBranch` (which would otherwise become `feature/<name>`)
+- **WHEN** the repository is on `release/1.1` and `/opsx-ff` reaches Step 4a or `/opsx-new` reaches Step 5a
+- **THEN** the registry entry for `<name>` contains `"baseBranch": "release/1.1"`
+
+#### Scenario: base is read at the project root, not inside the worktree
+
+- **WHEN** the registry add step runs from inside `.worktrees/<name>`
+- **THEN** it passes the value captured before worktree creation (project-root HEAD) and MUST NOT derive it from the current HEAD
 
 ### Requirement: Registry add uses merge semantics
 
-The registry `add()` operation SHALL merge into an existing same-named entry rather than replacing it wholesale. Fields present on the existing entry but absent from the new call (for example `baseBranch` supplied during `ensure-worktree`) SHALL be preserved. When no `baseBranch` argument is provided, the operation SHALL NOT write a `baseBranch` key (no `undefined` empty key). An explicit `baseBranch` argument SHALL override the stored value.
+The registry `add()` operation SHALL merge into an existing same-named entry rather than replacing it wholesale. Fields present on the existing entry but absent from the new call (for example `baseBranch` supplied by an earlier `registry add --base`) SHALL be preserved. When no `baseBranch` argument is provided, the operation SHALL NOT write a `baseBranch` key (no `undefined` empty key). An explicit `baseBranch` argument SHALL override the stored value.
 
 #### Scenario: add without --base preserves an existing baseBranch
 
@@ -33,27 +38,32 @@ The registry `add()` operation SHALL merge into an existing same-named entry rat
 - **WHEN** `registry add <name> <worktree> --base release/1.1` is called
 - **THEN** the entry contains `"baseBranch": "release/1.1"`
 
-### Requirement: Proposal carries a Base traceability header
+### Requirement: openspec list --json exposes baseBranch
 
-After generating `proposal.md`, the propose workflow SHALL insert a blockquote line `> Base: <BASE_BRANCH>` at the top of the document. This header SHALL be preserved because it is the only long-term base record after the change is archived (the registry entry is removed at finish time).
+The oso `openspec list --json` shim SHALL include the change's `baseBranch` (as recorded in the project-root `openspec/oso-change-registry.json`) in each change object it emits, and SHALL omit the key entirely when no base was recorded. Command text SHALL obtain the base through this command rather than by parsing the registry file directly.
 
-#### Scenario: proposal.md records the base
+#### Scenario: recorded base appears in list output
 
-- **WHEN** `propose` completes with base `release/1.1`
-- **THEN** `openspec/changes/<name>/proposal.md` begins with a `> Base: release/1.1` line
+- **WHEN** the registry entry for `demo` contains `baseBranch: "release/1.1"` and `openspec list --json` runs
+- **THEN** the emitted change object for `demo` contains `"baseBranch": "release/1.1"`
 
-### Requirement: Finish determines base from the registry and never defaults to main
+#### Scenario: absent base is omitted, not null
 
-The `opsx-finish` Step 6a SHALL determine the base branch in this order, without skipping: (1) read the `baseBranch` field for the change from the project-root `openspec/oso-change-registry.json`; (2) if absent, ask the user with the `question` tool; (3) if still undetermined, STOP without rebasing or merging. It MUST NOT assume `main` or `master`, and MUST NOT treat `base` and `main` as the same unless the user confirms the base is `main`. After determining the base, it SHALL restate the merge direction `feature/<name> → <base-branch>` and obtain confirmation.
+- **WHEN** the registry entry for `demo` has no `baseBranch` and `openspec list --json` runs
+- **THEN** the emitted change object for `demo` contains no `baseBranch` key
 
-#### Scenario: base read from registry and restated
+### Requirement: Finish determines base from openspec list --json and never defaults to main
 
-- **WHEN** the registry entry for the change contains `baseBranch: "release/1.1"`
+The `opsx-finish` Step 6a SHALL determine the base branch in this order, without skipping: (1) read the `baseBranch` field for the change from `openspec list --json`; (2) if absent, ask the user with the `question` tool; (3) if still undetermined, STOP without rebasing or merging. It MUST NOT assume `main` or `master`, and MUST NOT treat `base` and `main` as the same unless the user confirms the base is `main`. After determining the base, it SHALL restate the merge direction `feature/<name> → <base-branch>` and obtain confirmation.
+
+#### Scenario: base read from list output and restated
+
+- **WHEN** `openspec list --json` reports `baseBranch: "release/1.1"` for the change
 - **THEN** finish restates the merge direction as `feature/<name> → release/1.1` and proceeds without asking for a base
 
 #### Scenario: missing baseBranch triggers a question, not a main default
 
-- **WHEN** the registry entry has no `baseBranch`
+- **WHEN** the change has no recorded `baseBranch`
 - **THEN** finish asks the user for the base branch via the `question` tool and MUST NOT fall back to `main`
 
 ### Requirement: Template commands use the current or original branch as base

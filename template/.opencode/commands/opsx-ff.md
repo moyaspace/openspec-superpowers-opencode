@@ -2,13 +2,13 @@
 description: Create a change and generate all artifacts in isolated worktree (Experimental)
 ---
 
-Fast-forward：创建 worktree → 在 worktree 内生成全部 artifacts → commit → 回 main。
+Fast-forward：创建 worktree → 在 worktree 内生成全部 artifacts → commit → 退出 worktree 回项目根（不切换分支）。
 
 **Input**: 变更名称（kebab-case），或变更描述。
 
 ### Step 1: 确定名称
 
-如果提供了名称则直接用。否则 AskUserQuestion 询问。
+如果提供了名称则直接用。否则用 **question** 工具询问。
 
 ### Step 2: 确认 git 仓库已有至少一个 commit
 
@@ -27,20 +27,20 @@ git rev-parse --verify HEAD
 git add -A && git commit -m "chore: initial project setup"
 ```
 
-跳到 Step 3
+跳到 2d
 
-**2c. 检查 main 是否有未提交更改：**
+**2c. 检查当前分支是否有未提交更改：**
 
 ```bash
 git status --porcelain
 ```
 
-- 输出为空 → 跳到 Step 3
+- 输出为空 → 跳到 2d
 - 输出非空 → 用 **question** 工具询问：
 
-  > **main 分支有未提交的更改。是否先提交？(y/N)**
+  > **当前分支有未提交的更改。是否先提交？(y/N)**
   >
-  > - **N** → 不提交，跳到 Step 3
+  > - **N** → 不提交，跳到 2d
   > - **Y** →
 
   **2c-1. 提交变更：**
@@ -55,12 +55,23 @@ git status --porcelain
   git log --oneline -1
   ```
 
-  - 显示有新 commit → 成功，跳到 Step 3
+  - 显示有新 commit → 成功，跳到 2d
   - 无新 commit 或报错 → 失败，回到 2c-1 重试
+
+**2d. 读取 base（不可跳过）：**
+
+`ensure-worktree` 会以当前 HEAD 为 base。这里在**创建 worktree 之前**从项目根读出它，作为 Step 4a 写入注册表、以及 Output 展示的值：
+
+```bash
+git rev-parse --abbrev-ref HEAD   # → BASE_BRANCH
+```
+
+- 只读：不写注册表、不调 `question`、不切换分支
+- 读出来不是你想要的 base → 提示用户自行 `git switch <目标分支>` 后重跑，不得继续切 worktree
 
 ### Step 3: 创建隔离 Worktree
 
-Artifacts 在 feature 分支上生成，不在 main 上留痕迹。
+Artifacts 在 feature 分支上生成，不在基础分支上留痕迹。
 
 **3a. 创建 worktree：**
 
@@ -99,7 +110,7 @@ openspec new change "<name>"
 记录 change 到注册表，供后续 opsx 命令查找活跃变更以及对应的 worktree：
 
 ```bash
-openspec-superpowers-opencode registry add <name> .worktrees/<name>
+openspec-superpowers-opencode registry add <name> .worktrees/<name> --base "<BASE_BRANCH>"
 ```
 
 - **成功（exit 0）** → 继续 Step 5
@@ -131,7 +142,7 @@ d. 显示 "✓ Created <artifact-id>"
 
 e. 循环直到 `openspec status --change "<name>" --json` 中所有 `applyRequires` 为 `"done"`
 
-### Step 6: 提交 artifacts 并回 main
+### Step 6: 提交 artifacts 并退出 worktree（cd 回项目根，不切换分支）
 
 ```bash
 git add -A && git commit -m "change: <name>"
@@ -143,6 +154,7 @@ cd <project-root>
 - 变更：`<name>`
 - Worktree：`.worktrees/<name>/`
 - 分支：`feature/<name>`
+- 基础分支：`<BASE_BRANCH>`
 - 已创建：`<N>` 个 artifacts
 - 提示：`/opsx-apply` 开始实现
 
@@ -150,5 +162,5 @@ cd <project-root>
 
 - `context` 和 `rules` 是给你的约束，不是写入文件的内容
 - 始终先读依赖 artifact 再创建新 artifact
-- 上下文不清晰时优先 AskUserQuestion
+- 上下文不清晰时优先用 **question** 工具
 - 确认每个 artifact 文件已写入后再继续下一个

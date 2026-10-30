@@ -2,13 +2,13 @@
 description: Start a new change in an isolated worktree (Experimental)
 ---
 
-覆盖 OpenSpec 内置命令。创建 worktree → 在 worktree 内生成变更 → commit → 回 main。
+覆盖 OpenSpec 内置命令。创建 worktree → 在 worktree 内生成变更 → commit → 退出 worktree 回项目根（不切换分支）。
 
 **Input**: 变更名称（kebab-case），或变更描述。
 
 ### Step 1: 确定名称
 
-如果提供了名称则直接用。否则 AskUserQuestion：
+如果提供了名称则直接用。否则用 **question** 工具：
 
 > "你想创建什么变更？描述一下你要构建或修复的内容。"
 
@@ -37,20 +37,20 @@ git rev-parse --verify HEAD
 git add -A && git commit -m "chore: initial project setup"
 ```
 
-跳到 Step 4
+跳到 3d
 
-**3c. 检查 main 是否有未提交更改：**
+**3c. 检查当前分支是否有未提交更改：**
 
 ```bash
 git status --porcelain
 ```
 
-- 输出为空 → 跳到 Step 4
+- 输出为空 → 跳到 3d
 - 输出非空 → 用 **question** 工具询问：
 
-  > **main 分支有未提交的更改。是否先提交？(y/N)**
+  > **当前分支有未提交的更改。是否先提交？(y/N)**
   >
-  > - **N** → 不提交，跳到 Step 4
+  > - **N** → 不提交，跳到 3d
   > - **Y** →
 
   **3c-1. 提交变更：**
@@ -65,12 +65,23 @@ git status --porcelain
   git log --oneline -1
   ```
 
-  - 显示有新 commit → 成功，跳到 Step 4
+  - 显示有新 commit → 成功，跳到 3d
   - 无新 commit 或报错 → 失败，回到 3c-1 重试
+
+**3d. 读取 base（不可跳过）：**
+
+`ensure-worktree` 会以当前 HEAD 为 base。这里在**创建 worktree 之前**从项目根读出它，作为 Step 5a 写入注册表、以及 Output 展示的值：
+
+```bash
+git rev-parse --abbrev-ref HEAD   # → BASE_BRANCH
+```
+
+- 只读：不写注册表、不调 `question`、不切换分支
+- 读出来不是你想要的 base → 提示用户自行 `git switch <目标分支>` 后重跑，不得继续切 worktree
 
 ### Step 4: 创建隔离 Worktree
 
-Artifacts 应在 feature 分支上生成，不在 main 上留痕迹。
+Artifacts 应在 feature 分支上生成，不在基础分支上留痕迹。
 
 **4a. 创建 worktree：**
 
@@ -111,7 +122,7 @@ openspec new change "<name>"
 记录 change 到注册表，供后续 opsx 命令查找活跃变更以及对应的 worktree：
 
 ```bash
-openspec-superpowers-opencode registry add <name> .worktrees/<name>
+openspec-superpowers-opencode registry add <name> .worktrees/<name> --base "<BASE_BRANCH>"
 ```
 
 - **成功（exit 0）** → 继续 Step 6
@@ -130,7 +141,7 @@ openspec instructions <first-artifact-id> --change "<name>"
 
 展示第一个 artifact 的 template 和 instruction，**不需要创建它**。
 
-### Step 7: 提交 scaffold 并回 main
+### Step 7: 提交 scaffold 并退出 worktree（cd 回项目根，不切换分支）
 
 ```bash
 git add -A && git commit -m "change: <name> (scaffold)"
@@ -144,6 +155,7 @@ cd <project-root>
 - 变更：`<name>`
 - Worktree：`.worktrees/<name>/`
 - 分支：`feature/<name>`
+- 基础分支：`<BASE_BRANCH>`
 - Schema：...
 - 下一步：`/opsx-continue` 创建下一个 artifact，或 `/opsx-ff <name>` 一次性生成全部
 
