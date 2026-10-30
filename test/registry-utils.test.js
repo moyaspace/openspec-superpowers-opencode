@@ -281,6 +281,31 @@ describe('mergeListJson()', () => {
         const parsed = JSON.parse(result);
         assert.ok(!('baseBranch' in parsed.changes[0]));
     });
+
+    test('Phase ② root-only changes never gain baseBranch', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-a'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', (cmd, opts) => {
+            if (opts.cwd.endsWith('feature-a')) {
+                return Buffer.from(JSON.stringify({
+                    changes: [{ name: 'feature-a', completedTasks: 1, totalTasks: 3, status: 'in-progress' }]
+                }));
+            }
+            return Buffer.from(JSON.stringify({
+                changes: [{ name: 'root-only-change', completedTasks: 0, totalTasks: 0, status: 'no-tasks' }]
+            }));
+        });
+
+        const result = registryUtils.mergeListJson([
+            { name: 'feature-a', worktree: '.worktrees/feature-a', baseBranch: 'release/1.1' }
+        ], dir);
+
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 2);
+        assert.strictEqual(parsed.changes[1].name, 'root-only-change');
+        assert.ok(!('baseBranch' in parsed.changes[1]));
+    });
 });
 
 // ============================================================

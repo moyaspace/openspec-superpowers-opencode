@@ -316,9 +316,10 @@ describe('reset()', () => {
 });
 
 // ============================================================
-// CLI 集成：ensure-worktree / registry add --base 写入 baseBranch
-// 通过真实 git 仓库 + dist/cli/index.js 子进程，验证 baseBranch
-// 取自 `git rev-parse --abbrev-ref HEAD`（创建时当前分支）。
+// CLI 集成：ensure-worktree / registry add --base
+// base 的唯一写入点是命令文本里的 `registry add --base`；
+// ensure-worktree 只建 worktree，不读不写注册表（创建与早返回路径皆然）。
+// 以下用真实 git 仓库 + dist/cli/index.js 子进程验证该契约。
 // ============================================================
 
 /** 在 dir 中执行 git 命令并返回 stdout */
@@ -392,6 +393,20 @@ describe('ensure-worktree / registry add --base（CLI 集成）', () => {
         const entry = readRegistryFile(repo).changes.find(c => c.name === name);
         assert.ok(entry, 'registry add 预置的条目应仍存在');
         assert.ok(!('baseBranch' in entry), 'ensure-worktree 不应写入 baseBranch');
+    });
+
+    test('ensure-worktree 完全不触碰注册表（创建与早返回路径）', () => {
+        const repo = makeGitRepo('sc-base-branch');
+        const name = 'clean-demo';
+        const registryFile = path.join(repo, 'openspec', 'oso-change-registry.json');
+
+        const created = runCliFrom(repo, ['ensure-worktree', name]);
+        assert.strictEqual(created.code, 0, `首次 ensure-worktree 应成功, stderr: ${created.stderr}`);
+        assert.ok(!fs.existsSync(registryFile), '创建 worktree 不应写入注册表');
+
+        const earlyReturn = runCliFrom(repo, ['ensure-worktree', name]);
+        assert.strictEqual(earlyReturn.code, 0, `worktree 已存在时应早返回 exit 0, stderr: ${earlyReturn.stderr}`);
+        assert.ok(!fs.existsSync(registryFile), '早返回不应写入注册表');
     });
 
     test('registry add --base <branch> 写入显式指定的 baseBranch', () => {
