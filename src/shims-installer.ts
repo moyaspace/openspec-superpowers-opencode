@@ -449,3 +449,5 @@ export {
     binDirFromToolDir,
     findRealOpenspec,
 };
+
+export type { ShimOperationResult };

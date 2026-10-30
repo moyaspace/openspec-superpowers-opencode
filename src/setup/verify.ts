@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 interface ProgressEvent {
     type: string;
@@ -136,6 +137,10 @@ async function verifyProject(options: VerifyProjectOptions): Promise<VerifyProje
 }
 
 export { verifyProject };
+
+export function resolveToolRoot(): string {
+    return path.dirname(fileURLToPath(new URL('../../package.json', import.meta.url)));
+}
 
 /**
  * 校验落盘文件不含路径占位符。以目标文件为准，不看模板源——

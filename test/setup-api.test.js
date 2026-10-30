@@ -8,6 +8,14 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/** 已生效垫片的测试桩：阻止 init/dry-run 触碰真实全局 bin。 */
+const ACTIVE_SHIM = {
+    isWin: false,
+    findOpenspec: () => '/fake/bin/openspec',
+    findShimFile: () => '/fake/bin/openspec',
+    findOpenspecOrig: () => '/fake/bin/openspec-orig',
+};
+
 describe('setup public API', () => {
     it('exports init, reset, and dry-run entry points', () => {
 
@@ -28,6 +36,7 @@ describe('setup public API', () => {
         const result = await setup.dryRunProject({
             targetDir,
             templateDir: path.resolve(__dirname, '..', 'template'),
+            shimDeps: ACTIVE_SHIM,
             superpowersPath,
             runner: { run: () => ({ code: 0, stdout: '1.0.0', stderr: '' }) },
         });
@@ -78,6 +87,7 @@ describe('setup public API', () => {
         const result = await setup.initProject({
             targetDir,
             templateDir: path.resolve(__dirname, '..', 'template'),
+            shimDeps: ACTIVE_SHIM,
             superpowersPath,
             runner,
             lang: 'en',
@@ -106,6 +116,7 @@ describe('setup public API', () => {
         const result = await setup.initProject({
             targetDir,
             templateDir: path.resolve(__dirname, '..', 'template'),
+            shimDeps: ACTIVE_SHIM,
             env: { BROWN_OVERRIDE_INIT: 'no' },
             runner,
             superpowersPath,
@@ -138,6 +149,7 @@ describe('setup public API', () => {
         const result = await setup.initProject({
             targetDir,
             templateDir: path.resolve(__dirname, '..', 'template'),
+            shimDeps: ACTIVE_SHIM,
             superpowersPath,
             runner,
         });
@@ -161,6 +173,7 @@ describe('setup public API', () => {
         const result = await setup.dryRunProject({
             targetDir,
             templateDir: path.resolve(__dirname, '..', 'template'),
+            shimDeps: ACTIVE_SHIM,
             superpowersPath,
             runner: { run: () => ({ code: 0, stdout: '1.0.0', stderr: '' }) },
             env: { BROWN_OVERRIDE_INIT: 'yes', BROWN_OVERRIDE_OPENSPEC: 'no' },
@@ -189,6 +202,7 @@ describe('setup public API', () => {
         const result = await setup.dryRunProject({
             targetDir,
             templateDir: path.resolve(__dirname, '..', 'template'),
+            shimDeps: ACTIVE_SHIM,
             superpowersPath,
             runner: { run: () => ({ code: 0, stdout: '1.0.0', stderr: '' }) },
             env: {

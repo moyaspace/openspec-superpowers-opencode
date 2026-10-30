@@ -11,7 +11,8 @@ import { buildManifest, type Manifest } from './manifest.js';
 import { createInitPlan, type InitDecisions, type InitPlan } from './planner.js';
 import { createProcessRunner, type ProcessRunner, type RunResult } from './process-runner.js';
 import { resolveDecision, type Decision } from './prompt.js';
-import { verifyNoPlaceholders, verifyProject } from './verify.js';
+import { resolveToolRoot, verifyNoPlaceholders, verifyProject } from './verify.js';
+import { checkShim, ensureShim, type ShimDeps } from './shim-check.js';
 import { resetProject } from './reset.js';
 
 interface ProgressEvent {
@@ -52,6 +53,8 @@ interface SetupOptions {
     superpowersPath?: string | undefined;
     superpowersVersion?: string | undefined;
     decisions?: InitDecisions | undefined;
+    toolRoot?: string | undefined;
+    shimDeps?: ShimDeps | undefined;
 }
 
 interface RequireCommandError extends Error {
@@ -325,6 +328,21 @@ async function dryRunProject(options: SetupOptions = {}): Promise<InitPlan | { m
 
     p({ type: 'blank' });
 
+    // ---- 垫片自检（BUG004）：dry-run 只报告，不修改全局 bin ----
+    const shimStatus = checkShim(options.shimDeps ?? {});
+    if (shimStatus.active) {
+        p({ type: 'pass', item: t('openspec 垫片已生效', 'openspec shim active') });
+    } else {
+        p({
+            type: 'warn',
+            item: t(
+                `openspec 垫片未生效（${shimStatus.reason}）；正式 init 会自动安装，dry-run 不修改全局 bin`,
+                `openspec shim inactive (${shimStatus.reason}); real init will auto-install, dry-run does not touch global bin`,
+            ),
+        });
+    }
+    p({ type: 'blank' });
+
     // ---- 1/8: 检测 Superpowers ----
     p({ type: 'step', n: 1, total: 8, label: t('检测 Superpowers 安装路径', 'Detecting Superpowers installation path') });
     const superpowers = resolveSuperpowers(options);
@@ -514,6 +532,24 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
     const superpowers = resolveSuperpowers(options);
     p({ type: 'pass', item: 'Superpowers installed' });
 
+    p({ type: 'blank' });
+
+    // ---- 垫片自检（BUG004）：0/8 之后确认 openspec 已是垫片且 openspec-orig 存在 ----
+    // 垫片是全局状态，不属于本次 init 写入目标目录的内容，因此失败即中止而不是回滚。
+    const shimToolDir = options.toolRoot ?? resolveToolRoot();
+    const shimResult = ensureShim(shimToolDir, options.shimDeps ?? {});
+    if (!shimResult.ok) {
+        throw new Error(
+            `${t('openspec 垫片未生效且自动安装失败', 'openspec shim is inactive and auto-install failed')}: `
+            + `${shimResult.details.join('; ')}\n`
+            + t('请运行 `oso install-shims`（Windows 需管理员权限）', 'Run `oso install-shims` (administrator required on Windows)'),
+        );
+    }
+    if (shimResult.repaired) {
+        p({ type: 'pass', item: t('已自动安装垫片', 'openspec shim installed automatically') });
+    } else {
+        p({ type: 'pass', item: t('openspec 垫片已生效', 'openspec shim active') });
+    }
     p({ type: 'blank' });
 
     // ---- 1/8: 检测 Superpowers 路径 ----
