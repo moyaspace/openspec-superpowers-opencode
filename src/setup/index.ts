@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { createContext, type SetupContext } from './context.js';
 import { executeOperations } from './deploy.js';
@@ -143,6 +144,40 @@ const PLACEHOLDER_TARGETS = [
     '.opencode/commands/opsx-apply.md',
     '.opencode/commands/opsx-finish.md',
 ] as const;
+
+function listTemplateCommands(templateDir: string): string[] {
+    const root = path.join(templateDir, '.opencode', 'commands');
+    if (!fs.existsSync(root)) return [];
+    const out: string[] = [];
+    const walk = (relative: string): void => {
+        for (const entry of fs.readdirSync(path.join(root, relative), { withFileTypes: true })) {
+            const child = relative ? `${relative}/${entry.name}` : entry.name;
+            if (entry.isDirectory()) walk(child);
+            else if (entry.isFile() && entry.name.endsWith('.md')) out.push(child);
+        }
+    };
+    walk('');
+    return out.sort();
+}
+
+async function verifyDeploymentPostInit(toolRoot: string, context: SetupContext): Promise<string[]> {
+    const missing: string[] = [];
+    for (const relative of listTemplateCommands(context.templateDir)) {
+        const target = path.join(context.targetDir, '.opencode', 'commands', ...relative.split('/'));
+        if (!fs.existsSync(target)) missing.push(`.opencode/commands/${relative} (not deployed)`);
+    }
+    const cliEntry = path.join(toolRoot, 'dist', 'cli', 'index.js');
+    if (!fs.existsSync(cliEntry)) {
+        missing.push('dist/cli/index.js (missing)');
+    } else {
+        try {
+            await import(pathToFileURL(cliEntry).href);
+        } catch (error) {
+            missing.push(`dist/cli/index.js (import failed: ${(error as Error).message})`);
+        }
+    }
+    return missing;
+}
 
 function commitProject(
     targetDir: string,
@@ -767,6 +802,26 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
     p({ type: 'section', label: t('Git 初始化和提交', 'Git Init & Commit') });
     commitProject(context.targetDir, runner, p, t);
 
+    // ---- 部署后验证（GAP002）：命令齐全 + CLI 入口可加载；失败只报错，不回滚 ----
+    p({ type: 'section', label: t('部署后验证', 'Post-deploy verification') });
+    const postVerifyMissing = await verifyDeploymentPostInit(options.toolRoot ?? resolveToolRoot(), context);
+    if (postVerifyMissing.length > 0) {
+        for (const item of postVerifyMissing) p({ type: 'fail', item });
+        p({
+            type: 'fail',
+            item: t(
+                `部署后验证失败：${postVerifyMissing.length} 项缺失`,
+                `Post-deploy verification failed: ${postVerifyMissing.length} missing item(s)`,
+            ),
+        });
+        return { success: false, plan, manifest, verification, lockVerification };
+    }
+    p({ type: 'pass', item: t('模板命令均已部署', 'All template commands deployed') });
+    p({ type: 'pass', item: 'dist/cli/index.js' });
+    p({ type: 'milestone', text: t('部署后验证通过', 'Post-deploy verification passed') });
+
+    p({ type: 'blank' });
+
     p({ type: 'banner-init' });
     p({ type: 'blank' });
     p({ type: 'info', text: t('下一步：', 'Next steps:') });
@@ -782,4 +837,5 @@ export {
     dryRunProject,
     initProject,
     resetProject,
+    verifyDeploymentPostInit,
 };
