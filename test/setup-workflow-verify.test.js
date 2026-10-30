@@ -1,6 +1,9 @@
 import { changeListed, parseStatusOutput, parseTemplateOutput, verifyProject } from '../dist/setup/verify.js';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 describe('verifyProject', () => {
     it('parses structured template, change list, and status output', () => {
@@ -17,7 +20,9 @@ describe('verifyProject', () => {
         );
     });
 
-    it('cleans a uniquely named change in finally after a later failure', async () => {
+    it('cleans a uniquely named change in finally after a later failure', async (t) => {
+        const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-workflow-verify-'));
+        t.after(() => fs.rmSync(targetDir, { recursive: true, force: true }));
         const calls = [];
         const cleaned = [];
         let createdName;
@@ -40,7 +45,7 @@ describe('verifyProject', () => {
         };
 
         const result = await verifyProject({
-            targetDir: 'project',
+            targetDir,
             runner,
             uniquePart: () => '123-fixed',
             cleanup: name => cleaned.push(name),

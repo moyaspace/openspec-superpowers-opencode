@@ -703,6 +703,21 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
 
     p({ type: 'blank' });
 
+    // ---- 注册表创建 ----
+    const registryPath = path.join(context.targetDir, 'openspec', 'oso-change-registry.json');
+    let overwriteRegistry = true;
+    if (fs.existsSync(registryPath)) {
+        const regResult = await resolveDecision({
+            override: (options.env || process.env).BROWN_OVERRIDE_REGISTRY,
+            prompt: options.prompt,
+            question: t('oso-change-registry.json 已存在，是否覆写？(y/N):', 'oso-change-registry.json exists. Overwrite? (y/N):'),
+        });
+        overwriteRegistry = regResult === 'yes';
+    }
+    createRegistry(context.targetDir, p, overwriteRegistry);
+
+    p({ type: 'blank' });
+
     // ---- 8/8: 验证工作流 + 写入安装清单 ----
     p({ type: 'step', n: 8, total: 8, label: t('验证工作流 + 写入安装清单', 'Validating workflow + writing manifest') });
 
@@ -732,20 +747,6 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
     if (overwriteCount > 0) {
         p({ type: 'info', text: `  ${overwriteCount} ${t('项覆盖决策已记录', 'overwrite decisions recorded')}` });
     }
-
-    // ---- 注册表创建 ----
-    p({ type: 'blank' });
-    const registryPath = path.join(context.targetDir, 'openspec', 'oso-change-registry.json');
-    let overwriteRegistry = true;
-    if (fs.existsSync(registryPath)) {
-        const regResult = await resolveDecision({
-            override: (options.env || process.env).BROWN_OVERRIDE_REGISTRY,
-            prompt: options.prompt,
-            question: t('oso-change-registry.json 已存在，是否覆写？(y/N):', 'oso-change-registry.json exists. Overwrite? (y/N):'),
-        });
-        overwriteRegistry = regResult === 'yes';
-    }
-    createRegistry(context.targetDir, p, overwriteRegistry);
 
     // ---- Git 初始化和提交 ----
     p({ type: 'blank' });

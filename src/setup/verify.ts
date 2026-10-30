@@ -16,6 +16,7 @@ interface ProgressEvent {
 export type ProgressCallback = (event: ProgressEvent) => void;
 
 import { type ProcessRunner, type RunResult } from './process-runner.js';
+import { add as addRegistryEntry, remove as removeRegistryEntry } from '../registry.js';
 
 export function parseTemplateOutput(stdout: string): { ok: boolean; count: number } {
     try {
@@ -86,6 +87,7 @@ async function verifyProject(options: VerifyProjectOptions): Promise<VerifyProje
         ? options.uniquePart()
         : `${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
     const changeName = `oso-verify-${uniquePart}`;
+    const registryPath = path.join(targetDir, 'openspec', 'oso-change-registry.json');
     let created = false;
     const progress = options.progress || (() => {});
 
@@ -105,6 +107,13 @@ async function verifyProject(options: VerifyProjectOptions): Promise<VerifyProje
         requireSuccess(runner.run('openspec', ['new', 'change', changeName], { cwd: targetDir }), 'change-create');
         created = true;
         progress({ type: 'pass', item: 'Test change created' });
+
+        try {
+            addRegistryEntry(registryPath, changeName, '.');
+        } catch (error) {
+            throw new Error(`registry-add failed: ${(error as Error).message}`);
+        }
+        progress({ type: 'pass', item: 'Verification change registered' });
 
         const list = requireSuccess(runner.run('openspec', ['list', '--json'], { cwd: targetDir }), 'change-list');
         if (!changeListed(list.stdout, changeName)) throw new Error('created verification change is not listed');
@@ -129,6 +138,11 @@ async function verifyProject(options: VerifyProjectOptions): Promise<VerifyProje
         progress({ type: 'fail', item: (error as Error).message || 'Verification failed' });
         return { passed: false, changeName, error };
     } finally {
+        try {
+            removeRegistryEntry(registryPath, changeName);
+        } catch (error) {
+            progress({ type: 'warn', item: `registry remove ${changeName} failed: ${(error as Error).message}` });
+        }
         if (created) {
             await cleanup(changeName);
             progress({ type: 'pass', item: 'Test change cleaned up' });
