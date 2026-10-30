@@ -148,6 +148,16 @@ describe('add()', () => {
         assert.strictEqual(data.changes[0].worktree, '.worktrees/demo-v2');
     });
 
+    test('overrides the stored baseBranch when one is given on re-add', () => {
+        const dir = tmpDir();
+        const rp = writeRegistry(dir, { changes: [
+            { name: 'demo', worktree: '.worktrees/demo', createdAt: 'x', baseBranch: 'main' }
+        ]});
+        registry.add(rp, 'demo', '.worktrees/demo', 'release/1.1');
+        const data = registry.read(rp);
+        assert.strictEqual(data.changes[0].baseBranch, 'release/1.1');
+    });
+
     test('writes no baseBranch key for a new entry added without one', () => {
         const dir = tmpDir();
         const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
