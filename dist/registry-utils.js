@@ -182,6 +182,12 @@ function execOpenspecOrig(args) {
     }
     process.exit(0);
 }
+function withBaseBranch(change, entry) {
+    if (entry.baseBranch !== undefined) {
+        change.baseBranch = entry.baseBranch;
+    }
+    return change;
+}
 /**
  * CLI 入口：node registry-utils.js list
  * 被包装脚本调用，输出合并后的 list 结果。
@@ -209,7 +215,7 @@ function mergeListJson(entries, projectRoot) {
             ? (projectRoot ? path.join(projectRoot, entry.worktree) : entry.worktree)
             : null;
         if (!wtPath || !fs.existsSync(wtPath)) {
-            allChanges.push({ name: entry.name, worktree: null });
+            allChanges.push(withBaseBranch({ name: entry.name, worktree: null }, entry));
             continue;
         }
         let output = '';
@@ -221,7 +227,7 @@ function mergeListJson(entries, projectRoot) {
             });
         }
         catch {
-            allChanges.push({ name: entry.name, worktree: null });
+            allChanges.push(withBaseBranch({ name: entry.name, worktree: null }, entry));
             continue;
         }
         let parsed;
@@ -229,24 +235,24 @@ function mergeListJson(entries, projectRoot) {
             parsed = JSON.parse(output);
         }
         catch {
-            allChanges.push({ name: entry.name, worktree: null });
+            allChanges.push(withBaseBranch({ name: entry.name, worktree: null }, entry));
             continue;
         }
         if (!parsed || !Array.isArray(parsed.changes)) {
-            allChanges.push({ name: entry.name, worktree: null });
+            allChanges.push(withBaseBranch({ name: entry.name, worktree: null }, entry));
             continue;
         }
         let merged = false;
         for (const change of parsed.changes) {
             if (change.name === entry.name) {
                 change.worktree = entry.worktree.replace(/\\/g, '/');
-                allChanges.push(change);
+                allChanges.push(withBaseBranch(change, entry));
                 merged = true;
                 break;
             }
         }
         if (!merged) {
-            allChanges.push({ name: entry.name, worktree: null });
+            allChanges.push(withBaseBranch({ name: entry.name, worktree: null }, entry));
         }
     }
     if (projectRoot) {

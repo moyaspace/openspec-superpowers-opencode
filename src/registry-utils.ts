@@ -202,7 +202,15 @@ function execOpenspecOrig(args: string[]): never {
 interface MergedChange {
     name?: unknown;
     worktree?: string | null;
+    baseBranch?: string;
     [key: string]: unknown;
+}
+
+function withBaseBranch(change: MergedChange, entry: RegistryEntry): MergedChange {
+    if (entry.baseBranch !== undefined) {
+        change.baseBranch = entry.baseBranch;
+    }
+    return change;
 }
 
 /**
@@ -234,7 +242,7 @@ function mergeListJson(entries: RegistryEntry[], projectRoot: string | null): st
             : null;
 
         if (!wtPath || !fs.existsSync(wtPath)) {
-            allChanges.push({ name: entry.name, worktree: null });
+            allChanges.push(withBaseBranch({ name: entry.name, worktree: null }, entry));
             continue;
         }
 
@@ -246,7 +254,7 @@ function mergeListJson(entries: RegistryEntry[], projectRoot: string | null): st
                 cwd: wtPath
             });
         } catch {
-            allChanges.push({ name: entry.name, worktree: null });
+            allChanges.push(withBaseBranch({ name: entry.name, worktree: null }, entry));
             continue;
         }
 
@@ -254,11 +262,11 @@ function mergeListJson(entries: RegistryEntry[], projectRoot: string | null): st
         try {
             parsed = JSON.parse(output) as { changes?: MergedChange[] };
         } catch {
-            allChanges.push({ name: entry.name, worktree: null });
+            allChanges.push(withBaseBranch({ name: entry.name, worktree: null }, entry));
             continue;
         }
         if (!parsed || !Array.isArray(parsed.changes)) {
-            allChanges.push({ name: entry.name, worktree: null });
+            allChanges.push(withBaseBranch({ name: entry.name, worktree: null }, entry));
             continue;
         }
 
@@ -266,13 +274,13 @@ function mergeListJson(entries: RegistryEntry[], projectRoot: string | null): st
         for (const change of parsed.changes) {
             if (change.name === entry.name) {
                 change.worktree = entry.worktree.replace(/\\/g, '/');
-                allChanges.push(change);
+                allChanges.push(withBaseBranch(change, entry));
                 merged = true;
                 break;
             }
         }
         if (!merged) {
-            allChanges.push({ name: entry.name, worktree: null });
+            allChanges.push(withBaseBranch({ name: entry.name, worktree: null }, entry));
         }
     }
 

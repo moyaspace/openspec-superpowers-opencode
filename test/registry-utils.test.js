@@ -239,6 +239,48 @@ describe('mergeListJson()', () => {
         assert.strictEqual(parsed.changes[0].worktree, '.worktrees/feature-a');
         assert.strictEqual(parsed.changes[0].completedTasks, 1);  // 来自 worktree，不是 root 的 99
     });
+
+    test('injects baseBranch from the registry entry when the worktree dir is missing', () => {
+        const dir = tmpProject();
+        const result = registryUtils.mergeListJson([
+            { name: 'ghost', worktree: '.worktrees/ghost', baseBranch: 'release/1.1' }
+        ], dir);
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 1);
+        assert.strictEqual(parsed.changes[0].baseBranch, 'release/1.1');
+    });
+
+    test('injects baseBranch into a matched change from the worktree', (t) => {
+        const dir = tmpProject();
+        fs.mkdirSync(path.join(dir, '.worktrees', 'feature-a'), { recursive: true });
+
+        t.mock.method(child_process, 'execSync', (cmd, opts) => {
+            if (opts.cwd.endsWith('feature-a')) {
+                return Buffer.from(JSON.stringify({
+                    changes: [{ name: 'feature-a', completedTasks: 1, totalTasks: 3, status: 'in-progress' }]
+                }));
+            }
+            return Buffer.from(JSON.stringify({ changes: [] }));
+        });
+
+        const result = registryUtils.mergeListJson([
+            { name: 'feature-a', worktree: '.worktrees/feature-a', baseBranch: 'release/1.1' }
+        ], dir);
+
+        const parsed = JSON.parse(result);
+        assert.strictEqual(parsed.changes.length, 1);
+        assert.strictEqual(parsed.changes[0].baseBranch, 'release/1.1');
+        assert.strictEqual(parsed.changes[0].worktree, '.worktrees/feature-a');
+    });
+
+    test('omits the baseBranch key when the registry entry has none', () => {
+        const dir = tmpProject();
+        const result = registryUtils.mergeListJson([
+            { name: 'ghost', worktree: '.worktrees/ghost' }
+        ], dir);
+        const parsed = JSON.parse(result);
+        assert.ok(!('baseBranch' in parsed.changes[0]));
+    });
 });
 
 // ============================================================

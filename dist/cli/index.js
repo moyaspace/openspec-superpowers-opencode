@@ -236,9 +236,6 @@ function runEnsureWorktree(name, cwd) {
         process.exit(1);
     }
     console.log(t(`  ✓ worktree 创建完成: .worktrees/${name}/`, `  ✓ Worktree created: .worktrees/${name}/`));
-    // 必须在此刻取 base：此时 cwd 仍是项目根，HEAD 即真实的分支；稍后在 worktree 内取会得到 feature/<name>。
-    const baseBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8' }).trim();
-    registry.add(getChangeRegistryPath(cwd), name, `.worktrees/${name}`, baseBranch);
     process.exit(0);
 }
 // ---- remove-worktree — 清除变更 worktree 和分支 ----
