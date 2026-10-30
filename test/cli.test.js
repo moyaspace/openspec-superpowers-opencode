@@ -62,3 +62,20 @@ describe('remove-worktree', () => {
         assert.ok(result.stdout.includes('✗') || result.stdout.includes('failed'));
     });
 });
+
+// ============================================================
+// registry add --base usage text
+// ============================================================
+describe('registry add --base usage', () => {
+    test('help documents [--base <branch>] (en)', () => {
+        const result = runCli('--help');
+        assert.strictEqual(result.code, 0);
+        assert.ok(result.stdout.includes('registry add <name> <worktree> [--base <branch>]'), result.stdout);
+    });
+
+    test('help documents [--base <branch>] (zh)', () => {
+        const result = runCli('--help', '--lang', 'zh-CN');
+        assert.strictEqual(result.code, 0);
+        assert.ok(result.stdout.includes('registry add <name> <worktree> [--base <branch>]'), result.stdout);
+    });
+});

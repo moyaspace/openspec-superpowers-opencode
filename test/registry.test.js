@@ -3,9 +3,14 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import child_process from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 // registry 模块（测试前还不存在——RED）
 import * as registry from '../dist/registry.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const cliPath = path.resolve(__dirname, '..', 'dist', 'cli', 'index.js');
 
 /** 创建临时目录用于每个测试 */
 function tmpDir() {
@@ -307,5 +312,104 @@ describe('reset()', () => {
         ]});
         const result = registry.reset(rp, false);
         assert.strictEqual(result.changesCount, 3);
+    });
+});
+
+// ============================================================
+// CLI 集成：ensure-worktree / registry add --base 写入 baseBranch
+// 通过真实 git 仓库 + dist/cli/index.js 子进程，验证 baseBranch
+// 取自 `git rev-parse --abbrev-ref HEAD`（创建时当前分支）。
+// ============================================================
+
+/** 在 dir 中执行 git 命令并返回 stdout */
+function gitExec(dir, args) {
+    return child_process.execFileSync('git', args, {
+        cwd: dir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe']
+    });
+}
+
+/**
+ * 建一个一次性 git 仓库：初始化 + 首次提交，然后切到指定分支。
+ * 返回仓库根目录（不含 .worktrees / openspec，交由 CLI 自行创建）。
+ */
+function makeGitRepo(branch) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'registry-cli-'));
+    gitExec(dir, ['init', '-q']);
+    gitExec(dir, ['config', 'user.email', 'test@example.com']);
+    gitExec(dir, ['config', 'user.name', 'Test User']);
+    gitExec(dir, ['config', 'commit.gpgsign', 'false']);
+    fs.writeFileSync(path.join(dir, 'README.md'), '# fixture\n');
+    gitExec(dir, ['add', '.']);
+    gitExec(dir, ['commit', '-q', '-m', 'init']);
+    gitExec(dir, ['checkout', '-q', '-b', branch]);
+    return dir;
+}
+
+/** 以指定 cwd 运行 dist CLI，仿 cli.test.js 的 execFileSync 模式 */
+function runCliFrom(cwd, args) {
+    try {
+        const stdout = child_process.execFileSync(process.execPath, [cliPath, ...args], {
+            cwd,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        return { stdout: stdout.trim(), stderr: '', code: 0 };
+    } catch (e) {
+        return {
+            stdout: e.stdout ? e.stdout.toString().trim() : '',
+            stderr: e.stderr ? e.stderr.toString().trim() : '',
+            code: e.status || 1
+        };
+    }
+}
+
+/** 读取仓库注册表（文件不存在时视为空） */
+function readRegistryFile(repo) {
+    const p = path.join(repo, 'openspec', 'oso-change-registry.json');
+    if (!fs.existsSync(p)) return { changes: [] };
+    return JSON.parse(fs.readFileSync(p, 'utf-8'));
+}
+
+describe('ensure-worktree / registry add --base（CLI 集成）', () => {
+    test('ensure-worktree 以创建时的当前分支名写入 baseBranch', () => {
+        const repo = makeGitRepo('sc-base-branch');
+        const name = 'base-demo';
+
+        const res = runCliFrom(repo, ['ensure-worktree', name]);
+        assert.strictEqual(res.code, 0, `ensure-worktree 应成功, stderr: ${res.stderr}`);
+
+        const entry = readRegistryFile(repo).changes.find(c => c.name === name);
+        assert.ok(entry, 'ensure-worktree 应注册该变更');
+        assert.strictEqual(entry.baseBranch, 'sc-base-branch');
+    });
+
+    test('registry add --base <branch> 写入显式指定的 baseBranch', () => {
+        const repo = makeGitRepo('sc-main');
+
+        const res = runCliFrom(repo, ['registry', 'add', 'add-demo', '.worktrees/add-demo', '--base', 'release/1.1']);
+        assert.strictEqual(res.code, 0, `registry add 应成功, stderr: ${res.stderr}`);
+
+        const entry = readRegistryFile(repo).changes.find(c => c.name === 'add-demo');
+        assert.ok(entry, 'registry add 应注册该变更');
+        assert.strictEqual(entry.baseBranch, 'release/1.1');
+    });
+
+    test('worktree 已存在时重跑 ensure-worktree 不重写 baseBranch', () => {
+        const repo = makeGitRepo('sc-base-branch');
+        const name = 'idem-demo';
+
+        runCliFrom(repo, ['ensure-worktree', name]);
+        const first = readRegistryFile(repo).changes.find(c => c.name === name);
+        assert.ok(first, '首次运行应注册该变更');
+        assert.strictEqual(first.baseBranch, 'sc-base-branch', '首次运行应写入 baseBranch');
+
+        const res2 = runCliFrom(repo, ['ensure-worktree', name]);
+        assert.strictEqual(res2.code, 0, `worktree 已存在时应早返回 exit 0, stderr: ${res2.stderr}`);
+
+        const second = readRegistryFile(repo).changes.find(c => c.name === name);
+        assert.ok(second, '重跑后条目应仍存在');
+        assert.strictEqual(second.baseBranch, 'sc-base-branch', '重跑不应改写已记录的 baseBranch');
     });
 });

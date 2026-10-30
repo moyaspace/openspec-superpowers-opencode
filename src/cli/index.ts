@@ -57,7 +57,7 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode reset             重置项目配置
     openspec-superpowers-opencode dry-run [--lang zh-CN|zh-TW|en]     预览变更
     openspec-superpowers-opencode ensure-worktree <name>    确保 worktree 已创建
-    openspec-superpowers-opencode registry add <name> <worktree>  注册表添加变更
+    openspec-superpowers-opencode registry add <name> <worktree> [--base <branch>]  注册表添加变更
     openspec-superpowers-opencode registry remove <name>    注册表删除变更
     openspec-superpowers-opencode registry list             列出所有活跃变更
     openspec-superpowers-opencode registry reset            重置注册表为空
@@ -94,7 +94,7 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     openspec-superpowers-opencode reset              Reset project config
     openspec-superpowers-opencode dry-run [--lang zh-CN|zh-TW|en]    Preview changes
     openspec-superpowers-opencode ensure-worktree <name>    Ensure worktree exists
-    openspec-superpowers-opencode registry add <name> <worktree>  Add change to registry
+    openspec-superpowers-opencode registry add <name> <worktree> [--base <branch>]  Add change to registry
     openspec-superpowers-opencode registry remove <name>    Remove change from registry
     openspec-superpowers-opencode registry list             List active changes
     openspec-superpowers-opencode registry reset            Reset registry to empty
@@ -254,6 +254,11 @@ function runEnsureWorktree(name: string, cwd: string): void {
     }
 
     console.log(t(`  ✓ worktree 创建完成: .worktrees/${name}/`, `  ✓ Worktree created: .worktrees/${name}/`));
+
+    // 必须在此刻取 base：此时 cwd 仍是项目根，HEAD 即真实的分支；稍后在 worktree 内取会得到 feature/<name>。
+    const baseBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf8' }).trim();
+    registry.add(getChangeRegistryPath(cwd) as string, name, `.worktrees/${name}`, baseBranch);
+
     process.exit(0);
 }
 
@@ -320,11 +325,14 @@ async function handleRegistry(registryArgs: string[]): Promise<void> {
             const name = registryArgs[1];
             const worktree = registryArgs[2];
             if (!name || !worktree) {
-                console.error(t('用法: registry add <name> <worktree>', 'Usage: registry add <name> <worktree>'));
+                console.error(t('用法: registry add <name> <worktree> [--base <branch>]', 'Usage: registry add <name> <worktree> [--base <branch>]'));
                 process.exit(1);
             }
+            const baseFlagIdx = registryArgs.indexOf('--base');
+            const baseValue = baseFlagIdx >= 0 ? registryArgs[baseFlagIdx + 1] : undefined;
+            const baseBranch = baseValue && !baseValue.startsWith('-') ? baseValue : undefined;
             try {
-                registry.add(registryPath as string, name, worktree);
+                registry.add(registryPath as string, name, worktree, baseBranch);
                 console.log(t(`  ✓ 注册表已更新: ${name}`, `  ✓ Registry updated: ${name}`));
             } catch (e) {
                 console.error(t(`  ✗ 写入注册表失败: ${(e as Error).message}`, `  ✗ Registry write failed: ${(e as Error).message}`));
