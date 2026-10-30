@@ -89,6 +89,7 @@ async function verifyProject(options: VerifyProjectOptions): Promise<VerifyProje
     const changeName = `oso-verify-${uniquePart}`;
     const registryPath = path.join(targetDir, 'openspec', 'oso-change-registry.json');
     let created = false;
+    let registered = false;
     const progress = options.progress || (() => {});
 
     const cleanup = options.cleanup || (name => {
@@ -110,6 +111,7 @@ async function verifyProject(options: VerifyProjectOptions): Promise<VerifyProje
 
         try {
             addRegistryEntry(registryPath, changeName, '.');
+            registered = true;
         } catch (error) {
             throw new Error(`registry-add failed: ${(error as Error).message}`);
         }
@@ -139,7 +141,7 @@ async function verifyProject(options: VerifyProjectOptions): Promise<VerifyProje
         return { passed: false, changeName, error };
     } finally {
         try {
-            removeRegistryEntry(registryPath, changeName);
+            if (registered) removeRegistryEntry(registryPath, changeName);
         } catch (error) {
             progress({ type: 'warn', item: `registry remove ${changeName} failed: ${(error as Error).message}` });
         }

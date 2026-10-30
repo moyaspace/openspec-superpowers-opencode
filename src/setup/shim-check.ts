@@ -52,9 +52,11 @@ export function ensureShim(
     const isWin = deps.isWin ?? process.platform === 'win32';
     const install = deps.install ?? installShims;
     const result = install(toolDir, isWin);
+    // 安装器的 success 不代表垫片真的写入了（例如 assets/shims 缺失），必须复检。
+    const after = checkShim(deps);
     return {
-        ok: result.success,
-        repaired: result.success,
-        details: [status.reason, ...result.details],
+        ok: after.active,
+        repaired: after.active,
+        details: [status.reason, ...result.details, after.reason],
     };
 }
