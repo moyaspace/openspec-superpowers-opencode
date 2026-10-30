@@ -2,6 +2,7 @@ export interface RegistryEntry {
     name: string;
     worktree: string;
     createdAt?: string | undefined;
+    baseBranch?: string | undefined;
     [key: string]: unknown;
 }
 export interface RegistryData {
@@ -17,9 +18,9 @@ declare function read(registryPath: string): RegistryData;
  */
 declare function write(registryPath: string, data: RegistryData): void;
 /**
- * 添加条目（同名覆盖）
+ * 添加条目（同名合并：保留旧条目已有的其他字段，如 baseBranch）
  */
-declare function add(registryPath: string, name: string, worktree: string): void;
+declare function add(registryPath: string, name: string, worktree: string, baseBranch?: string): void;
 /**
  * 删除条目（保留空文件）
  */

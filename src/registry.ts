@@ -8,6 +8,7 @@ export interface RegistryEntry {
     name: string;
     worktree: string;
     createdAt?: string | undefined;
+    baseBranch?: string | undefined;
     [key: string]: unknown;
 }
 
@@ -37,13 +38,19 @@ function write(registryPath: string, data: RegistryData): void {
 }
 
 /**
- * 添加条目（同名覆盖）
+ * 添加条目（同名合并：保留旧条目已有的其他字段，如 baseBranch）
  */
-function add(registryPath: string, name: string, worktree: string): void {
+function add(registryPath: string, name: string, worktree: string, baseBranch?: string): void {
     const data = read(registryPath);
     const idx = data.changes.findIndex(c => c.name === name);
     const normalizedWt = worktree.replace(/\\/g, '/');
-    const entry: RegistryEntry = { name, worktree: normalizedWt, createdAt: new Date().toISOString() };
+    const entry: RegistryEntry = {
+        ...(idx >= 0 ? data.changes[idx] : {}),
+        name,
+        worktree: normalizedWt,
+        createdAt: new Date().toISOString(),
+        ...(baseBranch !== undefined ? { baseBranch } : {}),
+    };
     if (idx >= 0) {
         data.changes[idx] = entry;
     } else {

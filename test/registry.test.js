@@ -117,6 +117,46 @@ describe('add()', () => {
         const data = registry.read(rp);
         assert.strictEqual(data.changes.length, 2);
     });
+
+    test('stores baseBranch when one is given', () => {
+        const dir = tmpDir();
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
+        registry.write(rp, { changes: [] });
+        registry.add(rp, 'demo', '.worktrees/demo', 'release/1.1');
+        const data = registry.read(rp);
+        assert.strictEqual(data.changes[0].baseBranch, 'release/1.1');
+    });
+
+    test('keeps a previously stored baseBranch when re-added without one', () => {
+        const dir = tmpDir();
+        const rp = writeRegistry(dir, { changes: [
+            { name: 'demo', worktree: '.worktrees/demo', createdAt: 'x', baseBranch: 'release/1.1' }
+        ]});
+        registry.add(rp, 'demo', '.worktrees/demo');
+        const data = registry.read(rp);
+        assert.strictEqual(data.changes[0].baseBranch, 'release/1.1');
+    });
+
+    test('keeps unknown custom fields of an existing entry on merge', () => {
+        const dir = tmpDir();
+        const rp = writeRegistry(dir, { changes: [
+            { name: 'demo', worktree: '.worktrees/demo', createdAt: 'x', foo: 'bar' }
+        ]});
+        registry.add(rp, 'demo', '.worktrees/demo-v2');
+        const data = registry.read(rp);
+        assert.strictEqual(data.changes[0].foo, 'bar');
+        assert.strictEqual(data.changes[0].worktree, '.worktrees/demo-v2');
+    });
+
+    test('writes no baseBranch key for a new entry added without one', () => {
+        const dir = tmpDir();
+        const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
+        registry.write(rp, { changes: [] });
+        registry.add(rp, 'demo', '.worktrees/demo');
+        const raw = fs.readFileSync(rp, 'utf-8');
+        assert.ok(!raw.includes('baseBranch'), 'registry JSON must not carry a baseBranch key');
+        assert.ok(!('baseBranch' in registry.read(rp).changes[0]));
+    });
 });
 
 // ============================================================

@@ -23,13 +23,19 @@ function write(registryPath, data) {
     fs.writeFileSync(registryPath, JSON.stringify(data, null, 2) + '\n');
 }
 /**
- * 添加条目（同名覆盖）
+ * 添加条目（同名合并：保留旧条目已有的其他字段，如 baseBranch）
  */
-function add(registryPath, name, worktree) {
+function add(registryPath, name, worktree, baseBranch) {
     const data = read(registryPath);
     const idx = data.changes.findIndex(c => c.name === name);
     const normalizedWt = worktree.replace(/\\/g, '/');
-    const entry = { name, worktree: normalizedWt, createdAt: new Date().toISOString() };
+    const entry = {
+        ...(idx >= 0 ? data.changes[idx] : {}),
+        name,
+        worktree: normalizedWt,
+        createdAt: new Date().toISOString(),
+        ...(baseBranch !== undefined ? { baseBranch } : {}),
+    };
     if (idx >= 0) {
         data.changes[idx] = entry;
     }
