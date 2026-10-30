@@ -455,17 +455,25 @@ async function dryRunProject(options: SetupOptions = {}): Promise<InitPlan | { m
 
     // ---- 6/8: 占位符替换 ----
     p({ type: 'step', n: 6, total: 8, label: t('替换路径占位符', 'Replacing path placeholders') });
-    const placeholderCandidates: Array<[string, string | null]> = [
-        ['_AGENTS.md', 'AGENTS.md'],
-        ['openspec/schemas/superpowers-bridge-opencode/schema.yaml', null],
-        ['.opencode/commands/opsx-apply.md', null],
-        ['.opencode/commands/opsx-finish.md', null],
-    ];
-    for (const [src, dst] of placeholderCandidates) {
-        const sourcePath = path.join(context.templateDir, ...src.split('/'));
-        const targetRel = dst || src;
-        if (fs.existsSync(sourcePath) && fs.readFileSync(sourcePath, 'utf8').includes('{{SUPERPOWERS_BASE_PATH}}')) {
-            p({ type: 'action', text: `replace placeholders in: ${targetRel}` });
+    for (const relative of PLACEHOLDER_TARGETS) {
+        const op = plan.operations.find(candidate => candidate.target
+            && path.relative(context.targetDir, candidate.target).replace(/\\/g, '/') === relative);
+        const planWrites = op !== undefined && (op.type === 'write' || op.type === 'copy');
+        const diskTarget = path.join(context.targetDir, ...relative.split('/'));
+        let content: string | null = null;
+        if (planWrites) {
+            content = op.content ?? (op.source ? fs.readFileSync(op.source, 'utf8') : '');
+        } else if (fs.existsSync(diskTarget)) {
+            content = fs.readFileSync(diskTarget, 'utf8');
+        }
+        if (content === null) {
+            p({ type: 'info', text: `${relative} ${op ? '(not written)' : '(not in plan)'}` });
+            continue;
+        }
+        if (content.includes('{{SUPERPOWERS_BASE_PATH}}')) {
+            p({ type: 'fail', item: `${relative} (unreplaced placeholder)` });
+        } else {
+            p({ type: 'action', text: `placeholder-free: ${relative}` });
         }
     }
     p({ type: 'milestone', text: t('占位符替换完成', 'Placeholder replacement complete') });
@@ -714,6 +722,7 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
         });
         overwriteRegistry = regResult === 'yes';
     }
+    const registryPriorBytes = fs.existsSync(registryPath) ? fs.readFileSync(registryPath) : null;
     createRegistry(context.targetDir, p, overwriteRegistry);
 
     p({ type: 'blank' });
@@ -735,6 +744,11 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
     manifest.verification = verification.passed ? 'passed' : 'failed';
     writeManifest(context.targetDir, manifest);
     if (!verification.passed) {
+        if (registryPriorBytes === null) {
+            fs.rmSync(registryPath, { force: true });
+        } else {
+            fs.writeFileSync(registryPath, registryPriorBytes);
+        }
         p({ type: 'fail', item: t('验证失败', 'Verification failed') });
         return { success: false, plan, manifest, verification, lockVerification };
     }
