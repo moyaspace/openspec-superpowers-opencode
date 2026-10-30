@@ -405,11 +405,16 @@ describe('ensure-worktree / registry add --base（CLI 集成）', () => {
         assert.ok(first, '首次运行应注册该变更');
         assert.strictEqual(first.baseBranch, 'sc-base-branch', '首次运行应写入 baseBranch');
 
+        // 哨兵：改写为第二趟绝不会算出的值。若重跑会重算并覆盖（如把 registry.add 提到早返回之上），断言必挂。
+        const seed = runCliFrom(repo, ['registry', 'add', name, `.worktrees/${name}`, '--base', 'sentinel/old']);
+        assert.strictEqual(seed.code, 0, `哨兵写入应成功, stderr: ${seed.stderr}`);
+        assert.strictEqual(readRegistryFile(repo).changes.find(c => c.name === name).baseBranch, 'sentinel/old', '哨兵值应已写入');
+
         const res2 = runCliFrom(repo, ['ensure-worktree', name]);
         assert.strictEqual(res2.code, 0, `worktree 已存在时应早返回 exit 0, stderr: ${res2.stderr}`);
 
         const second = readRegistryFile(repo).changes.find(c => c.name === name);
         assert.ok(second, '重跑后条目应仍存在');
-        assert.strictEqual(second.baseBranch, 'sc-base-branch', '重跑不应改写已记录的 baseBranch');
+        assert.strictEqual(second.baseBranch, 'sentinel/old', '重跑不应改写已记录的 baseBranch（哨兵应留存）');
     });
 });

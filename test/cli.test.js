@@ -77,5 +77,6 @@ describe('registry add --base usage', () => {
         const result = runCli('--help', '--lang', 'zh-CN');
         assert.strictEqual(result.code, 0);
         assert.ok(result.stdout.includes('registry add <name> <worktree> [--base <branch>]'), result.stdout);
+        assert.ok(result.stdout.includes('注册表添加变更'), '应命中中文文案而非英文回退');
     });
 });
