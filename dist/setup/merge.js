@@ -47,11 +47,16 @@ function mergeMarker(options) {
     if (options.decision !== 'yes') {
         return { action: 'skip', content: existing };
     }
+    const managedStart = managed.indexOf(marker);
+    const managedEnd = managedStart < 0 ? -1 : managed.indexOf(marker, managedStart + marker.length);
+    if (managedStart < 0 || managedEnd < 0) {
+        throw new Error(`Incomplete managed marker section in managed content: expected 2 markers, found ${managed.split(marker).length - 1}`);
+    }
     const start = existing.indexOf(marker);
     const end = existing.indexOf(marker, start + marker.length) + marker.length;
     return {
         action: 'replace',
-        content: `${existing.slice(0, start)}${managed.trimEnd()}${existing.slice(end)}`,
+        content: `${existing.slice(0, start)}${managed.slice(managedStart, managedEnd + marker.length)}${existing.slice(end)}`,
     };
 }
 export { mergeMarker, mergeKeys, mergeOcodeJson, };

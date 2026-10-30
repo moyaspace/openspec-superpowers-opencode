@@ -41,6 +41,15 @@ declare function findOpenspecOrig(binDir: string, isWin: boolean): string | null
  */
 declare function isShimScript(openspecPath: string): boolean;
 /**
+ * 定位实际承载垫片内容的文件路径：Unix 为 `openspec` 本体，Windows 为同目录的
+ * `openspec.cmd` / `openspec.ps1` 旁路文件。
+ * @param openspecPath
+ * @param binDir
+ * @param isWin
+ * @returns string|null
+ */
+declare function findShimFile(openspecPath: string, binDir: string, isWin: boolean): string | null;
+/**
  * 检查 oso-change-registry.json 是否有效，返回条目数。
  * @param projectRoot
  * @returns {valid, count, error}
@@ -82,5 +91,5 @@ declare function formatResults(results: CheckResult[]): string;
  * @param results
  */
 declare function allPass(results: Array<Pick<CheckResult, 'status'>>): boolean;
-export { runAllChecks, formatResults, allPass, findOpenspec, findOpenspecOrig, isShimScript, checkRegistryFile, checkWorktrees };
+export { runAllChecks, formatResults, allPass, findOpenspec, findOpenspecOrig, findShimFile, isShimScript, checkRegistryFile, checkWorktrees };
 //# sourceMappingURL=verify.d.ts.map

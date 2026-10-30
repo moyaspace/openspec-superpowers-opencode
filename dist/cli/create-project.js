@@ -41,6 +41,7 @@ Example:
 }
 // 委托给 cli 主入口：将 'init' 插入到参数前
 process.argv.splice(2, 0, 'init');
-await import('./index.js');
+const cli = await import('./index.js');
+cli.runCli();
 export {};
 //# sourceMappingURL=create-project.js.map

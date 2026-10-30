@@ -1,7 +1,9 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {} from './process-runner.js';
+import { add as addRegistryEntry, remove as removeRegistryEntry } from '../registry.js';
 export function parseTemplateOutput(stdout) {
     try {
         const parsed = JSON.parse(stdout);
@@ -48,7 +50,9 @@ async function verifyProject(options) {
         ? options.uniquePart()
         : `${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
     const changeName = `oso-verify-${uniquePart}`;
+    const registryPath = path.join(targetDir, 'openspec', 'oso-change-registry.json');
     let created = false;
+    let registered = false;
     const progress = options.progress || (() => { });
     const cleanup = options.cleanup || (name => {
         fs.rmSync(path.join(targetDir, 'openspec', 'changes', name), { recursive: true, force: true });
@@ -62,6 +66,14 @@ async function verifyProject(options) {
         requireSuccess(runner.run('openspec', ['new', 'change', changeName], { cwd: targetDir }), 'change-create');
         created = true;
         progress({ type: 'pass', item: 'Test change created' });
+        try {
+            addRegistryEntry(registryPath, changeName, '.');
+            registered = true;
+        }
+        catch (error) {
+            throw new Error(`registry-add failed: ${error.message}`);
+        }
+        progress({ type: 'pass', item: 'Verification change registered' });
         const list = requireSuccess(runner.run('openspec', ['list', '--json'], { cwd: targetDir }), 'change-list');
         if (!changeListed(list.stdout, changeName))
             throw new Error('created verification change is not listed');
@@ -81,6 +93,13 @@ async function verifyProject(options) {
         return { passed: false, changeName, error };
     }
     finally {
+        try {
+            if (registered)
+                removeRegistryEntry(registryPath, changeName);
+        }
+        catch (error) {
+            progress({ type: 'warn', item: `registry remove ${changeName} failed: ${error.message}` });
+        }
         if (created) {
             await cleanup(changeName);
             progress({ type: 'pass', item: 'Test change cleaned up' });
@@ -88,4 +107,24 @@ async function verifyProject(options) {
     }
 }
 export { verifyProject };
+export function resolveToolRoot() {
+    return path.dirname(fileURLToPath(new URL('../../package.json', import.meta.url)));
+}
+/**
+ * 校验落盘文件不含路径占位符。以目标文件为准，不看模板源——
+ * 模板源含占位符是正常的，落盘后仍含才是缺陷。
+ */
+function verifyNoPlaceholders(targetDir, targets) {
+    for (const relative of targets) {
+        const targetPath = path.join(targetDir, ...relative.split('/'));
+        if (!fs.existsSync(targetPath)) {
+            throw new Error(`Placeholder check target missing: ${relative}`);
+        }
+        const content = fs.readFileSync(targetPath, 'utf8');
+        if (content.includes('{{SUPERPOWERS_BASE_PATH}}')) {
+            throw new Error(`Unreplaced path placeholder in ${relative}`);
+        }
+    }
+}
+export { verifyNoPlaceholders };
 //# sourceMappingURL=verify.js.map

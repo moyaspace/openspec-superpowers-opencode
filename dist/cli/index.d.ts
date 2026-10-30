@@ -1,3 +1,4 @@
 #!/usr/bin/env node
-export {};
+declare function runCli(): void;
+export { runCli };
 //# sourceMappingURL=index.d.ts.map

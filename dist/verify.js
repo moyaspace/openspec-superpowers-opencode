@@ -66,6 +66,27 @@ function isShimScript(openspecPath) {
     }
 }
 /**
+ * 定位实际承载垫片内容的文件路径：Unix 为 `openspec` 本体，Windows 为同目录的
+ * `openspec.cmd` / `openspec.ps1` 旁路文件。
+ * @param openspecPath
+ * @param binDir
+ * @param isWin
+ * @returns string|null
+ */
+function findShimFile(openspecPath, binDir, isWin) {
+    if (isShimScript(openspecPath))
+        return openspecPath;
+    if (isWin) {
+        const cmd = path.join(binDir, 'openspec.cmd');
+        if (isShimScript(cmd))
+            return cmd;
+        const ps1 = path.join(binDir, 'openspec.ps1');
+        if (isShimScript(ps1))
+            return ps1;
+    }
+    return null;
+}
+/**
  * 检查 oso-change-registry.json 是否有效，返回条目数。
  * @param projectRoot
  * @returns {valid, count, error}
@@ -312,5 +333,5 @@ function runCLI() {
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
     runCLI();
 }
-export { runAllChecks, formatResults, allPass, findOpenspec, findOpenspecOrig, isShimScript, checkRegistryFile, checkWorktrees };
+export { runAllChecks, formatResults, allPass, findOpenspec, findOpenspecOrig, findShimFile, isShimScript, checkRegistryFile, checkWorktrees };
 //# sourceMappingURL=verify.js.map

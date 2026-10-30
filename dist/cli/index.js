@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import readline from 'node:readline';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findProjectRoot, getChangeRegistryPath } from '../registry-utils.js';
 import * as setupApi from '../setup/index.js';
 import { runSetupCommand } from '../setup/cli-adapter.js';
@@ -20,6 +20,8 @@ import { installShims, uninstallShims } from '../shims-installer.js';
 const toolDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'); // 工具安装根目录（dist/cli/ 上两级 = 包根）
 const args = process.argv.slice(2);
 const isWin = process.platform === 'win32';
+// 仅在作为入口直接运行时才分发子命令：本模块被 import（如 init 的部署后验证）时必须无副作用。
+const isEntry = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 // 解析 --lang 参数（必须在 isHelp 之前）
 const langIndex = args.indexOf('--lang');
 let lang = 'en';
@@ -28,7 +30,7 @@ if (langIndex >= 0 && args[langIndex + 1] && !args[langIndex + 1]?.startsWith('-
     args.splice(langIndex, 2); // 从参数列表中移除，避免干扰子命令解析
 }
 const isVersion = args.some(a => a === '--version' || a === '-v');
-if (isVersion) {
+if (isEntry && isVersion) {
     console.log(JSON.parse(fs.readFileSync(path.join(toolDir, 'package.json'), 'utf8')).version);
     process.exit(0);
 }
@@ -114,45 +116,50 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     /opsx-finish        Complete change (merge/cleanup)
     /opsx-archive       Archive change
 `;
-if (isHelp) {
+if (isEntry && isHelp) {
     console.log(helpText);
     process.exit(0);
 }
-if (subcommand === 'init' || subcommand === 'reset' || subcommand === 'dry-run') {
-    const targetDir = subarg ? path.resolve(subarg) : process.cwd();
-    void runSetupCli(subcommand, targetDir, lang);
-}
-else if (subcommand === 'ensure-worktree') {
-    if (!subarg) {
-        console.error(t('用法: openspec-superpowers-opencode ensure-worktree <name>', 'Usage: openspec-superpowers-opencode ensure-worktree <name>'));
+function runCli() {
+    if (subcommand === 'init' || subcommand === 'reset' || subcommand === 'dry-run') {
+        const targetDir = subarg ? path.resolve(subarg) : process.cwd();
+        void runSetupCli(subcommand, targetDir, lang);
+    }
+    else if (subcommand === 'ensure-worktree') {
+        if (!subarg) {
+            console.error(t('用法: openspec-superpowers-opencode ensure-worktree <name>', 'Usage: openspec-superpowers-opencode ensure-worktree <name>'));
+            process.exit(1);
+        }
+        runEnsureWorktree(subarg, process.cwd());
+    }
+    else if (subcommand === 'registry') {
+        void handleRegistry(args.slice(1));
+    }
+    else if (subcommand === 'verify') {
+        runVerifyTop();
+    }
+    else if (subcommand === 'install-shims') {
+        runInstallShims();
+    }
+    else if (subcommand === 'uninstall-shims') {
+        runUninstallShims();
+    }
+    else if (subcommand === 'remove-worktree') {
+        if (!subarg) {
+            console.error(t('用法: openspec-superpowers-opencode remove-worktree <name>', 'Usage: openspec-superpowers-opencode remove-worktree <name>'));
+            process.exit(1);
+        }
+        runRemoveWorktree(subarg, process.cwd());
+    }
+    else {
+        console.error(t(`未知子命令: ${subcommand}`, `Unknown subcommand: ${subcommand}`));
+        console.error(t('可用命令: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims, remove-worktree', 'Available commands: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims, remove-worktree'));
         process.exit(1);
     }
-    runEnsureWorktree(subarg, process.cwd());
 }
-else if (subcommand === 'registry') {
-    void handleRegistry(args.slice(1));
-}
-else if (subcommand === 'verify') {
-    runVerifyTop();
-}
-else if (subcommand === 'install-shims') {
-    runInstallShims();
-}
-else if (subcommand === 'uninstall-shims') {
-    runUninstallShims();
-}
-else if (subcommand === 'remove-worktree') {
-    if (!subarg) {
-        console.error(t('用法: openspec-superpowers-opencode remove-worktree <name>', 'Usage: openspec-superpowers-opencode remove-worktree <name>'));
-        process.exit(1);
-    }
-    runRemoveWorktree(subarg, process.cwd());
-}
-else {
-    console.error(t(`未知子命令: ${subcommand}`, `Unknown subcommand: ${subcommand}`));
-    console.error(t('可用命令: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims, remove-worktree', 'Available commands: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims, remove-worktree'));
-    process.exit(1);
-}
+if (isEntry)
+    runCli();
+export { runCli };
 // ====================================================================
 /**
  * 交互式询问函数

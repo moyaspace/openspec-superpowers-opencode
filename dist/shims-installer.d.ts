@@ -117,4 +117,5 @@ declare function installShims(toolDir: string, isWin: boolean): ShimOperationRes
  */
 declare function uninstallShims(toolDir: string, isWin: boolean): ShimOperationResult;
 export { installShims, uninstallShims, findOpenspecBinDir, openspecOrigExists, copyOpenspecToOrig, installShimScripts, setExecutable, findOpenspecOrigFile, getRestoreTarget, getShimFiles, binDirFromToolDir, findRealOpenspec, };
+export type { ShimOperationResult };
 //# sourceMappingURL=shims-installer.d.ts.map
