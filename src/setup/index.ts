@@ -11,7 +11,7 @@ import { buildManifest, type Manifest } from './manifest.js';
 import { createInitPlan, type InitDecisions, type InitPlan } from './planner.js';
 import { createProcessRunner, type ProcessRunner, type RunResult } from './process-runner.js';
 import { resolveDecision, type Decision } from './prompt.js';
-import { verifyProject } from './verify.js';
+import { verifyNoPlaceholders, verifyProject } from './verify.js';
 import { resetProject } from './reset.js';
 
 interface ProgressEvent {
@@ -134,6 +134,13 @@ function createRegistry(projectRoot: string, progress?: ProgressCallback | undef
 
 type Translator = ((zh: string, en: string) => string) | undefined;
 
+const PLACEHOLDER_TARGETS = [
+    'AGENTS.md',
+    'openspec/schemas/superpowers-bridge-opencode/schema.yaml',
+    '.opencode/commands/opsx-apply.md',
+    '.opencode/commands/opsx-finish.md',
+] as const;
+
 function commitProject(
     targetDir: string,
     runner: ProcessRunner,
@@ -223,9 +230,15 @@ async function collectBrownfieldDecisions(options: BrownfieldOptions): Promise<B
         }
         return files.sort();
     };
-    const decisions: InitDecisions = {
-        openspec: await tDecide('BROWN_OVERRIDE_OPENSPEC', '覆盖 openspec/ 配置和 schema？', 'Overwrite OpenSpec config and schemas?'),
-    };
+    const openspecHasContent = fs.existsSync(path.join(targetDir, 'openspec', 'config.yaml'))
+        || hasEntries(path.join(targetDir, 'openspec', 'schemas'));
+    const decisions: InitDecisions = {};
+    if (env.BROWN_OVERRIDE_OPENSPEC || openspecHasContent) {
+        decisions.openspec = await tDecide('BROWN_OVERRIDE_OPENSPEC', '覆盖 openspec/ 配置和 schema？', 'Overwrite OpenSpec config and schemas?');
+    } else {
+        decisions.openspec = 'yes';
+        p({ type: 'info', text: t('openspec/ 不存在，已部署', 'openspec/ not found, deployed') });
+    }
     if (fs.existsSync(path.join(targetDir, '.opencode', 'opencode.json'))) {
         decisions.opencodeJson = await tDecide('BROWN_OVERRIDE_OCODEJSON', '合并 .opencode/opencode.json？', 'Merge .opencode/opencode.json?');
     }
@@ -471,26 +484,6 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
     const context = createContext({ ...options, mode: 'init' });
     const p = options.progress || (() => {});
     const t = tFn(options.lang);
-    const env = options.env || process.env;
-    const decide = (envName: string, question: string, allowAsk = false) => resolveDecision({
-        override: env[envName],
-        prompt: options.prompt,
-        question,
-        allowAsk,
-    });
-    const tDecide = (envName: string, questionZh: string, questionEn: string, allowAsk = false) => {
-        return decide(envName, t(questionZh, questionEn), allowAsk);
-    };
-    const listRelativeFiles = (root: string, relative = ''): string[] => {
-        if (!fs.existsSync(root)) return [];
-        const files: string[] = [];
-        for (const entry of fs.readdirSync(path.join(root, relative), { withFileTypes: true })) {
-            const child = path.join(relative, entry.name);
-            if (entry.isDirectory()) files.push(...listRelativeFiles(root, child));
-            else if (entry.isFile()) files.push(child);
-        }
-        return files.sort();
-    };
 
     // ---- 0. Git dirty check ----
     if (context.targetExists && fs.existsSync(path.join(context.targetDir, '.git'))) {
@@ -584,312 +577,83 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
         p({ type: 'blank' });
     }
 
-    const decisions: InitDecisions = {};
-    let plan: InitPlan | undefined;
-
-    function deployOpenspec(kind: string): void {
-        if (kind !== 'yes') return;
-        const src = context.templateDir;
-        const dst = context.targetDir;
-        // config.yaml
-        const configSrc = path.join(src, 'openspec', 'config.yaml');
-        const configDst = path.join(dst, 'openspec', 'config.yaml');
-        if (fs.existsSync(configSrc)) {
-            fs.mkdirSync(path.dirname(configDst), { recursive: true });
-            fs.copyFileSync(configSrc, configDst);
-            p({ type: 'pass', item: 'openspec/config.yaml' });
-        }
-        // schemas/
-        const schemasSrc = path.join(src, 'openspec', 'schemas');
-        const schemasDst = path.join(dst, 'openspec', 'schemas');
-        if (fs.existsSync(schemasSrc)) {
-            fs.mkdirSync(schemasDst, { recursive: true });
-            const langFilter = (name: string) => {
-                if (name.includes('.zh-CN.')) return (options.lang || 'en') === 'zh-CN';
-                if (name.includes('.zh-TW.')) return (options.lang || 'en') === 'zh-TW';
-                return true;
-            };
-            copyRecursive(schemasSrc, schemasDst, langFilter);
-            const fileCount = countFilesDeep(schemasDst);
-            p({ type: 'pass', item: `openspec/schemas/ (${fileCount} files)` });
-        }
-    }
-
-    function copyRecursive(src: string, dst: string, filterFn?: (name: string) => boolean): void {
-        const stat = fs.statSync(src);
-        if (stat.isDirectory()) {
-            fs.mkdirSync(dst, { recursive: true });
-            for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-                if (filterFn && !filterFn(entry.name)) continue;
-                copyRecursive(path.join(src, entry.name), path.join(dst, entry.name), filterFn);
-            }
-        } else {
-            fs.copyFileSync(src, dst);
-        }
-    }
-
-    function countFilesDeep(dir: string): number {
-        let count = 0;
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-            if (entry.isDirectory()) count += countFilesDeep(path.join(dir, entry.name));
-            else count++;
-        }
-        return count;
-    }
-
-    function deployOcodeJson(): void {
-        if (decisions.opencodeJson === 'yes') {
-            const src = path.join(context.templateDir, '.opencode', 'opencode.json');
-            const dst = path.join(context.targetDir, '.opencode', 'opencode.json');
-            if (fs.existsSync(src)) {
-                const merged = mergeOcodeJson(
-                    JSON.parse(fs.readFileSync(dst, 'utf8')) as Record<string, unknown>,
-                    JSON.parse(fs.readFileSync(src, 'utf8')) as Record<string, unknown>,
-                );
-                fs.writeFileSync(dst, `${JSON.stringify(merged, null, 2)}\n`);
-                p({ type: 'pass', item: '.opencode/opencode.json (merged)' });
-            }
-        } else if (decisions.opencodeJson === 'no') {
-            p({ type: 'info', text: '- .opencode/opencode.json (skipped)' });
-        }
-    }
-
-    function deployOpencodeDir(relDir: string): void {
-        const srcDir = path.join(context.templateDir, '.opencode', relDir);
-        const dstDir = path.join(context.targetDir, '.opencode', relDir);
-        if (!fs.existsSync(srcDir)) return;
-        fs.mkdirSync(dstDir, { recursive: true });
-        for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
-            const srcFile = path.join(srcDir, entry.name);
-            const dstFile = path.join(dstDir, entry.name);
-            const relName = `.opencode/${relDir}/${entry.name}`;
-            if (entry.isDirectory()) continue;
-            if (fs.existsSync(dstFile)) {
-                const decKey = relDir === 'commands' ? decisions.commands : decisions.skills;
-                const fileDecs = relDir === 'commands' ? decisions.commandFiles : decisions.skillFiles;
-                if (decKey === 'ask') {
-                    if (fileDecs && fileDecs[relName] === 'yes') {
-                        fs.copyFileSync(srcFile, dstFile);
-                        p({ type: 'pass', item: relName });
-                    } else {
-                        p({ type: 'info', text: `- ${relName} (skip)` });
-                    }
-                } else if (decKey === 'yes') {
-                    fs.copyFileSync(srcFile, dstFile);
-                    p({ type: 'pass', item: relName });
-                } else {
-                    p({ type: 'info', text: `- ${relName} (skip)` });
-                }
-            } else {
-                fs.copyFileSync(srcFile, dstFile);
-                p({ type: 'pass', item: relName });
-            }
-        }
-    }
-
-    function deployRootFile(key: string, file: string, marker: string): void {
-        const targetPath = path.join(context.targetDir, file);
-        const SOURCE_MAP: Record<string, string> = { 'AGENTS.md': '_AGENTS.md', '.gitignore': '_gitignore', '.gitattributes': '_gitattributes', '.editorconfig': '_editorconfig' };
-        const sourceName = SOURCE_MAP[file];
-        if (!sourceName) return;
-        const sourcePath = path.join(context.templateDir, sourceName);
-        if (!fs.existsSync(sourcePath)) return;
-        const managedContent = fs.readFileSync(sourcePath, 'utf8');
-        if (isBrown && hasCompleteMarker(targetPath, marker)) {
-            const d = (decisions || {})[key];
-            if (d === 'yes') {
-                const merged = mergeMarker({
-                    existing: fs.readFileSync(targetPath, 'utf8'),
-                    managed: managedContent,
-                    marker,
-                    decision: 'overwrite',
-                });
-                fs.writeFileSync(targetPath, merged.content);
-                p({ type: 'pass', item: `${file} (managed section replaced)` });
-            } else {
-                p({ type: 'info', text: `- ${file} (user skipped)` });
-            }
-        } else if (!isBrown) {
-            fs.copyFileSync(sourcePath, targetPath);
-            p({ type: 'pass', item: file });
-        } else {
-            fs.writeFileSync(targetPath, managedContent);
-            p({ type: 'pass', item: `${file} (bridge content appended)` });
-        }
-    }
-
-    const codeDir = context.targetDir;
+    // ---- 部署计划：棕地与绿地统一走 createInitPlan + executeOperations ----
+    // 棕地不再走「内联询问 + 四个直接写盘函数」：那条路径导致受管根文件被整文件覆盖、
+    // 占位符未渲染、openspec/ 不存在仍询问、首次使用不部署 commands
+    // （BUG001 / BUG002 / BUG003 / BUG006）。
+    let plan: InitPlan;
 
     if (isBrown) {
-        const proceed = await tDecide('BROWN_OVERRIDE_INIT', '  棕地项目。是否继续完整初始化？(y/N):', '  Brownfield. Continue with full init? (y/N):');
-        if (proceed !== 'yes') {
+        const brownfield = await collectBrownfieldDecisions({ ...options, context });
+        if (brownfield.cancelled) {
             p({ type: 'info', text: t('  Init 取消。', '  Init cancelled.') });
             return { success: true, cancelled: true };
         }
-        p({ type: 'pass', item: t('用户确认', 'User confirmed') });
         p({ type: 'blank' });
 
-        // ---- 3/8: 部署 openspec/ ----
-        p({ type: 'step', n: 3, total: 8, label: t('部署 openspec/ 配置', 'Deploying openspec/ config') });
-        decisions.openspec = await tDecide('BROWN_OVERRIDE_OPENSPEC', '  覆盖 openspec/ 配置和 schema？(y/N):', '  Overwrite OpenSpec config and schemas/? (y/N):');
-        deployOpenspec(decisions.openspec);
-        p({ type: 'info', text: t('- openspec/changes/ + openspec/specs/（棕地模式，跳过）', '- openspec/changes/ + openspec/specs/ (brownfield, skip)') });
-        p({ type: 'blank' });
-
-        // ---- 4/8: 部署 .opencode/ ----
-        p({ type: 'step', n: 4, total: 8, label: t('部署 .opencode/ 配置', 'Deploying .opencode/ config') });
-        if (fs.existsSync(path.join(codeDir, '.opencode', 'opencode.json'))) {
-            decisions.opencodeJson = await tDecide('BROWN_OVERRIDE_OCODEJSON', '  合并预定义权限到 .opencode/opencode.json（条目和顺序以预定义权限为准，用户自定义条目保留在末尾）？(y/N):', '  Merge predefined permissions into .opencode/opencode.json (entries + order follow predefined, user entries kept at end)? (y/N):');
-            deployOcodeJson();
-        } else {
-            const src = path.join(context.templateDir, '.opencode', 'opencode.json');
-            if (fs.existsSync(src)) {
-                const dst = path.join(codeDir, '.opencode', 'opencode.json');
-                fs.mkdirSync(path.dirname(dst), { recursive: true });
-                fs.copyFileSync(src, dst);
-                p({ type: 'pass', item: '.opencode/opencode.json' });
-            }
-        }
-        const hasFiles = (dir: string) => fs.existsSync(dir) && fs.readdirSync(dir).length > 0;
-        if (hasFiles(path.join(codeDir, '.opencode', 'commands'))) {
-            decisions.commands = await tDecide('BROWN_OVERRIDE_COMMANDS', '  .opencode/commands/ 已存在。全部覆盖/跳过/逐个询问？(yes/No/ask):', '  .opencode/commands/ exists. Overwrite all/skip each/ask each? (yes/No/ask):', true);
-            if (decisions.commands === 'ask') {
-                decisions.commandFiles = {};
-                const sourceRoot = path.join(context.templateDir, '.opencode', 'commands');
-                for (const relative of listRelativeFiles(sourceRoot)) {
-                    const portable = `.opencode/commands/${relative.replace(/\\/g, '/')}`;
-                    if (fs.existsSync(path.join(codeDir, ...portable.split('/')))) {
-                        decisions.commandFiles[portable] = await resolveDecision({
-                            prompt: options.prompt,
-                            question: `  Overwrite ${portable}? (y/N):`,
-                        });
-                    }
-                }
-            }
-            deployOpencodeDir('commands');
-        } else {
-            for (const op of (plan ? plan.operations : [])) {
-                if (op.target && path.relative(context.targetDir, op.target).replace(/\\/g, '/').startsWith('.opencode/commands/')) {
-                    p({ type: 'pass', item: path.relative(context.targetDir, op.target).replace(/\\/g, '/') });
-                }
-            }
-        }
-        if (hasFiles(path.join(codeDir, '.opencode', 'skills'))) {
-            decisions.skills = await tDecide('BROWN_OVERRIDE_SKILLS', '  .opencode/skills/ 已存在。全部覆盖/跳过/逐个询问？(yes/No/ask):', '  .opencode/skills/ exists. Overwrite all/skip each/ask each? (yes/No/ask):', true);
-            if (decisions.skills === 'ask') {
-                decisions.skillFiles = {};
-                const sourceRoot = path.join(context.templateDir, '.opencode', 'skills');
-                for (const relative of listRelativeFiles(sourceRoot)) {
-                    const portable = `.opencode/skills/${relative.replace(/\\/g, '/')}`;
-                    if (fs.existsSync(path.join(codeDir, ...portable.split('/')))) {
-                        decisions.skillFiles[portable] = await resolveDecision({
-                            prompt: options.prompt,
-                            question: `Overwrite ${portable}?`,
-                        });
-                    }
-                }
-            }
-            deployOpencodeDir('skills');
-        } else {
-            for (const op of (plan ? plan.operations : [])) {
-                if (op.target && path.relative(context.targetDir, op.target).replace(/\\/g, '/').startsWith('.opencode/skills/')) {
-                    p({ type: 'pass', item: path.relative(context.targetDir, op.target).replace(/\\/g, '/') });
-                }
-            }
-        }
-        p({ type: 'blank' });
-
-        // ---- 5/8: Git 配置 + AGENTS.md ----
-        p({ type: 'step', n: 5, total: 8, label: t('部署 Git 配置 + AGENTS.md', 'Deploying git config + AGENTS.md') });
-        const rootKeys: Array<[keyof InitDecisions & string, string, string]> = [
-            ['agents', 'AGENTS.md', '<!-- openspec-superpowers-opencode_instructions -->'],
-            ['gitignore', '.gitignore', '# <!-- openspec-superpowers-opencode_gitignore -->'],
-            ['gitattr', '.gitattributes', '# <!-- openspec-superpowers-opencode_gitattributes -->'],
-            ['editorconfig', '.editorconfig', '# <!-- openspec-superpowers-opencode_editorconfig -->'],
-        ];
-        for (const [key, file, marker] of rootKeys) {
-            if (hasCompleteMarker(path.join(context.targetDir, file), marker)) {
-                decisions[key] = await tDecide('BROWN_OVERRIDE_' + key.toUpperCase(), `  替换 ${file} 托管区块？(y/N):`, `  Replace managed ${file} section? (y/N):`);
-            }
-            deployRootFile(key, file, marker);
-        }
         plan = createInitPlan({
             ...context,
             lang: options.lang || 'en',
             lockFile,
             superpowersPath: superpowers.skillsPath,
-            decisions: { ...decisions, ...(options.decisions || {}) },
+            decisions: { ...brownfield.decisions, ...(options.decisions || {}) },
         });
-        p({ type: 'milestone', text: t('文件复制完成', 'Deploy complete') });
     } else {
-        // Greenfield: create full plan and execute
         plan = createInitPlan({
             ...context,
             lang: options.lang || 'en',
             lockFile,
             superpowersPath: superpowers.skillsPath,
-            decisions: { ...decisions, ...(options.decisions || {}) },
+            decisions: { ...(options.decisions || {}) },
         });
-        executeOperations(plan.operations, { projectRoot: context.targetDir });
+    }
 
-        p({ type: 'step', n: 3, total: 8, label: t('部署 openspec/ 配置', 'Deploying openspec/ config') });
-        {
-            const cfgPath = path.join(context.targetDir, 'openspec', 'config.yaml');
-            if (fs.existsSync(cfgPath)) p({ type: 'pass', item: 'openspec/config.yaml' });
-            const schemasDir = path.join(context.targetDir, 'openspec', 'schemas');
-            if (fs.existsSync(schemasDir)) {
-                const n = countFilesDeep(schemasDir);
-                p({ type: 'pass', item: `openspec/schemas/ (${n} files)` });
-            }
-        }
-        p({ type: 'blank' });
+    executeOperations(plan.operations, { projectRoot: context.targetDir });
 
-        p({ type: 'step', n: 4, total: 8, label: t('部署 .opencode/ 配置', 'Deploying .opencode/ config') });
+    const ROOT_FILE_SET = new Set(['AGENTS.md', '.gitignore', '.gitattributes', '.editorconfig']);
+    const reportOperations = (
+        step: number,
+        labelZh: string,
+        labelEn: string,
+        predicate: (rel: string) => boolean,
+    ): void => {
+        p({ type: 'step', n: step, total: 8, label: t(labelZh, labelEn) });
         for (const op of plan.operations) {
             if (!op.target) continue;
             const rel = path.relative(context.targetDir, op.target).replace(/\\/g, '/');
-            if (rel.startsWith('.opencode/') && rel !== 'skills.lock.json') {
-                if (op.type === 'preserve' && op.decision === 'skip') continue;
-                p({ type: 'pass', item: rel });
+            if (!predicate(rel)) continue;
+            if (op.type === 'preserve' && op.decision === 'skip') {
+                p({ type: 'info', text: `- ${rel} (skip)` });
+                continue;
             }
+            p({ type: 'pass', item: rel });
         }
         p({ type: 'blank' });
+    };
 
-        p({ type: 'step', n: 5, total: 8, label: t('部署 Git 配置 + AGENTS.md', 'Deploying git config + AGENTS.md') });
-        const gfRootFiles = ['AGENTS.md', '.gitignore', '.gitattributes', '.editorconfig'];
-        for (const rf of gfRootFiles) {
-            const has = plan.operations.some(op => {
-                if (!op.target) return false;
-                return path.relative(context.targetDir, op.target).replace(/\\/g, '/') === rf && !(op.type === 'preserve' && op.decision === 'skip');
-            });
-            if (has) p({ type: 'pass', item: rf });
-        }
-        p({ type: 'milestone', text: t('文件复制完成', 'Deploy complete') });
-    }
+    reportOperations(3, '部署 openspec/ 配置', 'Deploying openspec/ config',
+        rel => rel.startsWith('openspec/') && rel !== 'skills.lock.json');
+    reportOperations(4, '部署 .opencode/ 配置', 'Deploying .opencode/ config',
+        rel => rel.startsWith('.opencode/') && rel !== 'skills.lock.json');
+    reportOperations(5, '部署 Git 配置 + AGENTS.md', 'Deploying git config + AGENTS.md',
+        rel => ROOT_FILE_SET.has(rel));
+    p({ type: 'milestone', text: t('文件复制完成', 'Deploy complete') });
 
     p({ type: 'blank' });
 
-    // ---- 6/8: 占位符替换 ----
+    // ---- 6/8: 占位符替换（校验落盘文件，不看模板源） ----
     p({ type: 'step', n: 6, total: 8, label: t('替换路径占位符', 'Replacing path placeholders') });
-    const placeholderCandidates: Array<[string, string | null]> = [
-        ['_AGENTS.md', 'AGENTS.md'],
-        ['openspec/schemas/superpowers-bridge-opencode/schema.yaml', null],
-        ['.opencode/commands/opsx-apply.md', null],
-        ['.opencode/commands/opsx-finish.md', null],
-    ];
-    for (const [src, dst] of placeholderCandidates) {
-        const sourcePath = path.join(context.templateDir, ...src.split('/'));
-        const targetRel = dst || src;
-        if (!fs.existsSync(sourcePath)) continue;
-        const content = fs.readFileSync(sourcePath, 'utf8');
-        const targetPath = path.join(context.targetDir, ...targetRel.split('/'));
-        if (!fs.existsSync(targetPath)) continue;
-        if (content.includes('{{SUPERPOWERS_BASE_PATH}}')) {
-            p({ type: 'pass', item: targetRel });
-        } else {
-            p({ type: 'info', text: t(`${targetRel}（无占位符）`, `${targetRel} (no placeholder)`) });
-        }
-    }
+    const placeholderTargets = PLACEHOLDER_TARGETS.filter(relative => {
+        const target = path.join(context.targetDir, ...relative.split('/'));
+        if (fs.existsSync(target)) return true;
+        return plan.operations.some(operation => (
+            operation.type === 'write'
+            && operation.target !== undefined
+            && path.relative(context.targetDir, operation.target).replace(/\\/g, '/') === relative
+        ));
+    });
+    verifyNoPlaceholders(context.targetDir, placeholderTargets);
+    for (const relative of placeholderTargets) p({ type: 'pass', item: relative });
     p({ type: 'milestone', text: t('占位符替换完成', 'Placeholder replacement complete') });
 
     p({ type: 'blank' });

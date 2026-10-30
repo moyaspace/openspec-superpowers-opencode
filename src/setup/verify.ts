@@ -137,3 +137,21 @@ async function verifyProject(options: VerifyProjectOptions): Promise<VerifyProje
 
 export { verifyProject };
 
+/**
+ * 校验落盘文件不含路径占位符。以目标文件为准，不看模板源——
+ * 模板源含占位符是正常的，落盘后仍含才是缺陷。
+ */
+function verifyNoPlaceholders(targetDir: string, targets: readonly string[]): void {
+    for (const relative of targets) {
+        const targetPath = path.join(targetDir, ...relative.split('/'));
+        if (!fs.existsSync(targetPath)) {
+            throw new Error(`Placeholder check target missing: ${relative}`);
+        }
+        const content = fs.readFileSync(targetPath, 'utf8');
+        if (content.includes('{{SUPERPOWERS_BASE_PATH}}')) {
+            throw new Error(`Unreplaced path placeholder in ${relative}`);
+        }
+    }
+}
+
+export { verifyNoPlaceholders };

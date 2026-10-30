@@ -38,4 +38,30 @@ describe('mergeMarker', () => {
             /incomplete managed marker/i,
         );
     });
+
+    it('replaces only the marker block when the managed document has text around the markers', () => {
+        const managed = `---\nfront\n---\n${MARKER}\nbody\n${MARKER}\ntail\n`;
+        const existing = `---\nfront\n---\n${MARKER}\nold body\n${MARKER}\ntail\n`;
+
+        const first = mergeMarker({ existing, managed, marker: MARKER, decision: 'yes' });
+
+        assert.equal(first.action, 'replace');
+        assert.ok(first.content.startsWith('---\nfront\n---\n'), 'target preamble must be preserved');
+        assert.equal(first.content.includes('old body'), false, 'old managed body must be replaced');
+        assert.equal(first.content.split('---\nfront\n---\n').length - 1, 1, 'managed preamble must not be duplicated');
+        assert.ok(first.content.endsWith('tail\n'), 'target trailing content must be preserved');
+
+        const second = mergeMarker({ existing: first.content, managed, marker: MARKER, decision: 'yes' });
+
+        assert.equal(second.content, first.content, 'replacing twice must be idempotent');
+    });
+
+    it('rejects a managed document without a complete marker pair when replacing', () => {
+        const existing = `before\n${MARKER}\nold\n${MARKER}\nafter\n`;
+
+        assert.throws(
+            () => mergeMarker({ existing, managed: `no markers here\n${MARKER}\n`, marker: MARKER, decision: 'yes' }),
+            /incomplete managed marker section in managed content/i,
+        );
+    });
 });
