@@ -2,7 +2,7 @@
 $TOOL_DIR = "{{TOOL_DIR}}"
 
 # Self-heal: package was removed, restore original openspec and clean up
-$healthCheck = Join-Path $TOOL_DIR "dist" "registry-utils.js"
+$healthCheck = Join-Path (Join-Path $TOOL_DIR "dist") "registry-utils.js"
 if (-not (Test-Path $healthCheck)) {
     $here = Split-Path -Parent $PSCommandPath
     $origCmd = Join-Path $here "openspec-orig.cmd"
@@ -18,7 +18,7 @@ if (-not (Test-Path $healthCheck)) {
 
 if ($null -ne $TOOL_DIR -and $TOOL_DIR -ne "") {
     if ($args[0] -eq "list") {
-        $rutilsJs = Join-Path $TOOL_DIR "dist" "registry-utils.js"
+        $rutilsJs = Join-Path (Join-Path $TOOL_DIR "dist") "registry-utils.js"
         & node $rutilsJs @args
         exit $LASTEXITCODE
     }
