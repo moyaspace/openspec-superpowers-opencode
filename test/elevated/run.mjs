@@ -4,7 +4,9 @@
  *
  * 用一遍 npm test 跑完 199（主）+ 提权套件（elevated）：
  *   1. 主 glob 测试后，检测 gsudo 是否可用；
- *   2. 可用 → `gsudo node --test test/elevated/*.test.js` 提权运行（symlink 夹具 + 生命周期端到端）；
+ *   2. 可用 → `gsudo node --test --test-concurrency=1 test/elevated/*.test.js` 提权运行
+ *      （symlink 夹具 + 生命周期端到端）。必须串行：lifecycle-e2e 安装 tarball 会改写
+ *      全局 openspec 垫片，与其他套件并发会让后者的 openspec 调用指向临时项目而失败；
  *      不可用 → 打印 SKIPPED 说明，不视为失败；
  *   3. 任一环节失败则以非零码退出。
  *
@@ -35,7 +37,7 @@ if (gsudoCheck.error || gsudoCheck.status !== 0) {
 console.log(`ELEVATED: running ${elevatedFiles.length} elevated test file(s) via gsudo ...`);
 const r = spawnSync(
   "gsudo",
-  [process.execPath, "--test", ...elevatedFiles],
+  ["node", "--test", "--test-concurrency=1", ...elevatedFiles],
   { stdio: "inherit", shell: false },
 );
 
