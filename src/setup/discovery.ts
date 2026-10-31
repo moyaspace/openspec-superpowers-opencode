@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
@@ -68,6 +69,33 @@ function findSuperpowersSkills(packagesDir: string): string | null {
     return null;
 }
 
+function readSuperpowersVersion(skillsPath: string): string | null {
+    const packageFile = path.join(path.dirname(skillsPath), 'package.json');
+    if (!fs.existsSync(packageFile)) return null;
+    const parsed = JSON.parse(fs.readFileSync(packageFile, 'utf8')) as { version?: unknown };
+    return typeof parsed.version === 'string' ? parsed.version : null;
+}
+
+interface LocateSuperpowersOptions {
+    superpowersPath?: string | undefined;
+    superpowersVersion?: string | null | undefined;
+    packagesDir?: string | undefined;
+}
+
+interface SuperpowersLocation {
+    skillsPath: string;
+    version: string | null;
+}
+
+function locateSuperpowers(options: LocateSuperpowersOptions = {}): SuperpowersLocation | null {
+    const skillsPath = options.superpowersPath || findSuperpowersSkills(
+        options.packagesDir || path.join(os.homedir(), '.cache', 'opencode', 'packages'),
+    );
+    if (!skillsPath) return null;
+    const version = options.superpowersVersion || readSuperpowersVersion(skillsPath);
+    return { skillsPath, version };
+}
+
 function verifySkillLock(skillsDir: string, lock: SkillLock | null | undefined): { allMatch: boolean; warnings: string[] } {
     const warnings: string[] = [];
     for (const [relativePath, entry] of Object.entries((lock && lock.skills) || {})) {
@@ -86,6 +114,7 @@ function verifySkillLock(skillsDir: string, lock: SkillLock | null | undefined):
 export {
     findSuperpowersSkills,
     listLockMajors,
+    locateSuperpowers,
     parseMajorVersion,
     selectLockFile,
     verifySkillLock,

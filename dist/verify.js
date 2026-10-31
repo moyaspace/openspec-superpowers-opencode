@@ -7,19 +7,21 @@
  * 3. openspec 是否为包装脚本
  * 4. openspec/oso-change-registry.json 是否有效 JSON
  * 5. 注册表中所有 worktree 目录是否存在
+ * 6. Superpowers 主版本 ≥ 6 时追加 bash 可用性检查（缺失为 warn，不判失败）
  *
  * 输出格式：
  *   ✓ openspec: installed at /usr/local/bin/openspec
  *   ⚠ openspec-orig: not found
  *     修复：openspec-superpowers-opencode install-shims
  *
- * exit code: 全 ✓ → 0, 有 ⚠ → 1
+ * exit code: 全 ✓/∼/⚠(warn) → 0, 有 fail → 1
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import child_process from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findProjectRoot } from './registry-utils.js';
+import { locateSuperpowers, parseMajorVersion } from './setup/discovery.js';
 /**
  * 查找 openspec CLI 路径。
  * @param isWin
@@ -34,6 +36,37 @@ function findOpenspec(isWin) {
     catch {
         return null;
     }
+}
+/**
+ * 探测 bash 可用性。
+ * Windows 先查 PATH（where bash），再查 Git for Windows 的默认安装路径；
+ * 类 Unix 用 which bash。
+ * @param isWin
+ */
+function detectBash(isWin) {
+    try {
+        const whichCmd = isWin ? 'where bash' : 'which bash';
+        const output = child_process.execSync(whichCmd, { stdio: 'pipe', encoding: 'utf8' }).trim();
+        const first = output.split(/\r?\n/)[0]?.trim();
+        if (first)
+            return { available: true, path: first };
+    }
+    catch {
+        // fall through to well-known install locations
+    }
+    if (isWin) {
+        const localAppData = process.env.LOCALAPPDATA;
+        const candidates = [
+            'C:\\Program Files\\Git\\bin\\bash.exe',
+            'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+            ...(localAppData ? [path.join(localAppData, 'Programs', 'Git', 'bin', 'bash.exe')] : []),
+        ];
+        for (const candidate of candidates) {
+            if (fs.existsSync(candidate))
+                return { available: true, path: candidate };
+        }
+    }
+    return { available: false, path: null };
 }
 /**
  * 检查 openspec-orig 是否存在。
@@ -131,15 +164,22 @@ function checkWorktrees(projectRoot) {
     }
     return { valid: missing.length === 0, missing };
 }
+function resolveSuperpowersVersion(options) {
+    if (options.superpowersVersion !== undefined)
+        return options.superpowersVersion;
+    const located = locateSuperpowers({ packagesDir: options.packagesDir });
+    return located ? located.version : null;
+}
 /**
- * 运行所有 5 项检查，返回结构化结果。
+ * 运行所有检查（5 项固定 + Superpowers major ≥ 6 时的 bash 项），返回结构化结果。
  *
  * @param toolDir — 工具安装目录
  * @param isWin
  * @param projectRoot — 项目根目录（可选，非项目环境下跳过 4+5）
+ * @param options — 测试可注入的 bash 检测与 Superpowers 版本来源
  * @returns CheckResult[]
  */
-function runAllChecks(toolDir, isWin, projectRoot) {
+function runAllChecks(toolDir, isWin, projectRoot, options = {}) {
     const results = [];
     // ---- Check 1: openspec 存在 ----
     const openspecPath = findOpenspec(isWin);
@@ -284,6 +324,29 @@ function runAllChecks(toolDir, isWin, projectRoot) {
             fix: null
         });
     }
+    // ---- Check 6: bash 可用性（仅 Superpowers major ≥ 6 有意义） ----
+    const superpowersMajor = parseMajorVersion(resolveSuperpowersVersion(options));
+    if (superpowersMajor !== null && Number(superpowersMajor) >= 6) {
+        const bash = (options.detectBash ?? detectBash)(isWin);
+        if (bash.available) {
+            results.push({
+                check: 'bash',
+                status: 'pass',
+                message: `found at ${bash.path}`,
+                fix: null
+            });
+        }
+        else {
+            results.push({
+                check: 'bash',
+                status: 'warn',
+                message: 'not found — Superpowers SDD 的脚本需要 bash',
+                fix: isWin
+                    ? '安装 Git for Windows（自带 bash）或 WSL；其他功能不受影响'
+                    : '安装 bash（如通过系统包管理器）；其他功能不受影响'
+            });
+        }
+    }
     return results;
 }
 /**
@@ -296,18 +359,18 @@ function formatResults(results) {
     for (const r of results) {
         const icon = r.status === 'pass' ? '✓' : r.status === 'skip' ? '∼' : '⚠';
         lines.push(`${icon} ${r.check}: ${r.message}`);
-        if (r.status === 'fail' && r.fix) {
+        if ((r.status === 'fail' || r.status === 'warn') && r.fix) {
             lines.push(`  修复：${r.fix}`);
         }
     }
     return lines.join('\n');
 }
 /**
- * 检查是否全部通过。
+ * 检查是否全部通过。warn 与 pass / skip 一样视为通过（仅提示）。
  * @param results
  */
 function allPass(results) {
-    return results.every(r => r.status === 'pass' || r.status === 'skip');
+    return results.every(r => r.status === 'pass' || r.status === 'skip' || r.status === 'warn');
 }
 /**
  * CLI 入口。
@@ -333,5 +396,5 @@ function runCLI() {
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
     runCLI();
 }
-export { runAllChecks, formatResults, allPass, findOpenspec, findOpenspecOrig, findShimFile, isShimScript, checkRegistryFile, checkWorktrees };
+export { runAllChecks, formatResults, allPass, detectBash, findOpenspec, findOpenspecOrig, findShimFile, isShimScript, checkRegistryFile, checkWorktrees };
 //# sourceMappingURL=verify.js.map

@@ -11,6 +11,31 @@ function tmpDir() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'verify-test-'));
 }
 
+/** 构造「既有 5 项静态检查全通过」的项目目录（bash 项另行注入）。 */
+function projectWithPassingStaticChecks(t, isWin = false) {
+    const projectDir = tmpDir();
+    const binDir = path.join(projectDir, 'fake-bin');
+    fs.mkdirSync(binDir, { recursive: true });
+
+    const fakeOpenspecPath = path.join(binDir, 'openspec');
+    t.mock.method(child_process, 'execSync', () => fakeOpenspecPath);
+
+    // Check 3 passes: shim marker
+    fs.writeFileSync(fakeOpenspecPath, '#!/bin/sh\n# openspec shim for oso registry\n...');
+    // Check 2 passes: openspec-orig
+    fs.writeFileSync(
+        path.join(binDir, isWin ? 'openspec-orig.cmd' : 'openspec-orig'),
+        isWin ? '@echo off\n...' : '#!/bin/sh\n...',
+    );
+    // Check 4 passes: valid oso-change-registry.json
+    const regDir = path.join(projectDir, 'openspec');
+    fs.mkdirSync(regDir, { recursive: true });
+    fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({ changes: [] }));
+    // Check 5 passes: no worktree entries to check
+
+    return projectDir;
+}
+
 // ============================================================
 // findOpenspec()
 // ============================================================
@@ -28,6 +53,21 @@ describe('findOpenspec()', () => {
     test('takes first line when multiple results', (t) => {
         t.mock.method(child_process, 'execSync', () => '/usr/local/bin/openspec\n/home/user/.local/bin/openspec');
         assert.strictEqual(verify.findOpenspec(false), '/usr/local/bin/openspec');
+    });
+});
+
+// ============================================================
+// detectBash()
+// ============================================================
+describe('detectBash()', () => {
+    test('returns bash path from which/where', (t) => {
+        t.mock.method(child_process, 'execSync', () => '/usr/bin/bash\n');
+        assert.deepStrictEqual(verify.detectBash(false), { available: true, path: '/usr/bin/bash' });
+    });
+
+    test('returns unavailable when no bash is found', (t) => {
+        t.mock.method(child_process, 'execSync', () => { throw new Error('not found'); });
+        assert.deepStrictEqual(verify.detectBash(false), { available: false, path: null });
     });
 });
 
@@ -228,13 +268,53 @@ describe('runAllChecks()', () => {
         fs.writeFileSync(path.join(regDir, 'oso-change-registry.json'), JSON.stringify({ changes: [] }));
         // Check 5 passes: no worktree entries to check
 
-        const results = verify.runAllChecks(null, false, projectDir);
+        const results = verify.runAllChecks(null, false, projectDir, { superpowersVersion: null });
         assert.strictEqual(results.length, 5);
         for (const r of results) {
             if (r.status === 'fail') {
                 assert.fail(`Check "${r.check}" failed: ${r.message}`);
             }
         }
+    });
+
+    test('major >= 6 + bash unavailable → bash item is warn with install hint, allPass stays true', (t) => {
+        const projectDir = projectWithPassingStaticChecks(t, true);
+
+        const results = verify.runAllChecks(null, true, projectDir, {
+            superpowersVersion: '6.4.2',
+            detectBash: () => ({ available: false, path: null }),
+        });
+
+        const bash = results.find(r => r.check === 'bash');
+        assert.ok(bash, 'major >= 6 must add a bash check item');
+        assert.strictEqual(bash.status, 'warn');
+        assert.match(bash.message, /Superpowers SDD/);
+        assert.ok(bash.fix, 'warn must carry a fix hint');
+        assert.match(bash.fix, /Git for Windows|WSL/);
+        assert.strictEqual(verify.allPass(results), true, 'warn must count as passing');
+    });
+
+    test('major >= 6 + bash available → bash item is pass with path', (t) => {
+        const projectDir = projectWithPassingStaticChecks(t, false);
+
+        const results = verify.runAllChecks(null, false, projectDir, {
+            superpowersVersion: '6.4.2',
+            detectBash: () => ({ available: true, path: '/usr/bin/bash' }),
+        });
+
+        const bash = results.find(r => r.check === 'bash');
+        assert.ok(bash, 'major >= 6 must add a bash check item');
+        assert.strictEqual(bash.status, 'pass');
+        assert.match(bash.message, /\/usr\/bin\/bash/);
+    });
+
+    test('major < 6 → no bash item is added', (t) => {
+        const projectDir = projectWithPassingStaticChecks(t, false);
+
+        const results = verify.runAllChecks(null, false, projectDir, { superpowersVersion: '5.1.0' });
+
+        assert.strictEqual(results.find(r => r.check === 'bash'), undefined);
+        assert.strictEqual(results.length, 5);
     });
 
     test('checks 4+5 are skipped when projectRoot is null', (t) => {
@@ -367,6 +447,16 @@ describe('formatResults()', () => {
         assert.ok(output.includes('worktrees'));
     });
 
+    test('formats warn with warning icon and fix suggestion', () => {
+        const output = verify.formatResults([
+            { check: 'bash', status: 'warn', message: 'not found', fix: 'install Git for Windows or WSL' }
+        ]);
+        assert.ok(output.includes('⚠'));
+        assert.ok(output.includes('bash'));
+        assert.ok(output.includes('修复'));
+        assert.ok(output.includes('Git for Windows'));
+    });
+
     test('handles multiple results with mixed status', () => {
         const output = verify.formatResults([
             { check: 'a', status: 'pass', message: 'ok', fix: null },
@@ -392,6 +482,12 @@ describe('allPass()', () => {
     test('returns true when all pass or skip', () => {
         assert.strictEqual(verify.allPass([
             { status: 'pass' }, { status: 'skip' }
+        ]), true);
+    });
+
+    test('returns true when warn is present', () => {
+        assert.strictEqual(verify.allPass([
+            { status: 'pass' }, { status: 'warn' }
         ]), true);
     });
 

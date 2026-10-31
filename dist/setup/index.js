@@ -1,11 +1,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createContext } from './context.js';
 import { executeOperations } from './deploy.js';
-import { findSuperpowersSkills, listLockMajors, parseMajorVersion, selectLockFile } from './discovery.js';
+import { listLockMajors, locateSuperpowers, parseMajorVersion, selectLockFile } from './discovery.js';
 import { mergeMarker, mergeOcodeJson } from './merge.js';
 import { buildManifest } from './manifest.js';
 import { createInitPlan } from './planner.js';
@@ -14,6 +13,7 @@ import { resolveDecision } from './prompt.js';
 import { resolveToolRoot, verifyNoPlaceholders, verifyProject } from './verify.js';
 import { checkShim, ensureShim } from './shim-check.js';
 import { resetProject } from './reset.js';
+import { detectBash } from '../verify.js';
 function requireCommand(result, phase) {
     if (!result || result.code !== 0) {
         const error = new Error(`${phase} failed${result && result.stderr ? `: ${result.stderr.trim()}` : ''}`);
@@ -36,15 +36,13 @@ function hasCompleteMarker(file, marker) {
     return fs.existsSync(file) && fs.readFileSync(file, 'utf8').split(marker).length - 1 === 2;
 }
 function resolveSuperpowers(options) {
-    const skillsPath = options.superpowersPath || findSuperpowersSkills(path.join(os.homedir(), '.cache', 'opencode', 'packages'));
-    if (!skillsPath)
+    const located = locateSuperpowers({
+        superpowersPath: options.superpowersPath,
+        superpowersVersion: options.superpowersVersion,
+    });
+    if (!located)
         throw new Error('Superpowers skills directory was not found');
-    let version = options.superpowersVersion || null;
-    const packageFile = path.join(path.dirname(skillsPath), 'package.json');
-    if (!version && fs.existsSync(packageFile)) {
-        version = JSON.parse(fs.readFileSync(packageFile, 'utf8')).version;
-    }
-    return { skillsPath, version };
+    return located;
 }
 function reportUnsupportedLock(templateDir, major, t, p) {
     const majors = listLockMajors(templateDir);
@@ -675,6 +673,18 @@ async function initProject(options = {}) {
     p({ type: 'blank' });
     // ---- 8/8: 验证工作流 + 写入安装清单 ----
     p({ type: 'step', n: 8, total: 8, label: t('验证工作流 + 写入安装清单', 'Validating workflow + writing manifest') });
+    if (lockMajor !== null && Number(lockMajor) >= 6) {
+        const bash = detectBash(process.platform === 'win32');
+        if (bash.available) {
+            p({ type: 'pass', item: 'bash', detail: bash.path ?? '' });
+        }
+        else {
+            p({
+                type: 'warn',
+                item: t('未找到 bash：Superpowers SDD 的脚本需要 bash（Windows 请安装 Git for Windows 或 WSL），其他功能不受影响', 'bash not found: Superpowers SDD scripts need bash (install Git for Windows or WSL on Windows); other features are unaffected'),
+            });
+        }
+    }
     const manifest = buildManifest({
         projectRoot: context.targetDir,
         operations: plan.operations,

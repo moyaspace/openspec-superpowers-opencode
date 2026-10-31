@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 function parseMajorVersion(version) {
@@ -57,6 +58,20 @@ function findSuperpowersSkills(packagesDir) {
     }
     return null;
 }
+function readSuperpowersVersion(skillsPath) {
+    const packageFile = path.join(path.dirname(skillsPath), 'package.json');
+    if (!fs.existsSync(packageFile))
+        return null;
+    const parsed = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
+    return typeof parsed.version === 'string' ? parsed.version : null;
+}
+function locateSuperpowers(options = {}) {
+    const skillsPath = options.superpowersPath || findSuperpowersSkills(options.packagesDir || path.join(os.homedir(), '.cache', 'opencode', 'packages'));
+    if (!skillsPath)
+        return null;
+    const version = options.superpowersVersion || readSuperpowersVersion(skillsPath);
+    return { skillsPath, version };
+}
 function verifySkillLock(skillsDir, lock) {
     const warnings = [];
     for (const [relativePath, entry] of Object.entries((lock && lock.skills) || {})) {
@@ -72,5 +87,5 @@ function verifySkillLock(skillsDir, lock) {
     }
     return { allMatch: warnings.length === 0, warnings };
 }
-export { findSuperpowersSkills, listLockMajors, parseMajorVersion, selectLockFile, verifySkillLock, };
+export { findSuperpowersSkills, listLockMajors, locateSuperpowers, parseMajorVersion, selectLockFile, verifySkillLock, };
 //# sourceMappingURL=discovery.js.map
