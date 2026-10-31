@@ -13,14 +13,27 @@ describe('Superpowers discovery', () => {
         assert.equal(parseMajorVersion('6-beta'), null);
     });
 
-    it('selects the matching lock and otherwise falls back deterministically', (t) => {
+    it('selects the exact major lock', (t) => {
         const templateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-lock-'));
         t.after(() => fs.rmSync(templateDir, { recursive: true, force: true }));
-        fs.writeFileSync(path.join(templateDir, 'skills.lock.v6.json'), '{}');
         fs.writeFileSync(path.join(templateDir, 'skills.lock.v5.json'), '{}');
+        fs.writeFileSync(path.join(templateDir, 'skills.lock.v6.json'), '{}');
+        fs.writeFileSync(path.join(templateDir, 'skills.lock.v7.json'), '{}');
 
         assert.equal(selectLockFile(templateDir, '6'), path.join(templateDir, 'skills.lock.v6.json'));
-        assert.equal(selectLockFile(templateDir, '7'), path.join(templateDir, 'skills.lock.v5.json'));
+        assert.equal(selectLockFile(templateDir, '7'), path.join(templateDir, 'skills.lock.v7.json'));
+    });
+
+    it('returns no lock when the major is unsupported', (t) => {
+        const templateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-lock-'));
+        t.after(() => fs.rmSync(templateDir, { recursive: true, force: true }));
+        fs.writeFileSync(path.join(templateDir, 'skills.lock.v5.json'), '{}');
+        fs.writeFileSync(path.join(templateDir, 'skills.lock.v6.json'), '{}');
+        fs.writeFileSync(path.join(templateDir, 'skills.lock.v7.json'), '{}');
+
+        assert.equal(selectLockFile(templateDir, '8'), null);
+        assert.equal(selectLockFile(templateDir, '4'), null);
+        assert.equal(selectLockFile(templateDir, null), null);
     });
 
     it('chooses the first valid skills directory in deterministic order', (t) => {
