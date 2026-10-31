@@ -9,13 +9,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_DIR = path.join(__dirname, '..', 'template');
 const COMMANDS_DIR = path.join(TEMPLATE_DIR, '.opencode', 'commands');
 
-// The five lifecycle commands that must be base-branch agnostic.
+// The lifecycle commands that must be base-branch agnostic.
 const BASE_AWARE_COMMANDS = [
     'opsx-propose.md',
     'opsx-finish.md',
     'opsx-ff.md',
     'opsx-new.md',
     'opsx-continue.md',
+    'opsx-apply.md',
 ];
 
 const BASE_READ_COMMAND = 'git rev-parse --abbrev-ref HEAD';
@@ -226,5 +227,73 @@ describe('opsx template commands are base-branch agnostic', () => {
             15,
             `expected 15 command markdown files in template/.opencode/commands, found ${files.length}: ${files.join(', ')}`,
         );
+    });
+});
+
+describe('opsx-apply.md delegates the v6+ branch to upstream SDD', () => {
+    it('dispatches implementers with the OMO task() syntax', () => {
+        const content = readCommand('opsx-apply.md');
+        assert.ok(
+            content.includes('task(category="deep"'),
+            'opsx-apply.md: delegation must dispatch via task(category="deep"',
+        );
+    });
+
+    it('forbids copying the [CC] Subagent syntax', () => {
+        const content = readCommand('opsx-apply.md');
+        assert.ok(
+            content.includes('Subagent (general-purpose)'),
+            'opsx-apply.md: must name the forbidden Subagent (general-purpose) syntax',
+        );
+        assert.ok(
+            content.includes('MUST NOT 照抄'),
+            'opsx-apply.md: must forbid copying that syntax (MUST NOT 照抄)',
+        );
+    });
+
+    it('runs the SDD scripts through `bash "<SUPERPOWERS_BASE_PATH>..."`', () => {
+        const content = readCommand('opsx-apply.md');
+        assert.ok(
+            content.includes('bash "{{SUPERPOWERS_BASE_PATH}}'),
+            'opsx-apply.md: script invocations must use bash "{{SUPERPOWERS_BASE_PATH}}...',
+        );
+        for (const script of ['task-brief', 'review-package', 'sdd-workspace']) {
+            assert.ok(
+                content.includes(`/scripts/${script}"`),
+                `opsx-apply.md: must reference scripts/${script} as a quoted bash argument`,
+            );
+        }
+    });
+
+    it('keeps the three Step 4.5 contract sections before Step 5', () => {
+        const content = readCommand('opsx-apply.md');
+        const step45 = content.indexOf('### Step 4.5: v6+ 委托契约');
+        const step5 = content.indexOf('### Step 5: 逐任务实现');
+        assert.notEqual(step45, -1, 'opsx-apply.md: missing "### Step 4.5: v6+ 委托契约"');
+        assert.notEqual(step5, -1, 'opsx-apply.md: missing "### Step 5: 逐任务实现"');
+        assert.ok(
+            step45 < step5,
+            'opsx-apply.md: Step 4.5 must precede Step 5 so the mapping is read before dispatch',
+        );
+        for (const section of ['bash 调用写法', 'SDD → OMO 语法映射', 'tasks.md 勾选契约']) {
+            assert.ok(
+                content.includes(section),
+                `opsx-apply.md: Step 4.5 must keep the "${section}" section`,
+            );
+        }
+    });
+
+    it('keeps the v5 branch (Read items and both review steps)', () => {
+        const content = readCommand('opsx-apply.md');
+        for (const marker of [
+            '{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/spec-reviewer-prompt.md',
+            '{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/code-quality-reviewer-prompt.md',
+            '**Superpowers v5 流程：**',
+            '**Superpowers v5（两步审查）：**',
+            '**Spec 审查**',
+            '**代码质量审查**',
+        ]) {
+            assert.ok(content.includes(marker), `opsx-apply.md: v5 branch marker missing: ${marker}`);
+        }
     });
 });

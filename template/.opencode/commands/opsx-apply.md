@@ -103,7 +103,7 @@ Read：
 
 **① bash 调用写法（MUST）**
 
-SDD 的 `scripts/` 下三个脚本虽然有 `#!/usr/bin/env bash`，但安装到本机后不保证有可执行位（Windows 侧尤其没有），且占位符替换后的绝对路径可能含空格，因此：
+SDD 的 `scripts/` 下三个脚本虽然有 `#!/usr/bin/env bash`，但安装到本机后不保证有可执行位（Windows 侧尤其没有），且 Windows 上直接执行脚本会失败（会话 shell 未必是 bash）；加上占位符替换后的绝对路径可能含空格，因此：
 
 - MUST 一律写成 `bash <脚本路径> [参数...]`，不得直接执行脚本路径。
 - 脚本路径 MUST 用双引号包裹。
@@ -126,7 +126,8 @@ SKILL.md 用 [CC] 的 Subagent 语义描述派发。在 OMO 中 MUST 按下表�
 
 | SDD 写法 | OMO MUST 写法 | 说明 |
 |---|---|---|
-| `Subagent (general-purpose)` | `task(category="deep", load_skills=[], description="<任务名>", prompt="<prompt>")` | 实现者与审查者都用 `category="deep"`；`description` 必填 |
+| `Subagent (general-purpose)` | 实现者：`task(category="deep", load_skills=[], description="<任务名>", prompt="<prompt>")` | `description` 必填；`category="deep"` 只用于**实现者** |
+| Subagent 承担审查角色（task reviewer） | 审查者：`task(subagent_type="oracle", description="<审查名>", prompt="<prompt>")` | 与本仓库既有约定一致（v5 分支同样用 `oracle`）；MUST NOT 用 `category="deep"` 派审查者 |
 | 按任务复杂度选 `model`（SKILL.md 的 Model Selection） | **不写** `model` 参数 | 模型由 `category` 隐含；SKILL.md 的「机械任务用便宜模型 / 架构任务用最强模型」→ 选对应 `category`，不写模型名 |
 | 后台派发 | `run_in_background=true` | 结果用 `background_output(task_id="bg_...")` 收取，不要短超时轮询 |
 | 续跑同一个子 Agent（fix loop 前 3 轮、补充上下文） | `task(..., task_id="ses_...")` | 首次派发返回的 `ses_...` 会话 ID 要记下；续跑 MUST 带上它，不得另起新 Agent 重来 |
@@ -177,11 +178,10 @@ task(
 
 MUST 读取 SKILL.md 指引的每一个 `references/` 文件（v7 共 7 份：`batching.md`、`cannot-verify.md`、`final-review.md`、`fix-loop.md`、`handling-reports.md`、`preflight.md`、`resuming.md`），按其中的规则执行，不得凭记忆替代。
 
-MUST NOT 用旧的自编排流程替代 SKILL.md。以下内容一律以 SKILL.md / `implementer-prompt.md` / `task-reviewer-prompt.md` / `references/` 为准，本命令不重述：
+MUST NOT 用旧的自编排流程替代 SKILL.md。细节一律以 SKILL.md / `implementer-prompt.md` / `task-reviewer-prompt.md` / `references/` 为准；本节只补两处 SKILL.md 没写明的 OMO 落地口径 —— 脚本的 bash 调用形态（Step 4.5 ①）与 `BASE` 的记录口径（Step 6）。以下内容不在本节重述：
 
-- 何时运行 `scripts/task-brief`、`scripts/review-package`，参数怎么给；
 - implementer / task reviewer 的 prompt 怎么填（含 TDD 指令怎么进入 prompt —— 不再手工从 `test-driven-development/SKILL.md` 摘录 RED-GREEN-REFACTOR 前置指令）；
-- fix loop 轮次上限、BLOCKED / NEEDS_CONTEXT / DONE_WITH_CONCERNS 的处置、断点续跑规则。
+- fix loop 的轮次上限、BLOCKED / NEEDS_CONTEXT / DONE_WITH_CONCERNS 的处置、断点续跑规则。
 
 派发语法 MUST 按 Step 4.5 的「② SDD → OMO 语法映射」改写：`task(category="deep", load_skills=[])`，不写 `model` 参数，后台派发加 `run_in_background=true`，续跑带 `task_id="ses_..."`。
 
@@ -209,9 +209,9 @@ Read：
 
 **Superpowers v6+（审查同样交给 SDD）：**
 
-实现与审查都在 SDD 的同一个循环里完成，本命令不额外派审查 Agent：
+实现与审查都在 SDD 的同一个循环里完成，本命令不另起一套审查流程；审查者按 SKILL.md §3 派发：
 
-- 单任务审查 → SKILL.md §3 Review the task：用 `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package" <plan.md 路径> <BASE> <HEAD>` 生成 package，再用 `task-reviewer-prompt.md` 派审查者（`BASE` 是实现者派发前记录的 commit，不是 `HEAD~1`）。
+- 单任务审查 → SKILL.md §3 Review the task：用 `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package" <plan.md 路径> <BASE> <HEAD>` 生成 package，再用 `task-reviewer-prompt.md` 填 prompt、按 `task(subagent_type="oracle", ...)` 派审查者（`BASE` 是实现者派发前记录的 commit，不是 `HEAD~1`）。
 - 修复 → SKILL.md §4 The fix loop（读 `references/fix-loop.md`）。
 - 全分支审查 → SKILL.md 的 Final Review（读 `references/final-review.md`）。
 
