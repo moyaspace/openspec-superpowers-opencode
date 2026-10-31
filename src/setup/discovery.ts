@@ -15,15 +15,25 @@ function parseMajorVersion(version: unknown): string | null {
     return version.split('.')[0] as string;
 }
 
-function selectLockFile(templateDir: string, major: string | null): string | null {
-    const matching = major ? path.join(templateDir, `skills.lock.v${major}.json`) : null;
-    if (matching && fs.existsSync(matching)) return matching;
+function listLockMajors(templateDir: string): string[] {
+    let entries: fs.Dirent[];
+    try {
+        entries = fs.readdirSync(templateDir, { withFileTypes: true });
+    } catch {
+        return [];
+    }
+    return entries
+        .filter(entry => entry.isFile())
+        .map(entry => /^skills\.lock\.v(\d+)\.json$/.exec(entry.name))
+        .filter((match): match is RegExpExecArray => match !== null)
+        .map(match => match[1] as string)
+        .sort((a, b) => Number(a) - Number(b));
+}
 
-    const fallback = fs.readdirSync(templateDir, { withFileTypes: true })
-        .filter(entry => entry.isFile() && /^skills\.lock\.v[^/]+\.json$/.test(entry.name))
-        .map(entry => entry.name)
-        .sort()[0];
-    return fallback ? path.join(templateDir, fallback) : null;
+function selectLockFile(templateDir: string, major: string | null): string | null {
+    if (!major) return null;
+    const matching = path.join(templateDir, `skills.lock.v${major}.json`);
+    return fs.existsSync(matching) ? matching : null;
 }
 
 function findSkillsBelow(rootDir: string): string | null {
@@ -75,6 +85,7 @@ function verifySkillLock(skillsDir: string, lock: SkillLock | null | undefined):
 
 export {
     findSuperpowersSkills,
+    listLockMajors,
     parseMajorVersion,
     selectLockFile,
     verifySkillLock,

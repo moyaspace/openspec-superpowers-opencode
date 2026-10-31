@@ -6,15 +6,26 @@ function parseMajorVersion(version) {
         return null;
     return version.split('.')[0];
 }
+function listLockMajors(templateDir) {
+    let entries;
+    try {
+        entries = fs.readdirSync(templateDir, { withFileTypes: true });
+    }
+    catch {
+        return [];
+    }
+    return entries
+        .filter(entry => entry.isFile())
+        .map(entry => /^skills\.lock\.v(\d+)\.json$/.exec(entry.name))
+        .filter((match) => match !== null)
+        .map(match => match[1])
+        .sort((a, b) => Number(a) - Number(b));
+}
 function selectLockFile(templateDir, major) {
-    const matching = major ? path.join(templateDir, `skills.lock.v${major}.json`) : null;
-    if (matching && fs.existsSync(matching))
-        return matching;
-    const fallback = fs.readdirSync(templateDir, { withFileTypes: true })
-        .filter(entry => entry.isFile() && /^skills\.lock\.v[^/]+\.json$/.test(entry.name))
-        .map(entry => entry.name)
-        .sort()[0];
-    return fallback ? path.join(templateDir, fallback) : null;
+    if (!major)
+        return null;
+    const matching = path.join(templateDir, `skills.lock.v${major}.json`);
+    return fs.existsSync(matching) ? matching : null;
 }
 function findSkillsBelow(rootDir) {
     const entries = fs.readdirSync(rootDir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -61,5 +72,5 @@ function verifySkillLock(skillsDir, lock) {
     }
     return { allMatch: warnings.length === 0, warnings };
 }
-export { findSuperpowersSkills, parseMajorVersion, selectLockFile, verifySkillLock, };
+export { findSuperpowersSkills, listLockMajors, parseMajorVersion, selectLockFile, verifySkillLock, };
 //# sourceMappingURL=discovery.js.map
