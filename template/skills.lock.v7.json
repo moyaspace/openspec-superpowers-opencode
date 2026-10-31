@@ -1,0 +1,28 @@
+{
+  "schema": "@moyaspace/openspec-superpowers-opencode/skills-lock",
+  "version": 1,
+  "upstream": {
+    "repo": "github.com/obra/superpowers",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b"
+  },
+  "skills": {
+    "brainstorming/SKILL.md": {
+      "sha256": "61A7EF918652108C76A3FD01E02DD92D39996C6B46D4CB2819CBD03F6C45E46A"
+    },
+    "writing-plans/SKILL.md": {
+      "sha256": "A6C67C1900064347C2A329990DD3C555657C51C3EC53B259A08AA01A2C26139A"
+    },
+    "subagent-driven-development/SKILL.md": {
+      "sha256": "BA41F697136CBA88A7962D60C8E2F97488BA04A8688B1D0FBEB27F6953808E75"
+    },
+    "subagent-driven-development/implementer-prompt.md": {
+      "sha256": "81DD9D5A3FB0B09B96B5829F03B9796842F3199EF7591D1BA1C2DB2A515F64D0"
+    },
+    "subagent-driven-development/task-reviewer-prompt.md": {
+      "sha256": "BFED55C8F19D0FF6ED57B0FE09127C92890E9311C6C73917129598826BF9EBE8"
+    },
+    "test-driven-development/SKILL.md": {
+      "sha256": "64B03FCE4AEE5A97A93160CEA8111F3BA13A17B7C001DB4BD5836D67FD10705D"
+    }
+  }
+}
