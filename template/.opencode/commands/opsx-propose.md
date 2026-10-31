@@ -66,8 +66,9 @@ git status --porcelain
 git rev-parse --abbrev-ref HEAD   # → BASE_BRANCH
 ```
 
-- 只读：不写注册表、不调 `question`、不切换分支
-- 读出来不是你想要的 base → 提示用户自行 `git switch <目标分支>` 后重跑，不得继续切 worktree
+读出后向用户打印一行：`基础分支 = <BASE_BRANCH>`。
+
+约束：只读 —— 不写注册表、不调 `question`、不切换分支。
 
 ### Step 3: 创建隔离 Worktree
 
