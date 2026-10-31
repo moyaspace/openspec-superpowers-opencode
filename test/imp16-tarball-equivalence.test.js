@@ -9,18 +9,34 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, existsSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname, resolve } from "node:path";
+import { join, dirname, resolve, delimiter } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-function runNpm(args, cwd, timeout = 300000) {
+function runNpm(args, cwd, timeout = 300000, env) {
+  const merged = env ? { ...process.env, ...env } : undefined;
   if (process.platform === "win32") {
-    const r = spawnSync("cmd.exe", ["/d", "/s", "/c", "npm", ...args], { cwd, encoding: "utf8", timeout });
+    const r = spawnSync("cmd.exe", ["/d", "/s", "/c", "npm", ...args], { cwd, encoding: "utf8", timeout, env: merged });
     return { stdout: (r.stdout ?? "") + (r.stderr ?? ""), status: r.status ?? -1 };
   }
-  const r = spawnSync("npm", args, { cwd, encoding: "utf8", timeout });
+  const r = spawnSync("npm", args, { cwd, encoding: "utf8", timeout, env: merged });
   return { stdout: (r.stdout ?? "") + (r.stderr ?? ""), status: r.status ?? -1 };
+}
+
+/**
+ * 隔离 bin 目录：放一个 dummy openspec 并前置到 PATH，供 `npm install <tarball>` 使用。
+ *
+ * 被安装的包带有 `install` 生命周期脚本（shims-installer install），它用
+ * `where`/`which openspec` 定位 bin。不隔离就会写进**机器全局** npm bin，
+ * 并在并发时把正在被 cmd 执行的 openspec.cmd 原地换掉 → 另一测试拿到 9009。
+ */
+function makeIsolatedBin() {
+  const bin = mkdtempSync(join(tmpdir(), "oso-imp16-bin-"));
+  writeFileSync(join(bin, "openspec.cmd"), "@echo off\r\nexit /b 0\r\n");
+  writeFileSync(join(bin, "openspec.ps1"), "exit 0\r\n");
+  writeFileSync(join(bin, "openspec"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  return bin;
 }
 
 function runNode(script, args, cwd, timeout = 120000) {
@@ -31,12 +47,18 @@ function runNode(script, args, cwd, timeout = 120000) {
 test("tarball: CLI 版本输出与退出码与基线一致（1.1.1/0）", () => {
   const packDir = mkdtempSync(join(tmpdir(), "oso-imp16-pack-"));
   const projectDir = mkdtempSync(join(tmpdir(), "oso-imp16-project-"));
+  const binDir = makeIsolatedBin();
   try {
     const pack = runNpm(["pack", "--pack-destination", packDir], root);
     assert.equal(pack.status, 0, `npm pack 失败: ${pack.stdout}`);
     const tgzs = readdirSync(packDir).filter((f) => f.endsWith(".tgz"));
     assert.equal(tgzs.length, 1);
-    const install = runNpm(["install", join(packDir, tgzs[0]), "--no-audit", "--no-fund", "--force"], projectDir);
+    const install = runNpm(
+      ["install", join(packDir, tgzs[0]), "--no-audit", "--no-fund", "--force"],
+      projectDir,
+      300000,
+      { PATH: binDir + delimiter + (process.env.PATH ?? "") },
+    );
     assert.equal(install.status, 0, `npm install 失败: ${install.stdout}`);
 
     const pkgDir = join(projectDir, "node_modules", "@moyaspace", "openspec-superpowers-opencode");
@@ -112,6 +134,7 @@ test("tarball: CLI 版本输出与退出码与基线一致（1.1.1/0）", () => 
   } finally {
     rmSync(packDir, { recursive: true, force: true });
     rmSync(projectDir, { recursive: true, force: true });
+    rmSync(binDir, { recursive: true, force: true });
   }
 });
 
