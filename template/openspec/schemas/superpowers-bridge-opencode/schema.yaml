@@ -451,25 +451,37 @@ apply:
 
     0. **Pre-flight — 確認環境就緒**：
 
-        先檢測 Superpowers 版本（讀取 `{{SUPERPOWERS_BASE_PATH}}../package.json` 的 version 字段，取主版本號），
-        然後按版本確認以下 skill 檔案可讀取，若有任一 Read 失敗則 STOP：
+       先檢測 Superpowers 版本（讀取 `{{SUPERPOWERS_BASE_PATH}}../package.json` 的 version 字段，
+       取主版本號：`5` 走 v5 分支，`6` 及以上（v6+，含 v7）走 v6+ 分支），
+       然後按版本確認對應 skill 能力可 Read / 可訪問：
 
-        **Superpowers v5 需檢查：**
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/spec-reviewer-prompt.md
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/code-quality-reviewer-prompt.md
-          {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
+       **Superpowers v5（Read，任一失敗 STOP）：**
+         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
+         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
+         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/spec-reviewer-prompt.md
+         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/code-quality-reviewer-prompt.md
+         {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
 
-        **Superpowers v6 需檢查：**
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
-          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/task-reviewer-prompt.md
-          {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
+       **Superpowers v6+（任一 Read 失敗 STOP）：**
+         Read：
+           {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
+
+         並確認 SDD 的三個腳本存在（此處只確認可訪問，不運行）：
+           {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/task-brief
+           {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package
+           {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/sdd-workspace
+
+       如果有任一 Read 失敗、或 v6+ 下任一腳本缺失，STOP 並告知用戶，不要靜默降級。
 
        同時確認專案所需的 CLI 工具可用。讀取 plan.md 找出所有提到的工具
        （如 `mvn`/`mvnw`、`docker`、`python3`、`node`/`npm` 等）。
        若缺少工具，報告 WARNING（不停止）——用戶可能有替代方案。
+
+       確認 .gitignore 已就緒：若 plan.md 包含 `npm install` / `cargo build` / `pip install`
+       等會產生構建產物的命令，執行前先確認對應子目錄已有 .gitignore 排除產物
+       （Node/TS：`node_modules/`、`dist/`、`*.tsbuildinfo`；Rust：`target/`；
+       Python：`__pycache__/`、`*.pyc`、`.venv/`、`dist/`；Go：二進制產物）。
+       原則：先寫 .gitignore，再跑 install/build。
 
     1. **Workspace — 檢測並進入已有 worktree**：
 
@@ -478,7 +490,65 @@ apply:
        - 存在 → `cd .worktrees/<name>`
        - 不存在 → STOP，提示用戶先運行 `/opsx-ff <name>` 或 `/opsx-new <name>` 創建 worktree
 
-    2. **Executor — subagent-driven-development**：
+    2. **v6+ 委託契約（三節，MUST / MUST NOT）**：
+
+       下面三節只對 **v6+ 分支**生效，是硬約束，不是參考資料。SKILL.md 裡的命令與派發語法
+       都按 [CC] 側寫，落到 OMO 必須按本節改寫；v5 分支不受本節影響。
+       本節必須在 Executor 之前讀完，否則會先照抄 [CC] 語法。
+
+       **① bash 調用寫法（MUST）**
+
+       SDD 的 `scripts/` 下三個腳本雖然有 `#!/usr/bin/env bash`，但安裝到本機後不保證有
+       可執行位（Windows 側尤其沒有），且 Windows 上直接執行腳本會失敗（會話 shell 未必
+       是 bash）；加上佔位符替換後的絕對路徑可能含空格，因此：
+
+       - MUST 一律寫成 `bash <腳本路徑> [參數...]`，不得直接執行腳本路徑。
+       - 腳本路徑 MUST 用雙引號包裹。
+       - Windows（Git Bash / MSYS）同樣 MUST 帶 `bash ` 前綴；MUST NOT 省略前綴，
+         MUST NOT 用 `sh` 或 `./` 替代。
+       - `scripts/...` 是相對 SDD 技能目錄的路徑，MUST NOT 當作倉庫相對路徑。
+
+       SKILL.md 中的寫法 → apply 階段 MUST 使用的寫法：
+
+       | SKILL.md 中的寫法 | apply 階段 MUST 使用的寫法 |
+       |---|---|
+       | `bash scripts/sdd-workspace PLAN_FILE` | `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/sdd-workspace" <plan.md 路徑>` |
+       | `bash scripts/task-brief PLAN_FILE N` | `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/task-brief" <plan.md 路徑> <任務序號>` |
+       | `bash scripts/review-package PLAN_FILE BASE HEAD` | `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package" <plan.md 路徑> <BASE> <HEAD>` |
+
+       `bash --version` 失敗 → STOP 並告知用戶安裝 Git for Windows（或等價 bash）後重試；
+       MUST NOT 靜默降級成手工拼 prompt。
+
+       **② SDD → OMO 語法映射（MUST）**
+
+       SKILL.md 用 [CC] 的 Subagent 語義描述派發。在 OMO 中 MUST 按下表改寫，
+       MUST NOT 照抄 `Subagent (general-purpose)` 一類語法：
+
+       | SDD 寫法 | OMO MUST 寫法 | 說明 |
+       |---|---|---|
+       | `Subagent (general-purpose)` | 實現者：`task(category="deep", load_skills=[], description="<任務名>", prompt="<prompt>")` | `description` 必填；`category="deep"` 只用於**實現者** |
+       | Subagent 承擔審查角色（task reviewer） | 審查者：`task(subagent_type="oracle", description="<審查名>", prompt="<prompt>")` | 與本倉庫既有約定一致（v5 分支同樣用 `oracle`）；MUST NOT 用 `category="deep"` 派審查者 |
+       | 按任務複雜度選 `model`（SKILL.md 的 Model Selection） | **不寫** `model` 參數 | 模型由 `category` 隱含；SKILL.md 的「機械任務用便宜模型 / 架構任務用最強模型」→ 選對應 `category`，不寫模型名 |
+       | 後台派發 | `run_in_background=true` | 結果用 `background_output(task_id="bg_...")` 收取，不要短超時輪詢 |
+       | 續跑同一個子 Agent（fix loop 前 3 輪、補充上下文） | `task(..., task_id="ses_...")` | 首次派發返回的 `ses_...` 會話 ID 要記下；續跑 MUST 帶上它，不得另起新 Agent 重來 |
+       | `load_skills=["test-driven-development"]` 之類 | **MUST NOT 依賴**，一律 `load_skills=[]` | `load_skills` 只接受已註冊的 skill ID；Superpowers 的 skill 是檔案系統上的 `.md`，不是註冊技能，傳進去會被**靜默忽略**（不報錯、不生效） |
+
+       Superpowers skill 的唯一正確傳遞方式：`Read` 該 `.md` 文件，把內容（或其要求）
+       直接嵌進 `prompt`，或讓子 Agent 自己去 `Read` 指定路徑。
+
+       **③ tasks.md 勾選契約（MUST）**
+
+       - 實現者 report 中 `status = done` 的任務，控制方 MUST 在
+         `openspec/changes/<name>/tasks.md` 勾選對應 checkbox（`- [ ]` → `- [x]`）。
+         SDD 只維護自己的 ledger 與 todo，不會寫 OpenSpec 的 tasks.md，這一條只能由
+         apply 階段補上。
+       - 其它狀態（`done_with_concerns` / `needs_context` / `blocked`）MUST NOT 勾選。
+       - MUST 逐條勾選，不得批量把所有 checkbox 一次勾完；審查回退的任務 MUST 改回未勾選。
+       - 未真正執行的驗收項（測試、構建、手工驗證）MUST 記為「未驗」，MUST NOT 寫成通過。
+
+    3. **Executor — 實現與審查**：
+
+       **Superpowers v5：**
 
       從 plan.md 中提取每個微任務，對每個任務調用子 Agent：
 
@@ -503,17 +573,12 @@ apply:
               run_in_background=true
             )
 
-       c) 任務完成後，按版本執行對應審查：
+       c) 任務完成後，依序執行兩步審查：
 
        **Superpowers v5（兩步審查）：**
          c1) 讀取 spec-reviewer-prompt.md → oracle 做 spec 審查
          c2) 審查通過後，讀取 code-quality-reviewer-prompt.md → oracle 做代碼質量審查
          c3) 全部通過後，標記 tasks.md checkbox 為完成
-
-       **Superpowers v6（單步審查）：**
-         c1) 運行 scripts/review-package BASE HEAD 生成 diff package，記錄文件路徑
-         c2) 讀取 task-reviewer-prompt.md → oracle 一次審查（spec compliance + code quality）
-         c3) 審查通過後，標記 tasks.md checkbox 為完成
 
        重要 — TDD 方法論通過 Read + prompt 嵌入傳遞給子 Agent，
        而非透過 load_skills（Superpowers skills 為檔案系統路徑，
@@ -521,17 +586,64 @@ apply:
 
       本 schema 不支援 `executing-plans` 作為降級方案。
 
-    3. **Verification**：所有任務完成後，在 worktree 中執行驗證：
+       **Superpowers v6+ — 委託給 SDD，不再自編排：**
+
+       嚴格按 `{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md` 執行。
+       實現與審查是 SDD 同一個循環的兩半，一起交給它，不得拆成兩套自作流程：
+
+       - **Setup**：SKILL.md 的 Setup 段（workspace 用
+         `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/sdd-workspace" <plan.md 路徑>` 取得；
+         ledger 是 workspace 下的 `progress.md`，已存在則先讀 `references/resuming.md`）。
+       - **Pre-flight**：SKILL.md 要求讀的 `references/preflight.md`（含其中的衝突掃描）。
+       - **逐任務**：SKILL.md 的 The Task Loop（§1 dispatch implementer → §2 handle report →
+         §3 review task → §4 fix loop → §5 complete task）。
+       - **收尾**：SKILL.md 的 Final Review（`references/final-review.md`）。
+
+       MUST 讀取 SKILL.md 指引的每一個 `references/` 文件（v7 共 7 份：`batching.md`、
+       `cannot-verify.md`、`final-review.md`、`fix-loop.md`、`handling-reports.md`、
+       `preflight.md`、`resuming.md`），按其中的規則執行，不得憑記憶替代。
+
+       MUST NOT 用舊的自編排流程替代 SKILL.md。細節一律以 SKILL.md /
+       `implementer-prompt.md` / `task-reviewer-prompt.md` / `references/` 為準；
+       本階段只補兩處 SKILL.md 沒寫明的 OMO 落地口徑 —— 腳本的 bash 調用形態（見 2.①）
+       與 `BASE` 的記錄口徑（見下）。以下內容不在本節重述：
+
+       - implementer / task reviewer 的 prompt 怎麼填（含 TDD 指令怎麼進入 prompt ——
+         不再手工從 `test-driven-development/SKILL.md` 摘錄 RED-GREEN-REFACTOR 前置指令）；
+       - fix loop 的輪次上限、BLOCKED / NEEDS_CONTEXT / DONE_WITH_CONCERNS 的處置、
+         斷點續跑規則。
+
+       派發語法 MUST 按 2.② 的「SDD → OMO 語法映射」改寫：`task(category="deep", load_skills=[])`，
+       不寫 `model` 參數，後台派發加 `run_in_background=true`，續跑帶 `task_id="ses_..."`。
+
+       審查同樣交給 SDD：本階段不另起一套審查流程，審查者按 SKILL.md §3 派發：
+
+       - 單任務審查 → SKILL.md §3 Review the task：用
+         `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package" <plan.md 路徑> <BASE> <HEAD>`
+         生成 package，再用 `task-reviewer-prompt.md` 填 prompt、按
+         `task(subagent_type="oracle", ...)` 派審查者（`BASE` 是實現者派發前記錄的 commit，
+         不是 `HEAD~1`）。
+       - 修復 → SKILL.md §4 The fix loop（讀 `references/fix-loop.md`）。
+       - 全分支審查 → SKILL.md 的 Final Review（讀 `references/final-review.md`）。
+
+       除 SDD 流程之外，OSO 只追加兩條額外約束（MUST）：
+
+       1. 實現者 report 中 `status = done` 的任務，控制方 MUST 在
+          `openspec/changes/<name>/tasks.md` 勾選對應 checkbox（見 2.③）；其它狀態不勾。
+       2. MUST NOT 修改 `openspec/schemas/` 下任何文件與 `openspec/config.yaml`；
+          確實需要改 → STOP 並上報，交由用戶處理，不得自行改動。
+
+    4. **Verification**：所有任務完成後，在 worktree 中執行驗證：
 
        執行 `openspec status --change <name> --json`，確認所有 artifacts 已完成。
 
-    4. **Commit**：在 worktree 中提交所有變更：
+    5. **Commit**：在 worktree 中提交所有變更：
 
        ```bash
        git add -A && git commit -m "<name>: <描述>"
        ```
 
-    5. **完成**：
+    6. **完成**：
 
        apply 階段結束。通知用戶：
 
