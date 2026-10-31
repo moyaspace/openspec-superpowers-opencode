@@ -1,4 +1,4 @@
-import { parseMajorVersion, selectLockFile, findSuperpowersSkills, verifySkillLock } from '../dist/setup/discovery.js';
+import { parseMajorVersion, selectLockFile, findSuperpowersSkills, verifySkillLock, listLockMajors } from '../dist/setup/discovery.js';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -34,6 +34,25 @@ describe('Superpowers discovery', () => {
         assert.equal(selectLockFile(templateDir, '8'), null);
         assert.equal(selectLockFile(templateDir, '4'), null);
         assert.equal(selectLockFile(templateDir, null), null);
+    });
+
+    it('lists lock majors in numeric ascending order', (t) => {
+        const templateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-majors-'));
+        t.after(() => fs.rmSync(templateDir, { recursive: true, force: true }));
+        fs.writeFileSync(path.join(templateDir, 'skills.lock.v10.json'), '{}');
+        fs.writeFileSync(path.join(templateDir, 'skills.lock.v2.json'), '{}');
+        fs.writeFileSync(path.join(templateDir, 'skills.lock.v7.json'), '{}');
+        fs.writeFileSync(path.join(templateDir, 'other.json'), '{}');
+        fs.writeFileSync(path.join(templateDir, 'skills.lock.vbeta.json'), '{}');
+
+        assert.deepEqual(listLockMajors(templateDir), ['2', '7', '10']);
+    });
+
+    it('returns no lock majors for a missing template dir', (t) => {
+        const templateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-majors-'));
+        t.after(() => fs.rmSync(templateDir, { recursive: true, force: true }));
+
+        assert.deepEqual(listLockMajors(path.join(templateDir, 'absent')), []);
     });
 
     it('chooses the first valid skills directory in deterministic order', (t) => {
