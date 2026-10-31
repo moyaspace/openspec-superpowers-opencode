@@ -265,7 +265,7 @@ describe('opsx-apply.md delegates the v6+ branch to upstream SDD', () => {
         }
     });
 
-    it('keeps the three Step 4.5 contract sections before Step 5', () => {
+    it('keeps the Step 4.5 contract sections and the v6+ delegation bodies', () => {
         const content = readCommand('opsx-apply.md');
         const step45 = content.indexOf('### Step 4.5: v6+ 委托契约');
         const step5 = content.indexOf('### Step 5: 逐任务实现');
@@ -281,6 +281,21 @@ describe('opsx-apply.md delegates the v6+ branch to upstream SDD', () => {
                 `opsx-apply.md: Step 4.5 must keep the "${section}" section`,
             );
         }
+
+        const step5Body = sectionOf('opsx-apply.md', content, '### Step 5', '### Step 6');
+        assert.ok(
+            step5Body.includes('严格按')
+                && (step5Body.includes('SKILL.md') || step5Body.includes('references/batching.md')),
+            'opsx-apply.md: Step 5 v6+ branch must delegate to SKILL.md (严格按 … SKILL.md) '
+                + 'instead of re-implementing the task loop',
+        );
+
+        const step6Body = sectionOf('opsx-apply.md', content, '### Step 6', '### Step 7');
+        assert.ok(
+            step6Body.includes('不另起一套审查流程') || step6Body.includes('SKILL.md §3'),
+            'opsx-apply.md: Step 6 v6+ branch must delegate the review to SKILL.md §3 '
+                + '(不另起一套审查流程)',
+        );
     });
 
     it('keeps the v5 branch (Read items and both review steps)', () => {
