@@ -103,6 +103,60 @@ describe('setup public API', () => {
         assert.ok(calls.some(([program, args]) => program === 'git' && args[0] === 'init'));
     });
 
+    it('reports an unsupported Superpowers major and skips lock verification (BUG012)', async (t) => {
+        const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-unsupported-'));
+        const targetDir = path.join(parentDir, 'project');
+        const templateDir = path.join(parentDir, 'template');
+        const superpowersRoot = path.join(parentDir, 'superpowers');
+        const superpowersPath = path.join(superpowersRoot, 'skills');
+        const events = [];
+        let createdChange;
+        t.after(() => fs.rmSync(parentDir, { recursive: true, force: true }));
+        fs.cpSync(path.resolve(__dirname, '..', 'template'), templateDir, { recursive: true });
+        // 模板只有 v5 / v6 / v7 清单；Superpowers 报 v8 → 无精确匹配
+        fs.copyFileSync(path.join(templateDir, 'skills.lock.v6.json'), path.join(templateDir, 'skills.lock.v7.json'));
+        fs.mkdirSync(superpowersPath, { recursive: true });
+        fs.writeFileSync(path.join(superpowersRoot, 'package.json'), JSON.stringify({ version: '8.0.0' }));
+        const runner = {
+            run(program, args) {
+                const command = `${program} ${args.join(' ')}`;
+                if (command === 'opencode --version') return { code: 0, stdout: '1.2.3', stderr: '' };
+                if (args[0] === 'templates') {
+                    return { code: 0, stdout: JSON.stringify(Array.from({ length: 8 }, () => ({ source: 'project' }))), stderr: '' };
+                }
+                if (args[0] === 'new') {
+                    createdChange = args[2];
+                    return { code: 0, stdout: '', stderr: '' };
+                }
+                if (args[0] === 'list') return { code: 0, stdout: JSON.stringify({ changes: [{ name: createdChange }] }), stderr: '' };
+                if (args[0] === 'status') {
+                    return { code: 0, stdout: JSON.stringify({ artifacts: Array.from({ length: 8 }, () => ({})) }), stderr: '' };
+                }
+                return { code: 0, stdout: '', stderr: '' };
+            },
+        };
+
+        const result = await setup.initProject({
+            targetDir,
+            templateDir,
+            shimDeps: ACTIVE_SHIM,
+            superpowersPath,
+            runner,
+            lang: 'zh-CN',
+            progress: event => events.push(event),
+        });
+
+        const texts = events.map(event => `${event.label || ''}${event.item || ''}${event.text || ''}${event.detail || ''}`);
+        assert.equal(result.success, true);
+        assert.equal(fs.existsSync(path.join(targetDir, 'skills.lock.json')), false);
+        assert.ok(
+            texts.some(text => text.includes('不受支持')),
+            `expected an "unsupported" message, got: ${texts.join(' | ')}`,
+        );
+        assert.equal(texts.some(text => text.includes('No skills lock file was found in the template')), false);
+        assert.equal(texts.some(text => text.includes('hash 不匹配')), false);
+    });
+
     it('cancels a brownfield init before writing when the global override is no', async (t) => {
         const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-cancel-'));
         t.after(() => fs.rmSync(targetDir, { recursive: true, force: true }));

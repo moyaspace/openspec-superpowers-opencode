@@ -5,7 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createContext } from './context.js';
 import { executeOperations } from './deploy.js';
-import { findSuperpowersSkills, parseMajorVersion, selectLockFile } from './discovery.js';
+import { findSuperpowersSkills, listLockMajors, parseMajorVersion, selectLockFile } from './discovery.js';
 import { mergeMarker, mergeOcodeJson } from './merge.js';
 import { buildManifest } from './manifest.js';
 import { createInitPlan } from './planner.js';
@@ -45,6 +45,40 @@ function resolveSuperpowers(options) {
         version = JSON.parse(fs.readFileSync(packageFile, 'utf8')).version;
     }
     return { skillsPath, version };
+}
+function reportUnsupportedLock(templateDir, major, t, p) {
+    const majors = listLockMajors(templateDir);
+    if (major === null) {
+        p({
+            type: 'warn',
+            item: t('无法确定 Superpowers 版本，跳过完整性校验', 'Unable to determine Superpowers version, skipping integrity check'),
+        });
+        p({ type: 'info', text: t('  请检查 Superpowers 安装是否完整', '  Please check the Superpowers installation') });
+        return;
+    }
+    const numericMajor = Number(major);
+    const lowest = majors.length > 0 ? Number(majors[0]) : null;
+    const highest = majors.length > 0 ? Number(majors[majors.length - 1]) : null;
+    if (highest !== null && numericMajor > highest) {
+        p({
+            type: 'warn',
+            item: t(`当前 Superpowers v${major} 暂不受支持，跳过完整性校验`, `Superpowers v${major} is not supported yet, skipping integrity check`),
+        });
+        p({ type: 'info', text: t(`  请等待 oso 支持 v${major} 后再更新`, `  Please wait for oso to support v${major}`) });
+        return;
+    }
+    if (lowest !== null && numericMajor < lowest) {
+        p({
+            type: 'warn',
+            item: t(`Superpowers v${major} 已不受支持，跳过完整性校验`, `Superpowers v${major} is no longer supported, skipping integrity check`),
+        });
+        p({ type: 'info', text: t('  请升级 Superpowers', '  Please upgrade Superpowers') });
+        return;
+    }
+    p({
+        type: 'warn',
+        item: t(`未找到 v${major} 的锁清单，跳过完整性校验`, `No lock manifest found for v${major}, skipping integrity check`),
+    });
 }
 function writeManifest(projectRoot, manifest) {
     executeOperations([{
@@ -290,43 +324,47 @@ async function dryRunProject(options = {}) {
     const superpowers = resolveSuperpowers(options);
     p({ type: 'pass', item: t('Superpowers 路径', 'Superpowers path'), detail: superpowers.skillsPath.replace(/\\/g, '/') });
     // ---- Skill lock 部署 + 逐技能校验 ----
-    const lockFile = selectLockFile(context.templateDir, parseMajorVersion(superpowers.version));
-    if (!lockFile)
-        throw new Error('No skills lock file was found in the template');
     const lockMajor = parseMajorVersion(superpowers.version);
-    if (lockMajor) {
-        p({ type: 'info', text: `- ${t('检测到 Superpowers v' + lockMajor + '，使用对应锁文件', 'Detected Superpowers v' + lockMajor + ', using matching lock')}` });
-    }
-    p({ type: 'pass', item: `${t('已部署', 'Deployed')} skills.lock.json` });
-    const lockData = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
-    const skillsDir = superpowers.skillsPath;
-    let allMatch = true;
-    const lockVerificationWarnings = [];
-    for (const [relativePath, entry] of Object.entries((lockData && lockData.skills) || {})) {
-        const skillPath = path.join(skillsDir, ...relativePath.replace(/\\/g, '/').split('/'));
-        if (!fs.existsSync(skillPath)) {
-            p({ type: 'warn', item: relativePath, detail: t('文件不存在', 'file not found') });
-            lockVerificationWarnings.push(`${relativePath}: file not found`);
-            allMatch = false;
-            continue;
-        }
-        const actual = crypto.createHash('sha256').update(fs.readFileSync(skillPath)).digest('hex').toLowerCase();
-        const expected = String(entry.sha256 || '').toLowerCase();
-        if (actual !== expected) {
-            p({ type: 'warn', item: relativePath, detail: t('hash 不匹配，可能已更新', 'hash mismatch, may have been updated') });
-            lockVerificationWarnings.push(`${relativePath}: hash mismatch`);
-            allMatch = false;
-        }
-        else {
-            p({ type: 'pass', item: relativePath });
-        }
-    }
-    const lockVerification = { allMatch, warnings: lockVerificationWarnings };
-    if (allMatch) {
-        p({ type: 'milestone', text: t('Skill 完整性校验通过', 'Skill integrity check passed') });
+    const lockFile = selectLockFile(context.templateDir, lockMajor);
+    let lockVerification = { allMatch: true, warnings: [] };
+    if (!lockFile) {
+        reportUnsupportedLock(context.templateDir, lockMajor, t, p);
     }
     else {
-        p({ type: 'warn', item: t('Skill 校验有差异（WARNING：不阻塞，但建议更新 skills.lock.json）', 'Skill hash mismatch (WARNING: non-blocking, but consider updating skills.lock.json)') });
+        if (lockMajor) {
+            p({ type: 'info', text: `- ${t('检测到 Superpowers v' + lockMajor + '，使用对应锁文件', 'Detected Superpowers v' + lockMajor + ', using matching lock')}` });
+        }
+        p({ type: 'pass', item: `${t('已部署', 'Deployed')} skills.lock.json` });
+        const lockData = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+        const skillsDir = superpowers.skillsPath;
+        let allMatch = true;
+        const lockVerificationWarnings = [];
+        for (const [relativePath, entry] of Object.entries((lockData && lockData.skills) || {})) {
+            const skillPath = path.join(skillsDir, ...relativePath.replace(/\\/g, '/').split('/'));
+            if (!fs.existsSync(skillPath)) {
+                p({ type: 'warn', item: relativePath, detail: t('文件不存在', 'file not found') });
+                lockVerificationWarnings.push(`${relativePath}: file not found`);
+                allMatch = false;
+                continue;
+            }
+            const actual = crypto.createHash('sha256').update(fs.readFileSync(skillPath)).digest('hex').toLowerCase();
+            const expected = String(entry.sha256 || '').toLowerCase();
+            if (actual !== expected) {
+                p({ type: 'warn', item: relativePath, detail: t('hash 不匹配，可能已更新', 'hash mismatch, may have been updated') });
+                lockVerificationWarnings.push(`${relativePath}: hash mismatch`);
+                allMatch = false;
+            }
+            else {
+                p({ type: 'pass', item: relativePath });
+            }
+        }
+        lockVerification = { allMatch, warnings: lockVerificationWarnings };
+        if (allMatch) {
+            p({ type: 'milestone', text: t('Skill 完整性校验通过', 'Skill integrity check passed') });
+        }
+        else {
+            p({ type: 'warn', item: t('Skill 校验有差异（WARNING：不阻塞，但建议更新 skills.lock.json）', 'Skill hash mismatch (WARNING: non-blocking, but consider updating skills.lock.json)') });
+        }
     }
     p({ type: 'blank' });
     // ---- 2/8: openspec/ 部署状态 ----
@@ -489,48 +527,52 @@ async function initProject(options = {}) {
     p({ type: 'step', n: 1, total: 8, label: t('检测 Superpowers 安装路径', 'Detecting Superpowers installation path') });
     p({ type: 'milestone', text: `${t('Superpowers 路径', 'Superpowers path')}: ${superpowers.skillsPath.replace(/\\/g, '/')}` });
     // ---- Skill lock 部署 + 逐技能校验 ----
-    const lockFile = selectLockFile(context.templateDir, parseMajorVersion(superpowers.version));
-    if (!lockFile)
-        throw new Error('No skills lock file was found in the template');
     const lockMajor = parseMajorVersion(superpowers.version);
-    if (lockMajor) {
-        p({ type: 'info', text: `- ${t('检测到 Superpowers v' + lockMajor + '，使用对应锁文件', 'Detected Superpowers v' + lockMajor + ', using matching lock')}` });
-    }
-    const lockTarget = path.join(context.targetDir, 'skills.lock.json');
-    fs.mkdirSync(path.dirname(lockTarget), { recursive: true });
-    fs.copyFileSync(lockFile, lockTarget);
-    p({ type: 'pass', item: `${t('已部署', 'Deployed')} skills.lock.json` });
-    const lockVerificationWarnings = [];
-    const lockData = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
-    const skillsDir = superpowers.skillsPath;
-    let allMatch = true;
-    for (const [relativePath, entry] of Object.entries((lockData && lockData.skills) || {})) {
-        const skillPath = path.join(skillsDir, ...relativePath.replace(/\\/g, '/').split('/'));
-        if (!fs.existsSync(skillPath)) {
-            const msg = `${relativePath}: file not found`;
-            p({ type: 'warn', item: relativePath, detail: t('文件不存在', 'file not found') });
-            lockVerificationWarnings.push(msg);
-            allMatch = false;
-            continue;
-        }
-        const actual = crypto.createHash('sha256').update(fs.readFileSync(skillPath)).digest('hex').toLowerCase();
-        const expected = String(entry.sha256 || '').toLowerCase();
-        if (actual !== expected) {
-            const msg = `${relativePath}: hash mismatch`;
-            p({ type: 'warn', item: relativePath, detail: t('hash 不匹配，可能已更新', 'hash mismatch, may have been updated') });
-            lockVerificationWarnings.push(msg);
-            allMatch = false;
-        }
-        else {
-            p({ type: 'pass', item: relativePath });
-        }
-    }
-    const lockVerification = { allMatch, warnings: lockVerificationWarnings };
-    if (allMatch) {
-        p({ type: 'milestone', text: t('Skill 完整性校验通过', 'Skill integrity check passed') });
+    const lockFile = selectLockFile(context.templateDir, lockMajor);
+    let lockVerification = { allMatch: true, warnings: [] };
+    if (!lockFile) {
+        reportUnsupportedLock(context.templateDir, lockMajor, t, p);
     }
     else {
-        p({ type: 'warn', item: t('Skill 校验有差异（WARNING：不阻塞，但建议更新 skills.lock.json）', 'Skill hash mismatch (WARNING: non-blocking, but consider updating skills.lock.json)') });
+        if (lockMajor) {
+            p({ type: 'info', text: `- ${t('检测到 Superpowers v' + lockMajor + '，使用对应锁文件', 'Detected Superpowers v' + lockMajor + ', using matching lock')}` });
+        }
+        const lockTarget = path.join(context.targetDir, 'skills.lock.json');
+        fs.mkdirSync(path.dirname(lockTarget), { recursive: true });
+        fs.copyFileSync(lockFile, lockTarget);
+        p({ type: 'pass', item: `${t('已部署', 'Deployed')} skills.lock.json` });
+        const lockVerificationWarnings = [];
+        const lockData = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
+        const skillsDir = superpowers.skillsPath;
+        let allMatch = true;
+        for (const [relativePath, entry] of Object.entries((lockData && lockData.skills) || {})) {
+            const skillPath = path.join(skillsDir, ...relativePath.replace(/\\/g, '/').split('/'));
+            if (!fs.existsSync(skillPath)) {
+                const msg = `${relativePath}: file not found`;
+                p({ type: 'warn', item: relativePath, detail: t('文件不存在', 'file not found') });
+                lockVerificationWarnings.push(msg);
+                allMatch = false;
+                continue;
+            }
+            const actual = crypto.createHash('sha256').update(fs.readFileSync(skillPath)).digest('hex').toLowerCase();
+            const expected = String(entry.sha256 || '').toLowerCase();
+            if (actual !== expected) {
+                const msg = `${relativePath}: hash mismatch`;
+                p({ type: 'warn', item: relativePath, detail: t('hash 不匹配，可能已更新', 'hash mismatch, may have been updated') });
+                lockVerificationWarnings.push(msg);
+                allMatch = false;
+            }
+            else {
+                p({ type: 'pass', item: relativePath });
+            }
+        }
+        lockVerification = { allMatch, warnings: lockVerificationWarnings };
+        if (allMatch) {
+            p({ type: 'milestone', text: t('Skill 完整性校验通过', 'Skill integrity check passed') });
+        }
+        else {
+            p({ type: 'warn', item: t('Skill 校验有差异（WARNING：不阻塞，但建议更新 skills.lock.json）', 'Skill hash mismatch (WARNING: non-blocking, but consider updating skills.lock.json)') });
+        }
     }
     p({ type: 'blank' });
     // ---- 2/8: openspec/ 部署状态 ----
