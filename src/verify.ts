@@ -190,8 +190,12 @@ interface RunAllChecksOptions {
 
 function resolveSuperpowersVersion(options: RunAllChecksOptions): string | null {
     if (options.superpowersVersion !== undefined) return options.superpowersVersion;
-    const located = locateSuperpowers({ packagesDir: options.packagesDir });
-    return located ? located.version : null;
+    try {
+        const located = locateSuperpowers({ packagesDir: options.packagesDir });
+        return located ? located.version : null;
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -433,3 +437,4 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
 }
 
 export { runAllChecks, formatResults, allPass, detectBash, findOpenspec, findOpenspecOrig, findShimFile, isShimScript, checkRegistryFile, checkWorktrees };
+export type { BashDetection };

@@ -69,6 +69,15 @@ describe('detectBash()', () => {
         t.mock.method(child_process, 'execSync', () => { throw new Error('not found'); });
         assert.deepStrictEqual(verify.detectBash(false), { available: false, path: null });
     });
+
+    test('falls back to Git for Windows path when where bash fails', (t) => {
+        t.mock.method(child_process, 'execSync', () => { throw new Error('not found'); });
+        t.mock.method(fs, 'existsSync', candidate => candidate === 'C:\\Program Files\\Git\\bin\\bash.exe');
+        assert.deepStrictEqual(verify.detectBash(true), {
+            available: true,
+            path: 'C:\\Program Files\\Git\\bin\\bash.exe',
+        });
+    });
 });
 
 // ============================================================
@@ -314,6 +323,20 @@ describe('runAllChecks()', () => {
         const results = verify.runAllChecks(null, false, projectDir, { superpowersVersion: '5.1.0' });
 
         assert.strictEqual(results.find(r => r.check === 'bash'), undefined);
+        assert.strictEqual(results.length, 5);
+    });
+
+    test('returns 5 items without throwing when the Superpowers version probe fails', (t) => {
+        const projectDir = projectWithPassingStaticChecks(t, false);
+        const packagesDir = tmpDir();
+        const skills = path.join(packagesDir, 'superpowers@broken', 'node_modules', 'superpowers', 'skills');
+        fs.mkdirSync(skills, { recursive: true });
+        fs.writeFileSync(path.join(path.dirname(skills), 'package.json'), '{ broken json');
+
+        let results;
+        assert.doesNotThrow(() => {
+            results = verify.runAllChecks(null, false, projectDir, { packagesDir });
+        });
         assert.strictEqual(results.length, 5);
     });
 

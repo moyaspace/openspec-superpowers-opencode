@@ -674,7 +674,7 @@ async function initProject(options = {}) {
     // ---- 8/8: 验证工作流 + 写入安装清单 ----
     p({ type: 'step', n: 8, total: 8, label: t('验证工作流 + 写入安装清单', 'Validating workflow + writing manifest') });
     if (lockMajor !== null && Number(lockMajor) >= 6) {
-        const bash = detectBash(process.platform === 'win32');
+        const bash = (options.detectBash ?? detectBash)(process.platform === 'win32');
         if (bash.available) {
             p({ type: 'pass', item: 'bash', detail: bash.path ?? '' });
         }

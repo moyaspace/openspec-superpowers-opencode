@@ -167,8 +167,13 @@ function checkWorktrees(projectRoot) {
 function resolveSuperpowersVersion(options) {
     if (options.superpowersVersion !== undefined)
         return options.superpowersVersion;
-    const located = locateSuperpowers({ packagesDir: options.packagesDir });
-    return located ? located.version : null;
+    try {
+        const located = locateSuperpowers({ packagesDir: options.packagesDir });
+        return located ? located.version : null;
+    }
+    catch {
+        return null;
+    }
 }
 /**
  * 运行所有检查（5 项固定 + Superpowers major ≥ 6 时的 bash 项），返回结构化结果。

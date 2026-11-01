@@ -285,14 +285,42 @@ test('initProject：注册表创建发生在 8/8 之前，验证后无临时条�
         runner: verifyRunner(targetDir),
         lang: 'en',
         shimDeps: ACTIVE_SHIM,
+        detectBash: () => ({ available: false, path: null }),
         progress: event => events.push(event),
     });
 
     assert.equal(result.success, true);
+    const bashEvent = events.find(event => (event.item || '').includes('bash'));
+    assert.ok(bashEvent, 'v6+ init 必须打印 bash 状态行');
+    assert.equal(bashEvent.type, 'warn');
+    assert.equal(result.success, true, '缺 bash 不得阻塞 init');
     const step8 = events.findIndex(event => event.type === 'step' && event.n === 8);
     const registry = events.findIndex(event => (event.text || '').includes('oso-change-registry.json'));
     assert.ok(step8 >= 0, '必须出现 8/8 step 事件');
     assert.ok(registry >= 0, '必须出现注册表创建事件');
     assert.ok(registry < step8, '注册表创建必须早于 8/8');
     assert.deepEqual(readRegistryChanges(targetDir), [], 'init 结束后注册表不得残留 oso-verify-*');
+});
+
+test('initProject：Superpowers v5 不打印 bash 状态行', async (t) => {
+    const parent = tempDir(t);
+    const targetDir = path.join(parent, 'project');
+    const skills = path.join(parent, 'superpowers', 'skills');
+    fs.mkdirSync(skills, { recursive: true });
+    fs.writeFileSync(path.join(path.dirname(skills), 'package.json'), JSON.stringify({ version: '5.1.1' }));
+    const events = [];
+
+    const result = await initProject({
+        targetDir,
+        templateDir,
+        superpowersPath: skills,
+        runner: verifyRunner(targetDir),
+        lang: 'en',
+        shimDeps: ACTIVE_SHIM,
+        detectBash: () => { throw new Error('bash probe must not run for v5'); },
+        progress: event => events.push(event),
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(events.some(event => (event.item || '').includes('bash')), false);
 });

@@ -4,6 +4,7 @@ import { type InitDecisions, type InitPlan } from './planner.js';
 import { type ProcessRunner } from './process-runner.js';
 import { type ShimDeps } from './shim-check.js';
 import { resetProject } from './reset.js';
+import { type BashDetection } from '../verify.js';
 interface ProgressEvent {
     type: string;
     label?: string;
@@ -30,6 +31,7 @@ interface SetupOptions {
     env?: NodeJS.ProcessEnv | undefined;
     superpowersPath?: string | undefined;
     superpowersVersion?: string | undefined;
+    detectBash?: ((isWin: boolean) => BashDetection) | undefined;
     decisions?: InitDecisions | undefined;
     toolRoot?: string | undefined;
     shimDeps?: ShimDeps | undefined;

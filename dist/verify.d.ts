@@ -111,4 +111,5 @@ declare function formatResults(results: CheckResult[]): string;
  */
 declare function allPass(results: Array<Pick<CheckResult, 'status'>>): boolean;
 export { runAllChecks, formatResults, allPass, detectBash, findOpenspec, findOpenspecOrig, findShimFile, isShimScript, checkRegistryFile, checkWorktrees };
+export type { BashDetection };
 //# sourceMappingURL=verify.d.ts.map
