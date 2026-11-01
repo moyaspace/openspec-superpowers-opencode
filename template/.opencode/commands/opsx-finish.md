@@ -3,12 +3,13 @@ description: Finish an implemented change - merge worktree, cleanup, archive, PR
 ---
 完成 `/opsx-apply` 实现后的变更收尾工作：合并 worktree、清理、产出 retrospective、归档、开 PR。
 
-**Input**: 可选指定变更名称（如 `/opsx-finish add-auth`）。省略时从 `.worktrees/` 目录自动检测——仅存在一个 worktree 时直接选中；存在多个时列出全部并请用户选择。
+**Input**: 可选指定变更名称（如 `/opsx-finish add-auth`）。省略时按 Step 1 的判定顺序选择变更。
 
 **收尾流程**：
 
 ```
- 2. 检测     → 找到要完成的 worktree
+ 1. 选择变更 → 确定要完成的 change 名称
+ 2. 检测     → 确认 worktree 存在并进入（不存在则 STOP，不新建）
  3. 提交+测试 → 切换到 worktree → 提交未完成工作 → 运行测试套件（验证 worktree 自身完好）
  4. 回顾     → 产出 retrospective.md（文件操作，与代码无关）
  5. 归档     → openspec archive -y（文件操作，与代码无关）
@@ -18,15 +19,25 @@ description: Finish an implemented change - merge worktree, cleanup, archive, PR
 
 ---
 
-### Step 2: 确保 worktree 存在并选中
+### Step 1: 选择变更
+
+如果提供了名称则直接用，否则：
+- 从上下文推断
+- `.worktrees/` 下只有一个目录 → 自动选中
+- 多个或无法判断 → 运行 `openspec list --json` 取活动 changes，使用 **question** 工具让用户选择
+
+宣布：`"Using change: <name>"`
+
+### Step 2: 确认 worktree 存在并进入
 
 ```bash
-openspec-superpowers-opencode ensure-worktree <name>
+git worktree list
+cd .worktrees/<name>
 ```
 
-如果已有多个 worktree，`cd .worktrees/<name>` 根据用户指定的名称进入。
+`git worktree list` 的输出 MUST 包含 `.worktrees/<name>`。不包含 → **STOP**，按文末「无 worktree 时」处理。
 
-如果没有任何 worktree，`ensure-worktree` 创建时会失败并退出——没有 worktree 就没有可完成的分支。
+**MUST NOT** 新建 worktree：`ensure-worktree` 会先删除同名的 `feature/<name>` 分支、再新建一个空 worktree，收尾流程中禁止使用该命令。
 
 ### Step 3: 切换到 worktree，提交未完成工作并验证测试
 
@@ -36,28 +47,30 @@ cd .worktrees/<name>
 
 **3a. 提交未提交内容：**
 
-**3a-1. 检查状态**
+**3a-1. 检查状态并记录提交前 HEAD**
 
 ```bash
 git status --porcelain
+git rev-parse HEAD          # 记为 <before-head>
 ```
 
-- 输出为空 → 干净，跳到 3b
+- `git status --porcelain` 输出为空 → 干净，跳到 3b
 
 **3a-2. 提交变更**
 
 ```bash
-git add -A && git commit
+git add -A && git commit -m "<由 AI 按本次实际改动拟定>"
 ```
 
 **3a-3. 确认提交**
 
 ```bash
-git log --oneline -1
+git rev-parse HEAD          # 与 <before-head> 比较
 ```
 
-- 显示有新 commit → 成功，跳到 3b  
-- 无新 commit 或报错 → 失败，回到 3a-2 重试
+- 与 `<before-head>` 不同 → 成功，跳到 3b
+- 与 `<before-head>` 相同，且 3a-1 的 `git status --porcelain` 为空 → 本无内容可提交，跳到 3b
+- 与 `<before-head>` 相同，但 3a-1 有未提交内容 → 提交失败，回到 3a-2 重试
 
 **3b. 运行测试套件（项目自带入口优先，语言命令兜底）：**
 
@@ -102,7 +115,7 @@ test -f openspec/changes/<name>/verify.md
 ```
 
 - 文件存在且 Overall Decision 为 ❌ FAIL → STOP：先按 verify.md 中的失败项修复，再重跑 `/opsx-finish`
-- 文件存在且非 FAIL（含 PASS / PASS WITH CONCERNS）→ 跳到 4b
+- 文件存在且非 FAIL（含 PASS / PASS WITH WARNINGS）→ 跳到 4b
 - **文件不存在 → 自动生成**：
   1. 读取 verify artifact 的 instruction：`openspec instructions verify --change "<name>"`
   2. 按 instruction 逐 Scenario 核对证据（基于本变更的 specs、tasks.md checkbox 状态、Step 3 的测试结果）产出 verify.md
@@ -136,18 +149,19 @@ openspec archive <name> -y
 ### Step 5a: 提交归档变更
 
 ```bash
+git rev-parse HEAD          # 记为 <before-archive-head>
 git add -A && git commit -m "<name>: archive change"
 ```
 
 ### Step 5b: 确认提交
 
 ```bash
-git log --oneline -1
+git rev-parse HEAD          # 与 <before-archive-head> 比较
 ```
 
-- 显示有新 commit → 成功，跳到 Step 6
-- 无新 commit 或报错 → 回到 Step 5a 重试
-- 如报 "nothing to commit"（已是最新）→ 直接跳到 Step 6
+- 与 `<before-archive-head>` 不同 → 成功，跳到 Step 6
+- 与 `<before-archive-head>` 相同，且提交报 "nothing to commit" → 已是最新，跳到 Step 6
+- 与 `<before-archive-head>` 相同，且无 "nothing to commit" → 失败，回到 Step 5a 重试
 
 **方向约束（MUST）：**
 
@@ -195,7 +209,7 @@ base 可以就是 `main`；但 MUST NOT 未经用户确认就把 base 与 `main`
 ```
 实现完成。接下来要做什么？
 
-1. 合并到主分支（本地）
+1. 合并到基础分支 <base-branch>（本地）
 2. 推送并创建 Pull Request
 3. 保留分支，稍后处理
 4. 丢弃本次变更
@@ -261,8 +275,11 @@ git worktree remove --force .worktrees/_merge-test-<name>   # 连未提交的预
 ```bash
 # ── 阶段三：落地（<base-branch> 接收已验证结果）──
 cd <project-root>                      # 回项目根（测试台留到阶段四用 --force 整体丢弃）
+git rev-parse --abbrev-ref HEAD
 git merge --ff-only <feature-branch>   # 树 = 刚测过的树，逐字节一致
 ```
+
+`git rev-parse --abbrev-ref HEAD` 的输出 MUST 等于 `<base-branch>`；不等于 → STOP，不得继续 merge。
 
 - 若 `--ff-only` 失败（base 在验证期间前进）→ 停止并报告，重跑 `/opsx-finish`
 
@@ -309,7 +326,7 @@ lsof +D <worktree-path>      # 或 fuser -v <worktree-path>
 
 ```bash
 git push -u origin <feature-branch>
-gh pr create --title "<title>" --body "## Summary\n..."
+gh pr create --base <base-branch> --head <feature-branch> --title "<title>" --body "## Summary\n..."
 ```
 
 PR 创建后，change 已推送但尚未合入。worktree 和注册表条目均保留。
@@ -331,9 +348,10 @@ PR 创建后，change 已推送但尚未合入。worktree 和注册表条目均�
 ```bash
 openspec-superpowers-opencode registry remove <name>  # 1. 注册表（先于 git 操作）
 openspec-superpowers-opencode registry list           # 2. 验证：输出含 <name> 则重试上一步
-git checkout <base-branch>                            # 3. 回主工作区
-git worktree remove .worktrees/<name>                 # 4. 移除开发 worktree
-git branch -D <feature-branch>                        # 5. 删分支（丢弃用 -D 强删）
+cd <project-root>                                     # 3. 回到项目根（base 已被主工作区检出）
+git checkout <base-branch>                            # 4. 回主工作区
+git worktree remove .worktrees/<name>                 # 5. 移除开发 worktree
+git branch -D <feature-branch>                        # 6. 删分支（丢弃用 -D 强删）
 ```
 
 **若第 4 步移除开发 worktree 失败**：处置同「选项 1 → 阶段四第 4 步」的四条
@@ -343,8 +361,8 @@ git branch -D <feature-branch>                        # 5. 删分支（丢弃用
 
 ---
 
-**无 worktree 时**：如果用户运行 `/opsx-finish` 但对应 worktree 已被手动清理，
-检查是否有对应分支残留，建议用户手动处理。
+**无 worktree 时**：如果用户运行 `/opsx-finish` 但对应 worktree 已被手动清理，Step 2 会 STOP。
+此时检查是否有对应分支残留，建议用户手动处理。
 
 **幂等性**：如果 retrospective.md 已存在则跳过；如果变更已归档则跳过。
 
