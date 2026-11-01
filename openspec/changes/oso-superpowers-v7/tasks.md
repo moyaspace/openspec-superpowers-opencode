@@ -67,7 +67,7 @@
 
 ## 10. 追加范围（【用户指挥】）：`finish` 措辞更正
 
-- [ ] 10.1 等用户**逐条现场给出**要改的措辞与目标表述；AI 默认只复核并报告，MUST NOT 自行发挥改写。
+- [x] 10.1 等用户**逐条现场给出**要改的措辞与目标表述；AI 默认只复核并报告，MUST NOT 自行发挥改写。
 - [ ] 10.2 用户明确说「你来做」后，只改 `template/.opencode/commands/opsx-finish.md` 中的对应措辞；部署版 `.opencode/commands/opsx-finish.md` 是否同步由用户当场单独指示，默认不动。
 - [ ] 10.3 不得触碰：Step 6a 的 base 判定顺序与「方向约束（MUST）」段（T003 刚验收）、`{{SUPERPOWERS_BASE_PATH}}` 占位符、Step 3b 的测试分派口径（BUG007 刚验收）。
 - [ ] 10.4 越界判据：若某条「措辞更正」实际改变了读者能从该段得出的结论，它不是更正是修订 → 停下报告，按 `local/oso/sprints/README.md` §3.12 判定是否立 `BUG` / `GAP`。
