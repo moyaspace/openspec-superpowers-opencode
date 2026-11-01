@@ -144,7 +144,7 @@ v5 模式 → spec-reviewer-prompt.md + code-quality-reviewer-prompt.md（两次
 
 1. **Pre-flight 检查清单**（历史行号已失效，仅示意）：`task-reviewer-prompt.md` 优先，不存在则回退
 2. **Executor 审查方式说明**（历史行号已失效，仅示意）：描述两种审查流程
-3. 其余约 560 行 artifact instruction **完全不变**
+3. 其余约 640 行 artifact instruction **完全不变**
 
 ### C. 锁清单 — 拆为三个文件（v5 / v6 / v7）
 
