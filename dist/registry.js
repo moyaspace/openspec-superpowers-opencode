@@ -28,12 +28,13 @@ function write(registryPath, data) {
 function add(registryPath, name, worktree, baseBranch) {
     const data = read(registryPath);
     const idx = data.changes.findIndex(c => c.name === name);
+    const existing = idx >= 0 ? data.changes[idx] : undefined;
     const normalizedWt = worktree.replace(/\\/g, '/');
     const entry = {
-        ...(idx >= 0 ? data.changes[idx] : {}),
+        ...(existing ?? {}),
         name,
         worktree: normalizedWt,
-        createdAt: new Date().toISOString(),
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
         ...(baseBranch !== undefined ? { baseBranch } : {}),
     };
     if (idx >= 0) {

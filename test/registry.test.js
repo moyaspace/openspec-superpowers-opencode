@@ -163,6 +163,17 @@ describe('add()', () => {
         assert.strictEqual(data.changes[0].baseBranch, 'release/1.1');
     });
 
+    test('keeps createdAt when re-adding an existing entry', () => {
+        const dir = tmpDir();
+        const rp = writeRegistry(dir, { changes: [
+            { name: 'demo', worktree: '.worktrees/demo', createdAt: '2026-01-01T00:00:00.000Z', baseBranch: 'release/1.1' }
+        ]});
+        registry.add(rp, 'demo', '.worktrees/demo', 'main');
+        const data = registry.read(rp);
+        assert.strictEqual(data.changes[0].createdAt, '2026-01-01T00:00:00.000Z');
+        assert.strictEqual(data.changes[0].baseBranch, 'main');
+    });
+
     test('writes no baseBranch key for a new entry added without one', () => {
         const dir = tmpDir();
         const rp = path.join(dir, 'openspec', 'oso-change-registry.json');
