@@ -4,7 +4,7 @@ description: Implement tasks from an OpenSpec change in existing worktree (Exper
 
 按照 schema 定义的 apply 阶段流程，在已存在的 worktree 中实现变更。
 
-**Input**: 可选指定变更名称（如 `/opsx-apply add-auth`）。省略时从上下文推断，如果模糊则用 AskUserQuestion 让用户选择。
+**Input**: 可选指定变更名称（如 `/opsx-apply add-auth`）。省略时从上下文推断，如果模糊则用 **question** 工具让用户选择。
 
 **Apply 只负责实现**——worktree 由 `/opsx-ff` / `/opsx-new` 提前创建。
 
@@ -31,7 +31,7 @@ description: Implement tasks from an OpenSpec change in existing worktree (Exper
   openspec-superpowers-opencode verify
   ```
 
-  - **成功（exit 0）** → 执行 `openspec list --json` → 获取活动 changes → 使用 **AskUserQuestion** 工具让用户选择
+  - **成功（exit 0）** → 执行 `openspec list --json` → 获取活动 changes → 使用 **question** 工具让用户选择
   - **失败（exit 1）** →
     - 向用户展示 verify 的输出结果（诊断报告和修复建议）
     - 用 `question` 工具询问用户：**修复** 或者 **停止**
@@ -137,8 +137,8 @@ Superpowers skill 的唯一正确传递方式：`Read` 该 `.md` 文件，把内
 
 **③ tasks.md 勾选契约（MUST）**
 
-- 实现者 report 中 `status = done` 的任务，控制方 MUST 在 `openspec/changes/<name>/tasks.md` 勾选对应 checkbox（`- [ ]` → `- [x]`）。SDD 只维护自己的 ledger 与 todo，不会写 OpenSpec 的 tasks.md，这一条只能由本命令补上。
-- 其它状态（`done_with_concerns` / `needs_context` / `blocked`）MUST NOT 勾选。
+- 实现者 report 中 `status = DONE` 的任务，控制方 MUST 在 `openspec/changes/<name>/tasks.md` 勾选对应 checkbox（`- [ ]` → `- [x]`）。SDD 只维护自己的 ledger 与 todo，不会写 OpenSpec 的 tasks.md，这一条只能由本命令补上。
+- 其它状态（`DONE_WITH_CONCERNS` / `NEEDS_CONTEXT` / `BLOCKED`）MUST NOT 勾选。
 - MUST 逐条勾选，不得批量把所有 checkbox 一次勾完；审查回退的任务 MUST 改回未勾选。
 - 未真正执行的验收项（测试、构建、手工验证）MUST 记为「未验」，MUST NOT 写成通过。
 
@@ -217,7 +217,7 @@ Read：
 
 除 SDD 流程之外，OSO 只追加两条额外约束（MUST）：
 
-1. 实现者 report 中 `status = done` 的任务，控制方 MUST 在 `openspec/changes/<name>/tasks.md` 勾选对应 checkbox（见 Step 4.5 ③）；其它状态不勾。
+1. 实现者 report 中 `status = DONE` 的任务，控制方 MUST 在 `openspec/changes/<name>/tasks.md` 勾选对应 checkbox（见 Step 4.5 ③）；其它状态不勾。
 2. MUST NOT 修改 `openspec/schemas/` 下任何文件与 `openspec/config.yaml`；确实需要改 → STOP 并上报，交由用户处理，不得自行改动。
 
 ### Step 7: Verification

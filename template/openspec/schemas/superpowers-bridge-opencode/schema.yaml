@@ -538,11 +538,11 @@ apply:
 
        **③ tasks.md 勾選契約（MUST）**
 
-       - 實現者 report 中 `status = done` 的任務，控制方 MUST 在
-         `openspec/changes/<name>/tasks.md` 勾選對應 checkbox（`- [ ]` → `- [x]`）。
-         SDD 只維護自己的 ledger 與 todo，不會寫 OpenSpec 的 tasks.md，這一條只能由
-         apply 階段補上。
-       - 其它狀態（`done_with_concerns` / `needs_context` / `blocked`）MUST NOT 勾選。
+      - 實現者 report 中 `status = DONE` 的任務，控制方 MUST 在
+        `openspec/changes/<name>/tasks.md` 勾選對應 checkbox（`- [ ]` → `- [x]`）。
+        SDD 只維護自己的 ledger 與 todo，不會寫 OpenSpec 的 tasks.md，這一條只能由
+        apply 階段補上。
+      - 其它狀態（`DONE_WITH_CONCERNS` / `NEEDS_CONTEXT` / `BLOCKED`）MUST NOT 勾選。
        - MUST 逐條勾選，不得批量把所有 checkbox 一次勾完；審查回退的任務 MUST 改回未勾選。
        - 未真正執行的驗收項（測試、構建、手工驗證）MUST 記為「未驗」，MUST NOT 寫成通過。
 
@@ -628,8 +628,8 @@ apply:
 
        除 SDD 流程之外，OSO 只追加兩條額外約束（MUST）：
 
-       1. 實現者 report 中 `status = done` 的任務，控制方 MUST 在
-          `openspec/changes/<name>/tasks.md` 勾選對應 checkbox（見 2.③）；其它狀態不勾。
+      1. 實現者 report 中 `status = DONE` 的任務，控制方 MUST 在
+         `openspec/changes/<name>/tasks.md` 勾選對應 checkbox（見 2.③）；其它狀態不勾。
        2. MUST NOT 修改 `openspec/schemas/` 下任何文件與 `openspec/config.yaml`；
           確實需要改 → STOP 並上報，交由用戶處理，不得自行改動。
 

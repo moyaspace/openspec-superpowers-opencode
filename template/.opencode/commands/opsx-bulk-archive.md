@@ -16,7 +16,7 @@ This skill allows you to batch-archive changes, handling spec conflicts intellig
    openspec-superpowers-opencode verify
    ```
 
-   - **成功（exit 0）** → 执行 `openspec list --json` → 获取全部活动 changes → 使用 **AskUserQuestion** 工具让用户选择
+   - **成功（exit 0）** → 执行 `openspec list --json` → 获取全部活动 changes → 使用 **question** 工具让用户选择
    - **失败（exit 1）** →
      - 向用户展示 verify 的输出结果（诊断报告和修复建议）
      - 用 `question` 工具询问用户：**修复** 或者 **停止**
@@ -27,7 +27,7 @@ This skill allows you to batch-archive changes, handling spec conflicts intellig
 
 2. **Prompt for change selection**
 
-   Use **AskUserQuestion tool** with multi-select to let user choose changes:
+   Use the **question** tool with multi-select to let user choose changes:
    - Show each change with its schema
    - Include an option for "All changes"
    - Allow any number of selections (1+ works, 2+ is the typical use case)
@@ -108,7 +108,7 @@ This skill allows you to batch-archive changes, handling spec conflicts intellig
 
 7. **Confirm batch operation**
 
-   Use **AskUserQuestion tool** with a single confirmation:
+   Use the **question** tool with a single confirmation:
 
    - "Archive N changes?" with options based on status
    - Options might include:

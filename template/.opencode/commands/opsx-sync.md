@@ -16,7 +16,7 @@ This is an **agent-driven** operation - you will read delta specs and directly e
    openspec-superpowers-opencode verify
    ```
 
-   - **成功（exit 0）** → 执行 `openspec list --json` → 获取活动 changes → 使用 **AskUserQuestion** 工具让用户选择
+   - **成功（exit 0）** → 执行 `openspec list --json` → 获取活动 changes → 使用 **question** 工具让用户选择
    - **失败（exit 1）** →
      - 向用户展示 verify 的输出结果（诊断报告和修复建议）
      - 用 `question` 工具询问用户：**修复** 或者 **停止**

@@ -220,12 +220,24 @@ describe('opsx template commands are base-branch agnostic', () => {
         }
     });
 
-    it('template/.opencode/commands ships exactly 15 command files', () => {
+    it('template/.opencode/commands ships exactly 13 command files', () => {
         const files = fs.readdirSync(COMMANDS_DIR).filter((name) => name.endsWith('.md'));
         assert.equal(
             files.length,
-            15,
-            `expected 15 command markdown files in template/.opencode/commands, found ${files.length}: ${files.join(', ')}`,
+            13,
+            `expected 13 command markdown files in template/.opencode/commands, found ${files.length}: ${files.join(', ')}`,
+        );
+    });
+
+    it('no command uses the Claude Code tool name AskUserQuestion', () => {
+        const files = fs.readdirSync(COMMANDS_DIR).filter((name) => name.endsWith('.md'));
+        const offenders = files.filter((name) => readCommand(name).includes('AskUserQuestion'));
+        assert.deepEqual(
+            offenders,
+            [],
+            'these template commands use the Claude Code tool name AskUserQuestion; '
+                + 'OpenCode/OMO exposes the same capability as the question tool: '
+                + offenders.join(', '),
         );
     });
 });
