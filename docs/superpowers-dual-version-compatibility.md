@@ -26,7 +26,7 @@
 **v7 的安装位置与 v6 相同。** OpenCode 侧两者的 skills 目录都落在
 `~/.cache/opencode/packages/superpowers@*/node_modules/superpowers/skills`，
 不存在「v7 改了安装路径」这回事，路径探测逻辑无需为 v7 增加分支。
-v7 的实际差异集中在 `subagent-driven-development/` 目录内部：新增 `references/` 七份文档
+v7 的主要差异集中在 `subagent-driven-development/` 目录内部，另有 brainstorming 语义变化与新增 diagnosing-superpowers 技能：新增 `references/` 七份文档
 与 `re-review-prompt.md`，`SKILL.md` 随之把 fix loop、final review 等细节下沉到这些文件。
 因此在 OSO 侧，v7 与 v6 共用同一条 apply 分支（v6+ 委托上游 SDD）。
 
@@ -41,7 +41,7 @@ v7 的实际差异集中在 `subagent-driven-development/` 目录内部：新增
 
 - v7 `references/` 七份：`preflight.md`、`batching.md`、`handling-reports.md`、`fix-loop.md`、`final-review.md`、`resuming.md`、`cannot-verify.md`。
 - v7 的 `skills/` 共 15 个技能（v6.1.1 为 14 个），新增 `diagnosing-superpowers`。
-- v6+ 的两个分支共用同一套 OSO 委托约定，v5 分支保持零改动。
+- v6 与 v7 共用同一条 v6+ 分支，v5 分支保持零改动。
 
 ## 影响范围
 
@@ -70,7 +70,7 @@ opsx-ff、opsx-new、opsx-finish、opsx-archive 命令；template/_AGENTS.md（�
 ## 设计原则
 
 1. **无侵入**：v5 用户的体验完全不变
-2. **自适应**：v6 用户的模板自动走 v6 流程
+2. **自适应**：v6+ 用户的模板自动走 v6+ 流程
 3. **最小认知负担**：每份文件都保持简单，复杂度在 init 时消化
 4. **最小重复**：不因 < 15 行差异复制 500+ 行代码
 
@@ -80,8 +80,8 @@ opsx-ff、opsx-new、opsx-finish、opsx-archive 命令；template/_AGENTS.md（�
 
 | 文件 | 策略 | 理由 |
 |------|------|------|
-| `opsx-apply.md` | **单文件 + 条件分支** | 144 行中仅 ~12 行不同，不拆保持同步简单 |
-| `schema.yaml` | **单文件 + 条件分支** | 531 行中仅 ~12 行不同，拆分会导致 520 行重复 |
+| `opsx-apply.md` | **单文件 + 条件分支** | 约 250 行中仅 ~12 行不同，不拆保持同步简单 |
+| `schema.yaml` | **单文件 + 条件分支** | 约 650 行中仅 ~12 行不同，拆分会造成大段重复 |
 | `skills.lock.v5.json` / `.v6.json` / `.v7.json` | **按主版本拆为三个文件** | 内容是 hash 数据，无重叠可共享；按 Superpowers 主版本精确匹配 |
 | `src/setup/` + `src/verify.ts` | **TypeScript 部署实现 + 健康检查** | 由早期 `setup.ps1` / `setup.sh` 迁到 `src/setup/`，`src/verify.ts` 负责校验与告警 |
 
@@ -89,7 +89,9 @@ opsx-ff、opsx-new、opsx-finish、opsx-archive 命令；template/_AGENTS.md（�
 
 ### A. `opsx-apply.md` — 保持单文件，内联条件分支
 
-**Step 4a Pre-flight**（第 58-69 行）：
+> 历史设计：本节描述 v5 → v6 初期的「条件自编排」方案。v6+ 现已改为委托上游 SDD（见上文三版本对照），此处的 v6 部分仅作演进记录。
+
+**Step 4a Pre-flight**（历史行号已失效，仅示意）：
 
 ```
 当前（v5 only）：
@@ -98,7 +100,7 @@ opsx-ff、opsx-new、opsx-finish、opsx-archive 命令；template/_AGENTS.md（�
   Read code-quality-reviewer-prompt.md  ← v5 only
 
 改为：
-  Read implementer-prompt.md（v5/v6 共有）
+  Read implementer-prompt.md（v5 与 v6+ 共有）
 
   检测 task-reviewer-prompt.md 是否存在：
     ✅ 存在（v6）→ 记下 v6 模式，审查时用它
@@ -109,7 +111,7 @@ opsx-ff、opsx-new、opsx-finish、opsx-archive 命令；template/_AGENTS.md（�
     ❌ 不存在（v5）→ 走粘贴全文模式
 ```
 
-**Step 5 上下文传递**（第 71-93 行）：
+**Step 5 上下文传递**（历史行号已失效，仅示意）：
 
 ```
 v6 模式：
@@ -123,7 +125,7 @@ v5 模式：
   审查时直接 Read 代码
 ```
 
-**Step 6 审查**（第 95-111 行）：
+**Step 6 审查**（历史行号已失效，仅示意）：
 
 ```
 v6 模式 → task-reviewer-prompt.md（一次 dispatch 两个 verdict）
@@ -134,13 +136,15 @@ v5 模式 → spec-reviewer-prompt.md + code-quality-reviewer-prompt.md（两次
 
 ### B. `schema.yaml` — 保持单文件，内联条件分支
 
+> 历史设计：本节描述 v5 → v6 初期的「条件自编排」方案。v6+ 现已改为委托上游 SDD（见上文三版本对照），此处的 v6 部分仅作演进记录。
+
 与 opsx-apply.md 相同的条件分支逻辑，写入 `apply.instruction`。
 
 仅 3 处需要改动（共 ~12 行）：
 
-1. **Pre-flight 检查清单**（第 452-461 行）：`task-reviewer-prompt.md` 优先，不存在则回退
-2. **Executor 审查方式说明**（第 499-501 行）：描述两种审查流程
-3. 其余约 440 行 artifact instruction **完全不变**
+1. **Pre-flight 检查清单**（历史行号已失效，仅示意）：`task-reviewer-prompt.md` 优先，不存在则回退
+2. **Executor 审查方式说明**（历史行号已失效，仅示意）：描述两种审查流程
+3. 其余约 560 行 artifact instruction **完全不变**
 
 ### C. 锁清单 — 拆为三个文件（v5 / v6 / v7）
 
@@ -170,13 +174,13 @@ template/
     "commit": "612fbcdd01be93b7e3432f04fc8a864e2c3b8a88"
   },
   "skills": {
-    "brainstorming/SKILL.md": "BBA47904A7F6BBEE3BF8A107EEBE84E65D392BE683BBB898DED736B29E415F90",
-    "writing-plans/SKILL.md": "90056BAD3D5F196FA7C9FEC0FFE592E6D9C86BC983E406642A51D1A4198B7024",
-    "subagent-driven-development/SKILL.md": "081AD3869E55C80BF8F890B4768A90C0E8057DAF94B1B6FADEBFC85EA5B8304A",
-    "subagent-driven-development/implementer-prompt.md": "A416193F881E5A712C988FFFABFE1D5A97BFFCD091EB95577C84FE2136588617",
-    "subagent-driven-development/spec-reviewer-prompt.md": "631980E472EEC5394DE8B89B69D432E54FD3F7F523ECF9AFA7EB4CDA0C9B2BAF",
-    "subagent-driven-development/code-quality-reviewer-prompt.md": "06D1E7C2287E5A00BD1809BF39038ABD5F413B4CF917C37D30F00C48F6293421",
-    "test-driven-development/SKILL.md": "7DEE67B4AF6BDCCC7A914CA34533184D64592D0F5B23AEAE631538168DB14994"
+    "brainstorming/SKILL.md": { "sha256": "BBA47904A7F6BBEE3BF8A107EEBE84E65D392BE683BBB898DED736B29E415F90" },
+    "writing-plans/SKILL.md": { "sha256": "90056BAD3D5F196FA7C9FEC0FFE592E6D9C86BC983E406642A51D1A4198B7024" },
+    "subagent-driven-development/SKILL.md": { "sha256": "081AD3869E55C80BF8F890B4768A90C0E8057DAF94B1B6FADEBFC85EA5B8304A" },
+    "subagent-driven-development/implementer-prompt.md": { "sha256": "A416193F881E5A712C988FFFABFE1D5A97BFFCD091EB95577C84FE2136588617" },
+    "subagent-driven-development/spec-reviewer-prompt.md": { "sha256": "631980E472EEC5394DE8B89B69D432E54FD3F7F523ECF9AFA7EB4CDA0C9B2BAF" },
+    "subagent-driven-development/code-quality-reviewer-prompt.md": { "sha256": "06D1E7C2287E5A00BD1809BF39038ABD5F413B4CF917C37D30F00C48F6293421" },
+    "test-driven-development/SKILL.md": { "sha256": "7DEE67B4AF6BDCCC7A914CA34533184D64592D0F5B23AEAE631538168DB14994" }
   }
 }
 ```
@@ -192,12 +196,12 @@ template/
     "commit": "8ca22dba9a94f28898bbce59f2537ff4d87c747d"
   },
   "skills": {
-    "brainstorming/SKILL.md": "A32D2255354775AA124855AA7100CF276BEA096FFF4EBB3A0EDF57BE216E6C72",
-    "writing-plans/SKILL.md": "A6C67C1900064347C2A329990DD3C555657C51C3EC53B259A08AA01A2C26139A",
-    "subagent-driven-development/SKILL.md": "8DDE5589EE083FB4999106D116F01C8FDAF3116A8A9813FDEDEB80329DE49046",
-    "subagent-driven-development/implementer-prompt.md": "81DD9D5A3FB0B09B96B5829F03B9796842F3199EF7591D1BA1C2DB2A515F64D0",
-    "subagent-driven-development/task-reviewer-prompt.md": "BFED55C8F19D0FF6ED57B0FE09127C92890E9311C6C73917129598826BF9EBE8",
-    "test-driven-development/SKILL.md": "64B03FCE4AEE5A97A93160CEA8111F3BA13A17B7C001DB4BD5836D67FD10705D"
+    "brainstorming/SKILL.md": { "sha256": "A32D2255354775AA124855AA7100CF276BEA096FFF4EBB3A0EDF57BE216E6C72" },
+    "writing-plans/SKILL.md": { "sha256": "A6C67C1900064347C2A329990DD3C555657C51C3EC53B259A08AA01A2C26139A" },
+    "subagent-driven-development/SKILL.md": { "sha256": "8DDE5589EE083FB4999106D116F01C8FDAF3116A8A9813FDEDEB80329DE49046" },
+    "subagent-driven-development/implementer-prompt.md": { "sha256": "81DD9D5A3FB0B09B96B5829F03B9796842F3199EF7591D1BA1C2DB2A515F64D0" },
+    "subagent-driven-development/task-reviewer-prompt.md": { "sha256": "BFED55C8F19D0FF6ED57B0FE09127C92890E9311C6C73917129598826BF9EBE8" },
+    "test-driven-development/SKILL.md": { "sha256": "64B03FCE4AEE5A97A93160CEA8111F3BA13A17B7C001DB4BD5836D67FD10705D" }
   }
 }
 ```
@@ -207,7 +211,7 @@ template/
 其中 `brainstorming/SKILL.md` 与 `subagent-driven-development/SKILL.md` 的 hash 相对 v6 有变化，
 其余 4 条一致。
 
-三份文件都是**标准的 v1 flat 结构**，setup 逻辑无需处理任何分组逻辑。
+三份文件都是标准的 v1 结构（每个技能条目为 `{ "sha256": "…" }`），setup 逻辑无需处理任何分组逻辑。
 
 ### D. 锁清单选择与校验（`src/setup/` + `src/verify.ts`）
 
@@ -228,7 +232,7 @@ template/
 
 - **① v6 锁文件曾滞后。** `template/skills.lock.v6.json` 曾停在 v6.1.1（`upstream.commit=d884ae04…`），v6.2+ 用户执行 init 会看到假 hash 警告。本 change 已把它刷新到 v6.4.2（`8ca22dba9a94f28898bbce59f2537ff4d87c747d`），6 条 hash 均按实际文件重新计算。
 - **② v5 锁文件是拼凑值。** `template/skills.lock.v5.json` 的 `upstream.commit=612fbcdd…` 属于 v4 时代，部分 hash 与 v5 实际文件不符。决策是**不修**，因为 v5 已退出主流使用；本文件不得被当作 v5 的准确基线。
-- **③ v5 分支依赖已删除的文件。** v5 分支引用的 `spec-reviewer-prompt.md` 与 `code-quality-reviewer-prompt.md` 自 v6 起已不存在。v6+ 用户不会走 v5 分支，但若手工指定 v5，会因文件缺失而失败。
+- **③ v5 分支依赖已删除的文件。** v5 分支引用的 `spec-reviewer-prompt.md` 与 `code-quality-reviewer-prompt.md` 自 v6 起已不存在。v6+ 用户不会走 v5 分支，但若手工指定 v5，会因文件缺失而失败。处置：不修，仅在此记录；v6+ 用户不走 v5 分支，v5 即将退出支持。
 
 ## v7 的 brainstorming 语义变化与 OSO 的覆盖
 
@@ -236,8 +240,8 @@ Superpowers v7 的 `brainstorming/SKILL.md` 在写作设计文档时引入了两
 
 **体量分流。** SKILL.md 的 Size the Work 段按体量给出两种设计文档：
 
-> | A small change | a short one: what you already covered together, written down |
-> | A project | the full written design (below) |
+> - A small change → a short one: what you already covered together, written down
+> - A project → the full written design (below)
 
 即小改动写短设计（把双方已经谈过的内容落到纸面），大型项目写完整设计。SKILL.md 还要求先说明工作量大小，用户可以否决；如果任务中途变大，要停下来说明并升档。
 
@@ -258,7 +262,7 @@ brainstorm → proposal → design → specs → tasks → plan → apply 全链
 
 以下内容**不需要修改**：
 
-- ❌ `template/_AGENTS.md` — 只引用了 `test-driven-development/SKILL.md`，两版本都有
+- ❌ `template/_AGENTS.md` — 只引用了 `test-driven-development/SKILL.md`，v5 与 v6+ 都有
 - ❌ `opsx-finish.md` — 只引用了 `finishing-a-development-branch/SKILL.md`，文件未变
 - ❌ `template/_gitignore`、`_gitattributes`、`_editorconfig` — 与 Superpowers 版本无关
 - ❌ Brainstorm、proposal、specs、tasks、plan、verify、retrospective 的 schema instruction — 不引用 SDD
@@ -346,7 +350,7 @@ brainstorm → proposal → design → specs → tasks → plan → apply 全链
 如果不做多版本兼容，也可以：
 
 - **放弃 v5 支持**：只适配 v6，要求所有用户升级到 v6。简单，但破坏向后兼容。
-- **放弃 v6 支持**：保持现状，只适配 v5。但大多数用户会用 npm 安装的最新版（v6），会报错。
+- **放弃 v6 支持**：保持现状，只适配 v5。但大多数用户会用 npm 安装的最新版（v6+），会报错。
 - **软检测不锁 hash**：去掉 lock 文件，改为运行时 Read 检测。失去完整性校验但最简单。
 
 最终选择多版本兼容方案，是在**向后兼容**和**完整性校验**之间的平衡。
