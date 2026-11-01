@@ -242,6 +242,38 @@ describe('opsx template commands are base-branch agnostic', () => {
     });
 });
 
+describe('opsx-apply.md detects an existing worktree before creating one', () => {
+    it('Step 2 starts with `git worktree list`, not `ensure-worktree`', () => {
+        const content = readCommand('opsx-apply.md');
+        const step2 = sectionOf('opsx-apply.md', content, '### Step 2:', '### Step 3:');
+        assert.ok(
+            step2.includes('git worktree list'),
+            'opsx-apply.md: Step 2 must check `git worktree list` first',
+        );
+        const commands = fencedCommands(step2);
+        assert.equal(
+            commands[0],
+            'git worktree list',
+            `opsx-apply.md: Step 2 first fenced command must be "git worktree list", got ${JSON.stringify(commands)}`,
+        );
+        assert.equal(
+            commands.includes('openspec-superpowers-opencode ensure-worktree <name>'),
+            false,
+            'opsx-apply.md: Step 2 must not list ensure-worktree as a standalone fenced first step',
+        );
+    });
+
+    it('Step 2 forbids ensure-worktree when the target is already listed', () => {
+        const content = readCommand('opsx-apply.md');
+        const step2 = sectionOf('opsx-apply.md', content, '### Step 2:', '### Step 3:');
+        assert.ok(
+            /MUST NOT[^\n]*ensure-worktree/.test(step2)
+                || /ensure-worktree[^\n]*MUST NOT/.test(step2),
+            'opsx-apply.md: Step 2 must forbid calling ensure-worktree for an already-listed worktree',
+        );
+    });
+});
+
 describe('opsx-apply.md delegates the v6+ branch to upstream SDD', () => {
     it('dispatches implementers with the OMO task() syntax', () => {
         const content = readCommand('opsx-apply.md');

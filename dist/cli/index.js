@@ -7,7 +7,7 @@
 //   create-openspec-superpowers-opencode my-project                   别名
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import readline from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findProjectRoot, getChangeRegistryPath } from '../registry-utils.js';
@@ -211,26 +211,111 @@ function run(cmd, cwd) {
         return false;
     }
 }
-// ---- ensure-worktree — 确保变更的隔离 worktree 已创建 ----
+/** 执行只读 git 查询；失败返回 null（调用方按「不可用」处理） */
+function readGitOutput(cwd, args) {
+    try {
+        return execFileSync('git', args, {
+            cwd,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+        }).trim();
+    }
+    catch {
+        return null;
+    }
+}
+function samePath(a, b) {
+    const normalize = (p) => {
+        const resolved = path.resolve(p);
+        return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+    };
+    return normalize(a) === normalize(b);
+}
+/** 解析 `git worktree list --porcelain` 为条目列表；git 不可用或失败时返回空数组 */
+function readWorktreeEntries(cwd) {
+    const output = readGitOutput(cwd, ['worktree', 'list', '--porcelain']);
+    if (!output)
+        return [];
+    const entries = [];
+    let currentPath = null;
+    let currentBranch = null;
+    const flush = () => {
+        if (currentPath !== null)
+            entries.push({ path: currentPath, branch: currentBranch });
+        currentPath = null;
+        currentBranch = null;
+    };
+    for (const line of output.split(/\r?\n/)) {
+        if (line.startsWith('worktree ')) {
+            flush();
+            currentPath = line.slice('worktree '.length).trim();
+        }
+        else if (line.startsWith('branch ')) {
+            currentBranch = line.slice('branch '.length).trim();
+        }
+    }
+    flush();
+    return entries;
+}
+/** 当前所在 worktree 的根目录（`git rev-parse --show-toplevel`；失败回退 cwd） */
+function resolveCurrentWorktreeRoot(cwd) {
+    const toplevel = readGitOutput(cwd, ['rev-parse', '--show-toplevel']);
+    return toplevel ? path.resolve(toplevel) : cwd;
+}
+/**
+ * 仓库根目录。在 linked worktree 内 `--show-toplevel` 返回的是该 worktree 根，
+ * 因此用 `--git-common-dir`（指向主仓库 .git）反推真正的仓库根。
+ * 不在 git 仓库时回退 cwd，保持原有报错行为。
+ */
+function resolveRepoRoot(cwd) {
+    const toplevel = readGitOutput(cwd, ['rev-parse', '--show-toplevel']);
+    if (!toplevel)
+        return cwd;
+    const commonDir = readGitOutput(cwd, ['rev-parse', '--git-common-dir']);
+    if (!commonDir)
+        return path.resolve(toplevel);
+    return path.dirname(path.resolve(cwd, commonDir));
+}
 function runEnsureWorktree(name, cwd) {
-    const worktreeDir = path.join(cwd, '.worktrees', name);
+    const repoRoot = resolveRepoRoot(cwd);
+    const currentRoot = resolveCurrentWorktreeRoot(cwd);
+    const worktreeDir = path.join(repoRoot, '.worktrees', name);
+    const branch = `feature/${name}`;
+    const branchRef = `refs/heads/${branch}`;
+    const entries = readWorktreeEntries(cwd);
+    const currentEntry = entries.find((entry) => samePath(entry.path, currentRoot));
+    const alreadyInTarget = samePath(currentRoot, worktreeDir)
+        || (currentEntry !== undefined
+            && (samePath(currentEntry.path, worktreeDir) || currentEntry.branch === branchRef));
+    if (alreadyInTarget) {
+        console.log(t(`  ✓ 已在该 worktree 内: .worktrees/${name}/`, `  ✓ Already inside this worktree: .worktrees/${name}/`));
+        process.exit(0);
+    }
     if (fs.existsSync(worktreeDir)) {
         console.log(t(`  ✓ worktree 已存在: .worktrees/${name}/`, `  ✓ Worktree already exists: .worktrees/${name}/`));
         process.exit(0);
     }
-    const branch = `feature/${name}`;
-    // 清理残留分支（正常流程下不应存在，但 PR 后可能残余）
-    try {
-        execSync(`git branch -D "${branch}"`, { cwd, stdio: 'ignore' });
+    // 安全删除残留分支：仅当分支存在且未被任何 worktree 检出时才删，
+    // 避免 worktree 被手工删除后连同分支上的提交一起丢失。
+    const branchCheckedOut = entries.some((entry) => entry.branch === branchRef);
+    if (branchCheckedOut) {
+        console.log(t(`  ∼ 分支正被检出，跳过删除: ${branch}`, `  ∼ Branch is checked out, skipping deletion: ${branch}`));
+        process.exit(0);
     }
-    catch (_) {
-        // 分支不存在或删除失败都不阻塞
+    const branchExists = readGitOutput(repoRoot, ['show-ref', '--verify', '--quiet', branchRef]) !== null;
+    if (branchExists) {
+        try {
+            execFileSync('git', ['branch', '-D', branch], { cwd: repoRoot, stdio: 'ignore' });
+        }
+        catch (_) {
+            // 删除失败不阻塞（保持原行为）
+        }
     }
     console.log(t(`  → 创建 worktree: .worktrees/${name}/ (${branch})`, `  → Creating worktree: .worktrees/${name}/ (${branch})`));
     const wkCmd = isWin
         ? `git worktree add ".worktrees\\${name}" -b "${branch}"`
         : `git worktree add ".worktrees/${name}" -b "${branch}"`;
-    const ok = run(wkCmd, cwd);
+    const ok = run(wkCmd, repoRoot);
     if (!ok) {
         console.error(t('  ✗ worktree 创建失败', '  ✗ Worktree creation failed'));
         process.exit(1);

@@ -43,9 +43,13 @@ description: Implement tasks from an OpenSpec change in existing worktree (Exper
 ### Step 2: 确保 worktree 存在并进入
 
 ```bash
-openspec-superpowers-opencode ensure-worktree <name>
-cd .worktrees/<name>
+git worktree list
 ```
+
+- **输出含 `.worktrees/<name>`** → `cd .worktrees/<name>`
+- **输出不含** → 从**项目根**执行 `openspec-superpowers-opencode ensure-worktree <name>`，再 `cd .worktrees/<name>`
+
+**MUST NOT** 在 `git worktree list` 已列出目标时再调用 `ensure-worktree`。
 
 ### Step 3: 读取 schema apply 指令
 

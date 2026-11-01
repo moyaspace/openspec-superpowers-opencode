@@ -1,15 +1,18 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import child_process from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const cliPath = path.resolve(__dirname, '..', 'dist', 'cli', 'index.js');
 
-function runCli(...args) {
+function runCliFrom(cwd, ...args) {
     try {
         const stdout = child_process.execFileSync(process.execPath, [cliPath, ...args], {
+            cwd,
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe']
         });
@@ -21,6 +24,32 @@ function runCli(...args) {
             code: e.status || 1
         };
     }
+}
+
+function runCli(...args) {
+    return runCliFrom(process.cwd(), ...args);
+}
+
+/** 在 dir 中执行 git 命令并返回修剪后的 stdout */
+function gitRun(dir, args) {
+    return child_process.execFileSync('git', args, {
+        cwd: dir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe']
+    }).trim();
+}
+
+/** 建一个一次性 git 仓库（含首次提交），返回仓库根目录 */
+function makeGitRepo(prefix) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+    gitRun(dir, ['init', '-q', '--initial-branch=main']);
+    gitRun(dir, ['config', 'user.email', 'test@example.com']);
+    gitRun(dir, ['config', 'user.name', 'Test User']);
+    gitRun(dir, ['config', 'commit.gpgsign', 'false']);
+    fs.writeFileSync(path.join(dir, 'README.md'), '# fixture\n');
+    gitRun(dir, ['add', '.']);
+    gitRun(dir, ['commit', '-q', '-m', 'init']);
+    return dir;
 }
 
 // ============================================================
@@ -66,6 +95,78 @@ describe('remove-worktree', () => {
 // ============================================================
 // registry add --base usage text
 // ============================================================
+// ============================================================
+// ensure-worktree 幂等性与分支安全（BUG #7）
+// ============================================================
+describe('ensure-worktree idempotency and branch safety', () => {
+    test('inside the target worktree exits 0 without recreating or deleting', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const name = 'demo';
+        const first = runCliFrom(repo, 'ensure-worktree', name);
+        assert.strictEqual(first.code, 0, `首次创建应成功, stderr: ${first.stderr}`);
+
+        const worktree = path.join(repo, '.worktrees', name);
+        assert.ok(fs.existsSync(worktree), '首次调用应创建 worktree');
+        const branchHead = gitRun(repo, ['rev-parse', 'refs/heads/feature/demo']);
+
+        const inside = runCliFrom(worktree, 'ensure-worktree', name);
+        assert.strictEqual(inside.code, 0, `worktree 内调用应 exit 0, stderr: ${inside.stderr}`);
+        assert.match(inside.stdout, /已在该 worktree 内|Already inside this worktree/);
+        assert.doesNotMatch(inside.stdout, /创建 worktree|Creating worktree/);
+
+        assert.strictEqual(
+            gitRun(repo, ['rev-parse', 'refs/heads/feature/demo']),
+            branchHead,
+            '分支不应被删除重建'
+        );
+        assert.strictEqual(
+            gitRun(repo, ['worktree', 'list', '--porcelain']).split('\n').filter((l) => l.startsWith('worktree ')).length,
+            2,
+            '不应新增 worktree'
+        );
+    });
+
+    test('skips deleting a branch checked out by another worktree', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const name = 'shared';
+        gitRun(repo, ['worktree', 'add', '-q', '.worktrees/elsewhere', '-b', 'feature/shared']);
+        const branchHead = gitRun(repo, ['rev-parse', 'refs/heads/feature/shared']);
+
+        const result = runCliFrom(repo, 'ensure-worktree', name);
+        assert.strictEqual(result.code, 0, `应跳过而非报错, stderr: ${result.stderr}`);
+        assert.match(result.stdout, /跳过删除|skipping deletion|checked out/i);
+        assert.strictEqual(
+            gitRun(repo, ['rev-parse', 'refs/heads/feature/shared']),
+            branchHead,
+            '被检出的分支必须保留'
+        );
+        assert.strictEqual(fs.existsSync(path.join(repo, '.worktrees', name)), false);
+    });
+
+    test('normal path deletes a stale branch and creates the worktree', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const name = 'fresh';
+        const base = gitRun(repo, ['rev-parse', 'HEAD']);
+
+        gitRun(repo, ['checkout', '-q', '-b', 'stale-tmp']);
+        fs.writeFileSync(path.join(repo, 'stale.txt'), 'stale\n');
+        gitRun(repo, ['add', '.']);
+        gitRun(repo, ['commit', '-q', '-m', 'stale']);
+        gitRun(repo, ['branch', 'feature/fresh', 'stale-tmp']);
+        gitRun(repo, ['checkout', '-q', 'main']);
+
+        const result = runCliFrom(repo, 'ensure-worktree', name);
+        assert.strictEqual(result.code, 0, `正常路径应成功, stderr: ${result.stderr}`);
+        assert.ok(fs.existsSync(path.join(repo, '.worktrees', name)), '应创建 worktree');
+        assert.match(gitRun(repo, ['worktree', 'list', '--porcelain']), /\.worktrees[\\/]fresh/);
+        assert.strictEqual(
+            gitRun(repo, ['rev-parse', 'refs/heads/feature/fresh']),
+            base,
+            '残留分支应被删除并在当前 HEAD 上重建'
+        );
+    });
+});
+
 describe('registry add --base usage', () => {
     test('help documents [--base <branch>] (en)', () => {
         const result = runCli('--help');
