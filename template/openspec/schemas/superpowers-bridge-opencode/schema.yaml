@@ -492,9 +492,9 @@ apply:
 
     2. **v6+ 委託契約（三節，MUST / MUST NOT）**：
 
-       下面三節只對 **v6+ 分支**生效，是硬約束，不是參考資料。SKILL.md 裡的命令與派發語法
-       都按 [CC] 側寫，落到 OMO 必須按本節改寫；v5 分支不受本節影響。
-       本節必須在 Executor 之前讀完，否則會先照抄 [CC] 語法。
+      下面三節只對 **v6+ 分支**生效，是硬約束，不是參考資料。SKILL.md 裡的命令與派發語法
+      都按 **Claude Code（下稱 CC）** 側寫，落到 **Oh My OpenCode（下稱 OMO）** 必須按本節改寫；v5 分支不受本節影響。
+      本節必須在 Executor 之前讀完，否則會先照抄 **CC** 語法。
 
        **① bash 調用寫法（MUST）**
 
@@ -521,8 +521,8 @@ apply:
 
        **② SDD → OMO 語法映射（MUST）**
 
-       SKILL.md 用 [CC] 的 Subagent 語義描述派發。在 OMO 中 MUST 按下表改寫，
-       MUST NOT 照抄 `Subagent (general-purpose)` 一類語法：
+      SKILL.md 用 **Claude Code（CC）** 的 Subagent 語義描述派發。在 **Oh My OpenCode（OMO）** 中 MUST 按下表改寫，
+      MUST NOT 照抄 `Subagent (general-purpose)` 一類語法：
 
        | SDD 寫法 | OMO MUST 寫法 | 說明 |
        |---|---|---|

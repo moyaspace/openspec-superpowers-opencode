@@ -99,7 +99,7 @@ Read：
 
 ### Step 4.5: v6+ 委托契约（三节，MUST / MUST NOT）
 
-下面三节只对 **v6+ 分支**生效，是硬约束，不是参考资料。SKILL.md 里的命令与派发语法都按 [CC] 侧写，落到 OMO 必须按本节改写；v5 分支不受本节影响。
+下面三节只对 **v6+ 分支**生效，是硬约束，不是参考资料。SKILL.md 里的命令与派发语法都按 **Claude Code（下称 CC）** 侧写，落到 **Oh My OpenCode（下称 OMO）** 必须按本节改写；v5 分支不受本节影响。
 
 **① bash 调用写法（MUST）**
 
@@ -122,7 +122,7 @@ SKILL.md 中的写法 → 本命令 MUST 使用的写法：
 
 **② SDD → OMO 语法映射（MUST）**
 
-SKILL.md 用 [CC] 的 Subagent 语义描述派发。在 OMO 中 MUST 按下表改写，MUST NOT 照抄 `Subagent (general-purpose)` 一类语法：
+SKILL.md 用 **Claude Code（CC）** 的 Subagent 语义描述派发。在 **Oh My OpenCode（OMO）** 中 MUST 按下表改写，MUST NOT 照抄 `Subagent (general-purpose)` 一类语法：
 
 | SDD 写法 | OMO MUST 写法 | 说明 |
 |---|---|---|

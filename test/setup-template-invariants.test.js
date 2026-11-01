@@ -298,6 +298,20 @@ describe('opsx-apply.md delegates the v6+ branch to upstream SDD', () => {
         );
     });
 
+    it('defines the CC / OMO abbreviations where they are first used', () => {
+        const content = readCommand('opsx-apply.md');
+        assert.ok(
+            !content.includes('[CC]'),
+            'opsx-apply.md must not use the undefined [CC] abbreviation; '
+                + 'write Claude Code（下称 CC） instead',
+        );
+        assert.ok(
+            content.includes('Claude Code（下称 CC）') && content.includes('Oh My OpenCode（下称 OMO）'),
+            'opsx-apply.md must define Claude Code（下称 CC） and Oh My OpenCode（下称 OMO） '
+                + 'before the mapping table uses them',
+        );
+    });
+
     it('keeps the v5 branch (Read items and both review steps)', () => {
         const content = readCommand('opsx-apply.md');
         for (const marker of [
