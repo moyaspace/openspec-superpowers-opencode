@@ -97,7 +97,7 @@
 ### BUG013 `skills.lock.v6.json` 只匹配 v6.1.1
 
 - [x] 12.8 `template/skills.lock.v6.json` 的 `upstream.commit` = `8ca22db…`
-- [ ] 12.9 【用户指挥】v6.4.2 环境下 `oso init` 无 hash 警告
+- [x] 12.9 【用户指挥】v6.4.2 环境下 `oso init` 无 hash 警告
 
 ### 通用
 
