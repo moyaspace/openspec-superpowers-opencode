@@ -120,7 +120,7 @@
 
 ### Requirement: 兼容文档覆盖 v5 / v6 / v7
 
-`docs/superpowers-dual-version-compatibility.md` MUST 覆盖 v5、v6、v7 三个版本，并 MUST 记录三个既存问题：v6 锁清单曾长期停留在 v6.1.1、v5 锁清单为拼凑值不可作准确基线、v5 分支引用的 reviewer prompt 自 v6 起已不存在。文档 MUST 说明 v7 的 brainstorming 语义变化（体量分流 + 强制批准门）以及 OSO 明确覆盖该分流、始终走完整 artifacts 流程。
+`docs/superpowers-version-compatibility.md` MUST 覆盖 v5、v6、v7 三个版本，并 MUST 记录三个既存问题：v6 锁清单曾长期停留在 v6.1.1、v5 锁清单为拼凑值不可作准确基线、v5 分支引用的 reviewer prompt 自 v6 起已不存在。文档 MUST 说明 v7 的 brainstorming 语义变化（体量分流 + 强制批准门）以及 OSO 明确覆盖该分流、始终走完整 artifacts 流程。
 
 #### Scenario: 文档覆盖三版本与既存问题
 

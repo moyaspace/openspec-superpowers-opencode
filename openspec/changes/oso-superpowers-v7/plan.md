@@ -102,7 +102,7 @@
 
 - [ ] **Step 1:** `.github/workflows/ci.yml` 的 tarball 清单加入 `package/template/skills.lock.v7.json`。
 - [ ] **Step 2:** `npm pack` 后 `tar -tzf *.tgz | grep skills.lock` 确认 v5/v6/v7 三份都在；删除临时 tgz。
-- [ ] **Step 3:** `docs/superpowers-dual-version-compatibility.md` 扩为 v5/v6/v7：补 v7 行/段（SDD 布局、7 份 references、审查方式）。
+- [ ] **Step 3:** `docs/superpowers-version-compatibility.md` 扩为 v5/v6/v7：补 v7 行/段（SDD 布局、7 份 references、审查方式）。
 - [ ] **Step 4:** 补「三个既存问题」小节与处置（v6 曾停 v6.1.1 / v5 拼凑不可作基线 / v5 分支 reviewer prompt 自 v6 起不存在）。
 - [ ] **Step 5:** 补 v7 brainstorming 语义变化（体量分流 + 强制批准门）与「OSO 明确覆盖、始终走完整 artifacts 流程」。
 - [ ] **Step 6:** Commit：`docs: cover v5/v6/v7 compatibility and add v7 lock to tarball checks (F001)`

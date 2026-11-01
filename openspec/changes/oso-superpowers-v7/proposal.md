@@ -42,7 +42,7 @@ Superpowers 已发布 v7.0.1，但 V1 线（1.1.2）对 v7 的支持是残缺的
 
 **分发清单与文档（F001）**
 - From: `ci.yml` 的 tarball 清单只含 v5 / v6 lock；兼容文档只覆盖 v5 / v6。
-- To: 清单加入 `package/template/skills.lock.v7.json`；`docs/superpowers-dual-version-compatibility.md` 扩为 v5 / v6 / v7，记录三个既存问题（v6 lock 过期、v5 lock 拼凑、v5 分支引用的 reviewer prompt 自 v6 起不存在），说明 v7 的 brainstorming 体量分流 + 强制批准门，以及 OSO 明确覆盖该分流（始终走完整 artifacts 流程）。
+- To: 清单加入 `package/template/skills.lock.v7.json`；`docs/superpowers-version-compatibility.md` 扩为 v5 / v6 / v7，记录三个既存问题（v6 lock 过期、v5 lock 拼凑、v5 分支引用的 reviewer prompt 自 v6 起不存在），说明 v7 的 brainstorming 体量分流 + 强制批准门，以及 OSO 明确覆盖该分流（始终走完整 artifacts 流程）。
 - Reason: 分发缺文件会导致已发布包在 v7 环境下找不到 lock；文档不覆盖 v7 会让人按旧路径操作。
 - Impact: CI 与文档。
 
@@ -69,5 +69,5 @@ Superpowers 已发布 v7.0.1，但 V1 线（1.1.2）对 v7 的支持是残缺的
 - 代码：`src/setup/discovery.ts`（`selectLockFile`）、`src/setup/index.ts`（两个调用点的「不支持」提示）、`src/verify.ts`（`runAllChecks` 第 6 项 + bash 检测函数）。
 - 模板：`template/skills.lock.v7.json`（新增）、`template/skills.lock.v6.json`（刷新）、`template/.opencode/commands/opsx-apply.md`（v6+ 委托）、`template/openspec/schemas/superpowers-bridge-opencode/schema.yaml`（apply 段）、`template/.opencode/commands/opsx-finish.md`（用户指挥的措辞）。
 - 测试：`test/setup-discovery.test.js`（断言改为 v7 lock + 新增「超出支持范围不回退」用例）、`test/verify.test.js` 或 `test/setup-verify-registry.test.js`（bash 检测项）、模板一致性测试（v6+ 委托段与三件补、v5 分支未动）。
-- CI / 文档：`.github/workflows/ci.yml`（tarball 清单）、`docs/superpowers-dual-version-compatibility.md`（三版本）。
+- CI / 文档：`.github/workflows/ci.yml`（tarball 清单）、`docs/superpowers-version-compatibility.md`（三版本）。
 - 不触碰：`main`（V2.0 线）、`template/skills.lock.v5.json`（决策：不修）、部署版 `.opencode/commands/`（gitignored，除非用户当场指示）、版本号 / `npm publish` / dist-tag（T005）、2.0 设施（oso-core、插件、`supported-versions`、`.oso/config.yaml`）。

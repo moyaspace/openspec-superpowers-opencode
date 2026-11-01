@@ -2,7 +2,7 @@
 
 本 change（Sprint 1 · T004）在 `release/1.1` 上交付 3 个任务项，外加 1 项未编号的措辞更正：
 
-- **F001 Superpowers v7 支持**：新增 `template/skills.lock.v7.json`（6 条目，基线 v7.0.1 `2ce8aa15`）；`template/.opencode/commands/opsx-apply.md` 的 **v6 及更高**分支改为整体委托上游 SDD（v5 分支原样保留）；`template/openspec/schemas/superpowers-bridge-opencode/schema.yaml` 的 apply 段同步为委托口径；`src/verify.ts` 增 bash 可用性检查；`.github/workflows/ci.yml` 的 tarball 清单纳入 v7 lock；`docs/superpowers-dual-version-compatibility.md` 扩为 v5/v6/v7。
+- **F001 Superpowers v7 支持**：新增 `template/skills.lock.v7.json`（6 条目，基线 v7.0.1 `2ce8aa15`）；`template/.opencode/commands/opsx-apply.md` 的 **v6 及更高**分支改为整体委托上游 SDD（v5 分支原样保留）；`template/openspec/schemas/superpowers-bridge-opencode/schema.yaml` 的 apply 段同步为委托口径；`src/verify.ts` 增 bash 可用性检查；`.github/workflows/ci.yml` 的 tarball 清单纳入 v7 lock；`docs/superpowers-version-compatibility.md` 扩为 v5/v6/v7。
 - **BUG012 `selectLockFile` 静默回退**：精确匹配优先；无匹配时按 major 高于/低于支持范围分别明确提示；**绝不跨 major 复用清单**；同时改掉把该 bug 当规格钉死的测试断言。
 - **BUG013 `skills.lock.v6.json` 只匹配 v6.1.1**：把该 lock 刷新到 v6.4.2（commit `8ca22dba`）。
 - **追加范围（未编号，【用户指挥】）**：`template/.opencode/commands/opsx-finish.md` 的措辞更正。由用户逐条现场给出要改的措辞与目标表述；AI 默认只复核与报告，用户明确说「你来做」时才动手。

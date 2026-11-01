@@ -58,7 +58,7 @@
 - [x] 8.1 `.github/workflows/ci.yml` 的 tarball 内容清单加入 `package/template/skills.lock.v7.json`（紧邻 v5 / v6 两行）。
 - [x] 8.2 本地验证：`npm pack` 后 `tar -tzf *.tgz` 能列出 `package/template/skills.lock.v7.json`；清理临时 tgz。
 
-## 9. 必改点 8：`docs/superpowers-dual-version-compatibility.md` 扩为三版本
+## 9. 必改点 8：`docs/superpowers-version-compatibility.md` 扩为三版本
 
 - [x] 9.1 覆盖 v5 / v6 / v7：各自的 SDD 文件布局、审查方式、apply 分支行为差异。
 - [x] 9.2 记录三个既存问题及处置：`skills.lock.v6.json` 曾停在 v6.1.1（本 change 刷新到 v6.4.2）；`skills.lock.v5.json` 为拼凑值、不得作为 v5 准确基线（不修）；v5 分支引用的 `spec-reviewer-prompt.md` / `code-quality-reviewer-prompt.md` 自 v6 起不存在（v6+ 用户不走 v5 分支，手工指定 v5 会失败）。
@@ -105,7 +105,7 @@
 - [x] 12.11 `opsx-apply.md` 的 v6+ 分支已委托、v5 分支未动；委托段含 §2.5 ①②③
 - [x] 12.12 `schema.yaml` 的 apply 段与 `opsx-apply.md` 口径一致
 - [x] 12.13 `ci.yml` 的 tarball 清单含 `skills.lock.v7.json`
-- [x] 12.14 `docs/superpowers-dual-version-compatibility.md` 覆盖 v5 / v6 / v7
+- [x] 12.14 `docs/superpowers-version-compatibility.md` 覆盖 v5 / v6 / v7
 - [x] 12.15 `npm test` 全绿（0 fail；`9009` 偏差若有已记录）
 - [x] 12.16 `git status` 干净；`release/1.1` 上只多出本任务的 change + archive 提交；`main` 未变
 - [x] 12.17 finish 措辞更正：与用户给出的条目逐条对勾，模板一致性测试全绿、占位符在位
