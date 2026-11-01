@@ -83,11 +83,11 @@
 
 ### F001 Superpowers v7 支持
 
-- [ ] 12.1 【用户指挥】AC1：安装 Superpowers v7.0.1 后 `oso init` 全绿，无 hash 警告（需真实环境；AI 不自行切换用户缓存）
+- [x] 12.1 【用户指挥】AC1：安装 Superpowers v7.0.1 后 `oso init` 全绿，无 hash 警告（需真实环境；AI 不自行切换用户缓存）
 - [ ] 12.2 【用户指挥】AC2：v7 下 apply —— 主会话能读到 7 份 references；任务卡住走 fix-loop（≤5 轮）；能处理 BLOCKED；能跑 final review
 - [x] 12.3 AC3：`oso verify` 输出含 bash 检查项；缺 bash 为 ⚠ 而非失败
 - [ ] 12.4 【用户指挥】`.superpowers/sdd/` 自动创建且不出现在 `git status`
-- [ ] 12.5 【用户指挥】Windows 上三个脚本经 `bash <脚本>` 调用成功
+- [x] 12.5 【用户指挥】Windows 上三个脚本经 `bash <脚本>` 调用成功
 
 ### BUG012 `selectLockFile` 静默回退
 
