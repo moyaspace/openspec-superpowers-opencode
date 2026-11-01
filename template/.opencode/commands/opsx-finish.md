@@ -32,10 +32,10 @@ description: Finish an implemented change - merge worktree, cleanup, archive, PR
 
 ```bash
 git worktree list
-cd .worktrees/<name>
 ```
 
-`git worktree list` 的输出 MUST 包含 `.worktrees/<name>`。不包含 → **STOP**，按文末「无 worktree 时」处理。
+- **输出含 `.worktrees/<name>`** → `cd .worktrees/<name>`
+- **输出不含** → **STOP**，按文末「无 worktree 时」处理
 
 **MUST NOT** 新建 worktree：`ensure-worktree` 会先删除同名的 `feature/<name>` 分支、再新建一个空 worktree，收尾流程中禁止使用该命令。
 
@@ -185,8 +185,8 @@ Read：
 
 **Step 6a: 确定基础分支（禁止默认推断）**
 
-> 为什么这里必须问、而 `/opsx-propose` 不问：finish 执行时已在 `.worktrees/<name>` 内，`HEAD` 是 `feature/<name>`，
-> **base 无法从环境读出**，只能来自记录或用户。MUST NOT 因此就默认某个分支。
+> finish 执行时已在 `.worktrees/<name>` 内，`HEAD` 是 `feature/<name>`，
+> **base 无法从当前环境读出**，只能来自注册表记录或用户。MUST NOT 因此就默认某个分支。
 
 base 的来源，按顺序取第一个可用的：
 
@@ -276,10 +276,14 @@ git worktree remove --force .worktrees/_merge-test-<name>   # 连未提交的预
 # ── 阶段三：落地（<base-branch> 接收已验证结果）──
 cd <project-root>                      # 回项目根（测试台留到阶段四用 --force 整体丢弃）
 git rev-parse --abbrev-ref HEAD
-git merge --ff-only <feature-branch>   # 树 = 刚测过的树，逐字节一致
 ```
 
-`git rev-parse --abbrev-ref HEAD` 的输出 MUST 等于 `<base-branch>`；不等于 → STOP，不得继续 merge。
+- **输出 = `<base-branch>`** → 继续下一步
+- **输出 ≠ `<base-branch>`** → STOP，不得 merge
+
+```bash
+git merge --ff-only <feature-branch>   # 树 = 刚测过的树，逐字节一致
+```
 
 - 若 `--ff-only` 失败（base 在验证期间前进）→ 停止并报告，重跑 `/opsx-finish`
 
