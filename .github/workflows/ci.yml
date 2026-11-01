@@ -66,6 +66,7 @@ jobs:
             "package/template/openspec/schemas/superpowers-bridge-opencode/schema.yaml" \
             "package/template/skills.lock.v5.json" \
             "package/template/skills.lock.v6.json" \
+            "package/template/skills.lock.v7.json" \
             "package/template/_gitignore" \
             "package/template/_editorconfig" \
             "package/template/_gitattributes" \
