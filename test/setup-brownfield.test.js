@@ -376,7 +376,7 @@ test('棕地：已有 openspec/config.yaml 时仍询问，答 n 时文件不变'
     assert.equal(fs.readFileSync(path.join(targetDir, 'openspec', 'config.yaml'), 'utf8'), existingConfig);
 });
 
-test('棕地：schemas 非空时询问，答 y 时 schema 被覆盖', async (t) => {
+test('棕地：schemas 非空但无 config.yaml 时不询问，schema 被无条件覆盖', async (t) => {
     const targetDir = seedBrownfield(t);
     const schemaDir = path.join(targetDir, 'openspec', 'schemas', 'superpowers-bridge-opencode');
     fs.mkdirSync(schemaDir, { recursive: true });
@@ -398,10 +398,9 @@ test('棕地：schemas 非空时询问，答 y 时 schema 被覆盖', async (t) 
     });
 
     assert.equal(result.success, true);
-    assert.equal(prompts.length, 1, 'schemas 非空时必须询问且只问一次');
-    assert.match(prompts[0], /openspec/i);
+    assert.equal(prompts.length, 0, '没有 config.yaml 时 openspec 不得触发任何询问');
     const content = fs.readFileSync(path.join(schemaDir, 'schema.yaml'), 'utf8');
-    assert.notEqual(content, 'stale: true\n', 'schema 必须被模板覆盖');
+    assert.notEqual(content, 'stale: true\n', 'schema 必须被模板无条件覆盖');
 });
 
 test('棕地：BROWN_OVERRIDE_OPENSPEC 优先于目标状态判定', async (t) => {
@@ -500,7 +499,32 @@ test('棕地首次 init：无 commands 目录时部署全部模板命令', async
     }
 });
 
-test('棕地已有 commands 且答 n 时文件不变', async (t) => {
+test('棕地已有 commands 且未设置开关时被覆盖为模板渲染', async (t) => {
+    const targetDir = seedBrownfield(t);
+    const superpowersPath = makeSuperpowers(t);
+    const commandsDir = path.join(targetDir, '.opencode', 'commands');
+    fs.mkdirSync(commandsDir, { recursive: true });
+    fs.writeFileSync(path.join(commandsDir, 'opsx-ff.md'), '# 我的自定义命令\n');
+
+    const result = await initProject({
+        targetDir,
+        templateDir,
+        superpowersPath,
+        runner: initRunner(),
+        lang: 'en',
+        shimDeps: ACTIVE_SHIM,
+        env: { ...BROWN_ENV, BROWN_OVERRIDE_COMMANDS: undefined },
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(
+        fs.readFileSync(path.join(commandsDir, 'opsx-ff.md'), 'utf8'),
+        renderTemplate('.opencode/commands/opsx-ff.md', superpowersPath),
+        '未设置开关时既有 command 必须被模板渲染覆盖',
+    );
+});
+
+test('棕地已有 commands 且设置 BROWN_OVERRIDE_COMMANDS=no 时文件不变', async (t) => {
     const targetDir = seedBrownfield(t);
     const commandsDir = path.join(targetDir, '.opencode', 'commands');
     fs.mkdirSync(commandsDir, { recursive: true });

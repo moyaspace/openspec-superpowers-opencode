@@ -239,6 +239,41 @@ describe('setup public API', () => {
         assert.equal(result.projectKind, 'brownfield');
     });
 
+    it('does not prompt for commands when the override is unset', async (t) => {
+        const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-brown-default-'));
+        const targetDir = path.join(parentDir, 'project');
+        const superpowersPath = path.join(parentDir, 'superpowers', 'skills');
+        const existingCommand = path.join(targetDir, '.opencode', 'commands', 'opsx-ff.md');
+        const prompts = [];
+        t.after(() => fs.rmSync(parentDir, { recursive: true, force: true }));
+        fs.mkdirSync(path.join(targetDir, 'openspec'), { recursive: true });
+        fs.writeFileSync(path.join(targetDir, 'openspec', 'config.yaml'), 'user config');
+        fs.mkdirSync(path.dirname(existingCommand), { recursive: true });
+        fs.writeFileSync(existingCommand, 'user command');
+        fs.mkdirSync(superpowersPath, { recursive: true });
+        fs.writeFileSync(path.join(path.dirname(superpowersPath), 'package.json'), JSON.stringify({ version: '6.1.1' }));
+
+        const result = await setup.dryRunProject({
+            targetDir,
+            templateDir: path.resolve(__dirname, '..', 'template'),
+            shimDeps: ACTIVE_SHIM,
+            superpowersPath,
+            runner: { run: () => ({ code: 0, stdout: '1.0.0', stderr: '' }) },
+            env: {
+                BROWN_OVERRIDE_INIT: 'yes',
+                BROWN_OVERRIDE_OPENSPEC: 'no',
+            },
+            prompt: async question => {
+                prompts.push(question);
+                throw new Error(`unexpected prompt: ${question}`);
+            },
+        });
+        const operation = result.operations.find(candidate => candidate.target === existingCommand);
+
+        assert.equal(prompts.length, 0);
+        assert.equal(operation.type, 'write');
+    });
+
     it('collects per-file command decisions when the brownfield mode is ask', async (t) => {
         const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-brown-ask-'));
         const targetDir = path.join(parentDir, 'project');
@@ -266,12 +301,12 @@ describe('setup public API', () => {
             },
             prompt: async question => {
                 prompts.push(question);
-                return 'yes';
+                return 'no';
             },
         });
         const operation = result.operations.find(candidate => candidate.target === existingCommand);
 
-        assert.equal(operation.type, 'write');
-        assert.equal(prompts.length, 1);
+        assert.ok(prompts.length >= 1);
+        assert.equal(operation.type, 'preserve');
     });
 });
