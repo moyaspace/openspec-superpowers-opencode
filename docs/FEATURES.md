@@ -133,7 +133,7 @@ OPSX 命令 (WHEN - 流程编排)
 | 变量 | 控制对象 | 可选值 |
 |------|---------|--------|
 | `BROWN_OVERRIDE_INIT` | 是否继续完整初始化棕地项目 | yes / no |
-| `BROWN_OVERRIDE_OPENSPEC` | 是否覆盖 `openspec/config.yaml + schemas/` | yes / no |
+| `BROWN_OVERRIDE_OPENSPEC` | 是否覆盖 `openspec/config.yaml`（`schemas/` 属产品资产，始终刷新） | yes / no |
 | `BROWN_OVERRIDE_OCODEJSON` | 是否合并 `.opencode/opencode.json` | yes / no |
 | `BROWN_OVERRIDE_COMMANDS` | 是否覆盖 `.opencode/commands/`（OSO 产品资产，**未设置时默认随版本刷新**） | 未设置时覆盖 / yes / no / ask |
 | `BROWN_OVERRIDE_SKILLS` | 是否覆盖 `.opencode/skills/`（OSO 产品资产，**未设置时默认随版本刷新**） | 未设置时覆盖 / yes / no / ask |
