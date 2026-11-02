@@ -274,6 +274,44 @@ describe('setup public API', () => {
         assert.equal(operation.type, 'write');
     });
 
+    it('treats a blank BROWN_OVERRIDE_COMMANDS as unset (no prompt, default refresh)', async (t) => {
+        for (const blank of ['', '   ']) {
+            const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-brown-blank-'));
+            const targetDir = path.join(parentDir, 'project');
+            const superpowersPath = path.join(parentDir, 'superpowers', 'skills');
+            const existingCommand = path.join(targetDir, '.opencode', 'commands', 'opsx-ff.md');
+            const prompts = [];
+            t.after(() => fs.rmSync(parentDir, { recursive: true, force: true }));
+            fs.mkdirSync(path.join(targetDir, 'openspec'), { recursive: true });
+            fs.writeFileSync(path.join(targetDir, 'openspec', 'config.yaml'), 'user config');
+            fs.mkdirSync(path.dirname(existingCommand), { recursive: true });
+            fs.writeFileSync(existingCommand, 'user command');
+            fs.mkdirSync(superpowersPath, { recursive: true });
+            fs.writeFileSync(path.join(path.dirname(superpowersPath), 'package.json'), JSON.stringify({ version: '6.1.1' }));
+
+            const result = await setup.dryRunProject({
+                targetDir,
+                templateDir: path.resolve(__dirname, '..', 'template'),
+                shimDeps: ACTIVE_SHIM,
+                superpowersPath,
+                runner: { run: () => ({ code: 0, stdout: '1.0.0', stderr: '' }) },
+                env: {
+                    BROWN_OVERRIDE_INIT: 'yes',
+                    BROWN_OVERRIDE_OPENSPEC: 'no',
+                    BROWN_OVERRIDE_COMMANDS: blank,
+                },
+                prompt: async question => {
+                    prompts.push(question);
+                    throw new Error(`unexpected prompt: ${question}`);
+                },
+            });
+            const operation = result.operations.find(candidate => candidate.target === existingCommand);
+
+            assert.equal(prompts.length, 0, `空白 override ${JSON.stringify(blank)} 不得触发询问`);
+            assert.equal(operation.type, 'write', `空白 override ${JSON.stringify(blank)} 必须默认覆盖`);
+        }
+    });
+
     it('collects per-file command decisions when the brownfield mode is ask', async (t) => {
         const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-brown-ask-'));
         const targetDir = path.join(parentDir, 'project');

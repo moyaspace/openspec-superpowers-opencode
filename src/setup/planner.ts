@@ -97,7 +97,6 @@ const isOpenSpecData = (p: string): boolean => p.startsWith('openspec/changes/')
 const isOpenSpecSchema = (p: string): boolean => p.startsWith('openspec/schemas/');
 const isCommand = (p: string): boolean => p.startsWith('.opencode/commands/');
 const isSkill = (p: string): boolean => p.startsWith('.opencode/skills/');
-const isProductAsset = (p: string): boolean => isOpenSpecSchema(p) || isCommand(p) || isSkill(p);
 
 function createInitPlan(context: InitContext): InitPlan {
     const operations: PlanOperation[] = [];
@@ -151,12 +150,15 @@ function createInitPlan(context: InitContext): InitPlan {
                 continue;
             }
             const templateJson = JSON.parse(fs.readFileSync(source, 'utf8')) as Record<string, unknown>;
-            const userJson = JSON.parse(fs.readFileSync(target, 'utf8')) as Record<string, unknown>;
+            const existing = fs.readFileSync(target, 'utf8');
+            const userJson = JSON.parse(existing) as Record<string, unknown>;
+            const mergedContent = `${JSON.stringify(mergeOcodeJson(userJson, templateJson), null, 2)}\n`;
             operations.push({
                 type: 'write',
                 target,
-                content: `${JSON.stringify(mergeOcodeJson(userJson, templateJson), null, 2)}\n`,
+                content: mergedContent,
                 decision: 'overwrite',
+                changed: mergedContent !== existing,
             });
             continue;
         }
@@ -193,8 +195,9 @@ function createInitPlan(context: InitContext): InitPlan {
         const target = path.join(context.targetDir, targetName);
         const content = renderedTemplate(source, context.superpowersPath);
         if (brownfield && fs.existsSync(target)) {
+            const existing = fs.readFileSync(target, 'utf8');
             const merged = mergeMarker({
-                existing: fs.readFileSync(target, 'utf8'),
+                existing,
                 managed: content,
                 marker: MANAGED_MARKERS[sourceName as ManagedFileName]!,
                 decision: decisions[MANAGED_DECISIONS[sourceName as ManagedFileName]!] as string | undefined,
@@ -204,9 +207,10 @@ function createInitPlan(context: InitContext): InitPlan {
                 target,
                 content: merged.content,
                 decision: merged.action === 'skip' ? 'skip' : merged.action,
+                changed: merged.content !== existing,
             });
         } else {
-            operations.push({ type: 'write', target, content });
+            operations.push({ type: 'write', target, content, changed: false });
         }
     }
 

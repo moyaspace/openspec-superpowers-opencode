@@ -43,7 +43,8 @@ function initRunner() {
                 return { code: 0, signal: null, stdout: '', stderr: '' };
             }
             if (program === 'openspec' && args[0] === 'schema') {
-                const cwd = options.cwd ?? process.cwd();
+                if (!options.cwd) throw new Error('schema mock requires cwd');
+                const cwd = options.cwd;
                 const schemaFile = path.join(cwd, 'openspec', 'schemas', 'superpowers-bridge-opencode', 'schema.yaml');
                 return fs.existsSync(schemaFile)
                     ? { code: 0, signal: null, stdout: '', stderr: '' }
@@ -562,7 +563,7 @@ test('假 runner：schema.yaml 缺失时 7/8 必须失败（BUG021 反证）', a
             targetDir, templateDir, superpowersPath: makeSuperpowers(t),
             runner, lang: 'en', shimDeps: ACTIVE_SHIM, env: { ...BROWN_ENV },
         }),
-        /schema-validation failed/,
+        /schema-validation failed: Schema not found/,
     );
 });
 
@@ -670,6 +671,32 @@ test('升级可见性：恰好 10 条「已更新：」', async (t) => {
         );
     }
     assert.equal(error, null, `init 必须成功：${error ? error.message : '无'}`);
+});
+
+test('升级可见性：受管根文件托管区块内容变化时输出「已更新：AGENTS.md」', async (t) => {
+    const targetDir = seedBrownfield(t);
+    const agents = `# 我的项目\n\n${AGENTS_MARKER}\n旧版托管内容\n${AGENTS_MARKER}\n`;
+    fs.writeFileSync(path.join(targetDir, 'AGENTS.md'), agents);
+    const events = [];
+
+    const result = await initProject({
+        targetDir,
+        templateDir,
+        superpowersPath: makeSuperpowers(t),
+        runner: initRunner(),
+        lang: 'zh-CN',
+        shimDeps: ACTIVE_SHIM,
+        progress: event => events.push(event),
+        env: { ...BROWN_ENV },
+    });
+
+    assert.equal(result.success, true);
+    assert.ok(
+        events.some(event => event.type === 'action'
+            && (event.text || '').startsWith('已更新：')
+            && (event.text || '').includes('AGENTS.md')),
+        `受管区块内容变化必须输出「已更新：AGENTS.md」，实际事件：${JSON.stringify(events.filter(event => event.type === 'action'))}`,
+    );
 });
 
 test('用户自建命令不被覆盖、不被删除', async (t) => {

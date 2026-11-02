@@ -125,4 +125,41 @@ describe('createInitPlan', () => {
         assert.equal(merged.customSetting, true);
         assert.equal(merged.permission.edit['user/**'], 'allow');
     });
+
+    it('applies skills refresh decisions on a fake template', (t) => {
+        const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-plan-skills-'));
+        const targetDir = path.join(parentDir, 'project');
+        const fakeTemplate = path.join(parentDir, 'template');
+        const skillRelative = '.opencode/skills/demo/SKILL.md';
+        t.after(() => fs.rmSync(parentDir, { recursive: true, force: true }));
+
+        fs.mkdirSync(path.join(fakeTemplate, '.opencode', 'skills', 'demo'), { recursive: true });
+        fs.writeFileSync(path.join(fakeTemplate, ...skillRelative.split('/')), 'name: demo\n');
+        fs.mkdirSync(targetDir, { recursive: true });
+        fs.writeFileSync(path.join(targetDir, 'seed.txt'), 'existing');
+
+        const context = createContext({ targetDir, templateDir: fakeTemplate, mode: 'init' });
+        assert.equal(context.projectKind, 'brownfield');
+        const skillOperation = plan => plan.operations.find(operation => (
+            operation.target
+            && path.relative(targetDir, operation.target).replace(/\\/g, '/') === skillRelative
+        ));
+
+        const planDefault = createInitPlan({ ...context, lang: 'en' });
+        assert.equal(skillOperation(planDefault).type, 'write', '未设置决策时必须默认刷新');
+
+        const targetSkill = path.join(targetDir, ...skillRelative.split('/'));
+        fs.mkdirSync(path.dirname(targetSkill), { recursive: true });
+        fs.writeFileSync(targetSkill, 'user skill\n');
+
+        const planNo = createInitPlan({ ...context, lang: 'en', decisions: { skills: 'no' } });
+        assert.equal(skillOperation(planNo).type, 'preserve', 'skills=no 时必须保留已有文件');
+
+        const planAskYes = createInitPlan({
+            ...context,
+            lang: 'en',
+            decisions: { skills: 'ask', skillFiles: { [skillRelative]: 'yes' } },
+        });
+        assert.equal(skillOperation(planAskYes).type, 'write', 'skills=ask + 逐文件 yes 时必须覆盖');
+    });
 });
