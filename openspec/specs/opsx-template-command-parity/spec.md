@@ -1,7 +1,7 @@
 # opsx-template-command-parity Specification
 
 ## Purpose
-TBD - created by archiving change oso-template-base-branch. Update Purpose after archive.
+本 capability 保证模板版 `opsx-propose` / `opsx-ff` 与生产版在完整产物生成循环、输出格式与 Artifact Creation Guidelines 上的一致性，同时明确 `opsx-new` 仅做脚手架、不生成全量产物。
 ## Requirements
 ### Requirement: Propose and ff generate the full artifact set until apply requirements are done
 

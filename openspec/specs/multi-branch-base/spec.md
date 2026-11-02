@@ -1,7 +1,7 @@
 # multi-branch-base Specification
 
 ## Purpose
-TBD - created by archiving change oso-template-base-branch. Update Purpose after archive.
+本 capability 定义 change 的基础分支如何被创建命令（propose / ff / new）在 worktree 存在前捕获并写入注册表、如何经 `openspec list --json` 暴露，以及 finish 如何据此确定合并方向且禁止默认落到 `main`。
 ## Requirements
 ### Requirement: Creating commands record the base branch in the registry
 

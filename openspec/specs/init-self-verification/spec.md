@@ -1,7 +1,7 @@
 # init-self-verification Specification
 
 ## Purpose
-TBD - created by archiving change oso-v1-defect-backport. Update Purpose after archive.
+本 capability 定义 `oso init` 的 8/8 自检如何借助临时 change 与改动注册表验证 openspec 集成，并保证注册、失败与清理路径都不留下临时条目或目录。
 ## Requirements
 ### Requirement: 8/8 自检 MUST 将临时 change 写入注册表
 

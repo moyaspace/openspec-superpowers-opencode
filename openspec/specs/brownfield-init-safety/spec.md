@@ -1,7 +1,7 @@
 # brownfield-init-safety Specification
 
 ## Purpose
-TBD - created by archiving change oso-v1-defect-backport. Update Purpose after archive.
+本 capability 定义 `oso init` 在棕地项目上的安全边界：受管根文件保留用户原有内容、OSO 产品资产默认刷新、`BROWN_OVERRIDE_*` 三档开关语义不变，以及升级时输出被更新文件的可见性。
 ## Requirements
 ### Requirement: 棕地受管根文件 MUST 保留用户原有内容
 

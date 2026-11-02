@@ -1,7 +1,7 @@
 # opsx-finish-test-dispatch Specification
 
 ## Purpose
-TBD - created by archiving change oso-template-base-branch. Update Purpose after archive.
+本 capability 约束 `/opsx-finish` 的全量测试分派：优先采用项目自带的测试入口、候选冲突时询问用户、区分环境性失败与代码回归，并禁止模板泄漏机器本地绝对路径。
 ## Requirements
 ### Requirement: Test command dispatch prefers project-declared entry
 

@@ -1,7 +1,7 @@
 # typescript-esm-build-baseline Specification
 
 ## Purpose
-TBD - created by archiving change oso-typescript-esm-foundation-and-host-feasibility. Update Purpose after archive.
+本 capability 定义仓库的严格 TypeScript 与 ESM 构建基线：`tsconfig` 的严格选项、`dist/` 构建产物形态、版本组合冻结，以及 `typecheck` / `build` / `test` / `prepack` 的脚本语义。
 ## Requirements
 ### Requirement: 严格 TypeScript 类型检查与 ESM 构建基线
 

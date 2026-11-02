@@ -1,7 +1,7 @@
 # dual-esm-entry-isolation Specification
 
 ## Purpose
-TBD - created by archiving change oso-typescript-esm-foundation-and-host-feasibility. Update Purpose after archive.
+本 capability 约束同一 ESM 包内 CLI 入口与 OpenCode 插件入口的隔离：加载任一侧不得触发另一侧的初始化、Hook 注册或文件修改，并验证 npm tarball 安装不产生预期外的项目副作用。
 ## Requirements
 ### Requirement: CLI 与插件入口隔离
 

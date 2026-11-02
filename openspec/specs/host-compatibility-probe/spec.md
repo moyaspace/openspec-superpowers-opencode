@@ -1,7 +1,7 @@
 # host-compatibility-probe Specification
 
 ## Purpose
-TBD - created by archiving change oso-typescript-esm-foundation-and-host-feasibility. Update Purpose after archive.
+本 capability 定义 Host Compatibility Probe——用真实 OpenCode 宿主而非测试替身验证插件依赖的能力（Hook 触发、工具调用、消息标识、await 语义），并以三分法能力矩阵作为宿主行为的事实基线。
 ## Requirements
 ### Requirement: 真实宿主探测程序
 

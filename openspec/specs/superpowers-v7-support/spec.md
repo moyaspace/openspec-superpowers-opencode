@@ -1,7 +1,7 @@
 # superpowers-v7-support Specification
 
 ## Purpose
-TBD - created by archiving change oso-superpowers-v7. Update Purpose after archive.
+本 capability 定义 Superpowers v7 的支持面：v7 锁清单基线与其 hash 校验、v6 及更高版本 `opsx-apply` 委托上游 subagent-driven-development 的口径，以及 v5 分支保持、bash 可用性检查、分发清单与兼容文档的配套要求。
 ## Requirements
 ### Requirement: v7 锁清单基线
 

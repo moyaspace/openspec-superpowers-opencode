@@ -1,7 +1,7 @@
 # init-shim-selfcheck Specification
 
 ## Purpose
-TBD - created by archiving change oso-v1-defect-backport. Update Purpose after archive.
+本 capability 定义 `oso init` 启动时对 openspec 垫片的自检、自动修复，以及无写权限时中止并给出手动命令的行为。
 ## Requirements
 ### Requirement: init MUST 自检 openspec 垫片并自动修复
 

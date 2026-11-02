@@ -1,7 +1,7 @@
 # behavior-equivalence-migration Specification
 
 ## Purpose
-TBD - created by archiving change oso-typescript-esm-foundation-and-host-feasibility. Update Purpose after archive.
+本 capability 定义从 CommonJS 迁移到 TypeScript + ESM 期间的行为锁定方法：先用行为刻画测试固定既有可观察行为，再按依赖顺序逐组等价迁移，确保迁移只改变实现形态，而不改变 CLI、setup、registry、worktree、shim 与 verify 的对外行为。
 ## Requirements
 ### Requirement: 迁移前行为刻画测试
 

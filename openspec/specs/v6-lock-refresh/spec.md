@@ -1,7 +1,7 @@
 # v6-lock-refresh Specification
 
 ## Purpose
-TBD - created by archiving change oso-superpowers-v7. Update Purpose after archive.
+本 capability 定义 Superpowers v6 锁清单刷新到 v6.4.2 的基线要求与其 hash 校验方式，并明确 v5 锁清单不在本范围内改动。
 ## Requirements
 ### Requirement: v6 锁清单基线刷新到 v6.4.2
 

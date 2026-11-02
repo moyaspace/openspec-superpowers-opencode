@@ -1,7 +1,7 @@
 # deployment-post-verify Specification
 
 ## Purpose
-TBD - created by archiving change oso-v1-defect-backport. Update Purpose after archive.
+本 capability 定义 `oso init` 在返回成功前的部署后自检：模板命令文件必须全部落盘、CLI 入口必须可加载，且验证失败只报错、不回滚已部署文件。
 ## Requirements
 ### Requirement: init MUST 在成功返回前验证模板命令齐全
 

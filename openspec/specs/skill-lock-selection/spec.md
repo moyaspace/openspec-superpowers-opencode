@@ -1,7 +1,7 @@
 # skill-lock-selection Specification
 
 ## Purpose
-TBD - created by archiving change oso-superpowers-v7. Update Purpose after archive.
+本 capability 定义 `selectLockFile` 的锁清单选择规则：按 Superpowers 主版本精确匹配 `skills.lock.v<major>.json`，无精确匹配时拒绝跨主版本回退，并在越界时给出可读原因且跳过完整性校验。
 ## Requirements
 ### Requirement: 锁清单选择精确匹配优先
 
