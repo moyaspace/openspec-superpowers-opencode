@@ -5,6 +5,7 @@ export interface PlanOperation {
     source?: string;
     content?: string;
     decision?: string | undefined;
+    changed?: boolean;
 }
 export interface InitDecisions {
     openspec?: string | undefined;

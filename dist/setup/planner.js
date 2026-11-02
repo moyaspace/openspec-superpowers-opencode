@@ -47,6 +47,11 @@ function renderedTemplate(source, superpowersPath) {
     const replacement = superpowersPath.endsWith(path.sep) ? superpowersPath : `${superpowersPath}${path.sep}`;
     return content.split('{{SUPERPOWERS_BASE_PATH}}').join(replacement);
 }
+const isOpenSpecData = (p) => p.startsWith('openspec/changes/') || p.startsWith('openspec/specs/');
+const isOpenSpecSchema = (p) => p.startsWith('openspec/schemas/');
+const isCommand = (p) => p.startsWith('.opencode/commands/');
+const isSkill = (p) => p.startsWith('.opencode/skills/');
+const isProductAsset = (p) => isOpenSpecSchema(p) || isCommand(p) || isSkill(p);
 function createInitPlan(context) {
     const operations = [];
     const brownfield = context.projectKind === 'brownfield';
@@ -79,11 +84,15 @@ function createInitPlan(context) {
             continue;
         const source = path.join(context.templateDir, relativePath);
         const target = path.join(context.targetDir, relativePath);
-        if (brownfield && (portablePath.startsWith('openspec/changes/') || portablePath.startsWith('openspec/specs/'))) {
+        if (brownfield && isOpenSpecData(portablePath)) {
             operations.push({ type: 'preserve', target, decision: 'skip' });
             continue;
         }
-        if (brownfield && portablePath.startsWith('openspec/') && decisions.openspec !== 'yes') {
+        if (brownfield
+            && portablePath.startsWith('openspec/')
+            && !isOpenSpecSchema(portablePath)
+            && fs.existsSync(target)
+            && decisions.openspec !== 'yes') {
             operations.push({ type: 'preserve', target, decision: 'skip' });
             continue;
         }
@@ -102,29 +111,30 @@ function createInitPlan(context) {
             });
             continue;
         }
-        if (brownfield
-            && portablePath.startsWith('.opencode/commands/')
-            && fs.existsSync(target)
-            && (decisions.commands === 'ask'
-                ? decisions.commandFiles && decisions.commandFiles[portablePath] !== 'yes'
-                : decisions.commands !== 'yes')) {
+        const keepCommand = decisions.commands === 'no'
+            || (decisions.commands === 'ask'
+                && decisions.commandFiles
+                && decisions.commandFiles[portablePath] !== 'yes');
+        if (brownfield && isCommand(portablePath) && fs.existsSync(target) && keepCommand) {
             operations.push({ type: 'preserve', target, decision: 'skip' });
             continue;
         }
-        if (brownfield
-            && portablePath.startsWith('.opencode/skills/')
-            && fs.existsSync(target)
-            && (decisions.skills === 'ask'
-                ? decisions.skillFiles && decisions.skillFiles[portablePath] !== 'yes'
-                : decisions.skills !== 'yes')) {
+        const keepSkill = decisions.skills === 'no'
+            || (decisions.skills === 'ask'
+                && decisions.skillFiles
+                && decisions.skillFiles[portablePath] !== 'yes');
+        if (brownfield && isSkill(portablePath) && fs.existsSync(target) && keepSkill) {
             operations.push({ type: 'preserve', target, decision: 'skip' });
             continue;
         }
+        const existing = brownfield && fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
+        const content = renderedTemplate(source, context.superpowersPath);
         operations.push({
             type: 'write',
             target,
-            content: renderedTemplate(source, context.superpowersPath),
-            decision: brownfield && fs.existsSync(target) ? 'overwrite' : undefined,
+            content,
+            decision: existing === null ? undefined : 'overwrite',
+            changed: existing !== null && existing !== content,
         });
     }
     for (const [sourceName, targetName] of Object.entries(MANAGED_ROOT_FILES)) {
