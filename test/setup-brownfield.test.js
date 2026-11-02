@@ -37,10 +37,17 @@ function initRunner() {
     const calls = [];
     return {
         calls,
-        run(program, args = []) {
+        run(program, args = [], options = {}) {
             calls.push({ program, args });
             if (program === 'git') {
                 return { code: 0, signal: null, stdout: '', stderr: '' };
+            }
+            if (program === 'openspec' && args[0] === 'schema') {
+                const cwd = options.cwd ?? process.cwd();
+                const schemaFile = path.join(cwd, 'openspec', 'schemas', 'superpowers-bridge-opencode', 'schema.yaml');
+                return fs.existsSync(schemaFile)
+                    ? { code: 0, signal: null, stdout: '', stderr: '' }
+                    : { code: 1, signal: null, stdout: '', stderr: 'Schema not found' };
             }
             if (program === 'openspec' && args[0] === 'templates') {
                 return { code: 0, signal: null, stdout: JSON.stringify(Array.from({ length: 8 }, () => ({ source: 'project' }))), stderr: '' };
@@ -286,6 +293,9 @@ test('棕地：已有 openspec/config.yaml 时仍询问，答 n 时文件不变'
     fs.mkdirSync(path.join(targetDir, 'openspec'), { recursive: true });
     const existingConfig = 'schema: spec-driven\n';
     fs.writeFileSync(path.join(targetDir, 'openspec', 'config.yaml'), existingConfig);
+    const schemaDir = path.join(targetDir, 'openspec', 'schemas', 'superpowers-bridge-opencode');
+    fs.mkdirSync(schemaDir, { recursive: true });
+    fs.writeFileSync(path.join(schemaDir, 'schema.yaml'), 'existing: true\n');
     const prompts = [];
 
     const result = await initProject({
@@ -451,4 +461,25 @@ test('棕地已有 commands 且答 n 时文件不变', async (t) => {
 
     assert.equal(result.success, true);
     assert.equal(fs.readFileSync(path.join(commandsDir, 'opsx-ff.md'), 'utf8'), existing);
+});
+
+test('假 runner：schema.yaml 缺失时 7/8 必须失败（BUG021 反证）', async (t) => {
+    const targetDir = seedBrownfield(t);
+    const runner = initRunner();
+    // 在 schema validate 之前删掉 schema.yaml，模拟 BUG021 的落盘缺失
+    const originalRun = runner.run.bind(runner);
+    runner.run = (program, args = [], options = {}) => {
+        if (program === 'openspec' && args[0] === 'schema') {
+            fs.rmSync(path.join(options.cwd, 'openspec/schemas/superpowers-bridge-opencode/schema.yaml'), { force: true });
+        }
+        return originalRun(program, args, options);
+    };
+
+    await assert.rejects(
+        () => initProject({
+            targetDir, templateDir, superpowersPath: makeSuperpowers(t),
+            runner, lang: 'en', shimDeps: ACTIVE_SHIM, env: { ...BROWN_ENV },
+        }),
+        /schema-validation failed/,
+    );
 });
