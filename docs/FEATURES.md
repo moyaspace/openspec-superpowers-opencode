@@ -133,10 +133,10 @@ OPSX 命令 (WHEN - 流程编排)
 | 变量 | 控制对象 | 可选值 |
 |------|---------|--------|
 | `BROWN_OVERRIDE_INIT` | 是否继续完整初始化棕地项目 | yes / no |
-| `BROWN_OVERRIDE_OPENSPEC` | 是否覆盖 `openspec/config.yaml`（`schemas/` 属产品资产，始终刷新） | yes / no |
+| `BROWN_OVERRIDE_OPENSPEC` | 是否覆盖 `openspec/config.yaml`（`schemas/` 属产品资产，始终用当前版本覆盖） | yes / no |
 | `BROWN_OVERRIDE_OCODEJSON` | 是否合并 `.opencode/opencode.json` | yes / no |
-| `BROWN_OVERRIDE_COMMANDS` | 是否覆盖 `.opencode/commands/`（OSO 产品资产，**未设置时默认随版本刷新**） | 未设置时覆盖 / yes / no / ask |
-| `BROWN_OVERRIDE_SKILLS` | 是否覆盖 `.opencode/skills/`（OSO 产品资产，**未设置时默认随版本刷新**） | 未设置时覆盖 / yes / no / ask |
+| `BROWN_OVERRIDE_COMMANDS` | 是否覆盖 `.opencode/commands/`（OSO 产品资产，**未设置时默认用当前版本覆盖**） | 未设置时覆盖 / yes / no / ask |
+| `BROWN_OVERRIDE_SKILLS` | 是否覆盖 `.opencode/skills/`（OSO 产品资产，**未设置时默认用当前版本覆盖**） | 未设置时覆盖 / yes / no / ask |
 | `BROWN_OVERRIDE_AGENTS` | 是否替换 AGENTS.md 托管区块 | yes / no |
 | `BROWN_OVERRIDE_GITIGNORE` | 是否替换 `.gitignore` 托管区块 | yes / no |
 | `BROWN_OVERRIDE_GITATTR` | 是否替换 `.gitattributes` 托管区块 | yes / no |
@@ -148,7 +148,7 @@ OPSX 命令 (WHEN - 流程编排)
 - **no** — 已有文件跳过，新文件部署
 - **ask** — 逐文件交互式询问
 
-commands / skills 属 OSO 产品资产，升级时应随版本刷新，因此**未设置 `BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 时默认覆盖**；需要保留本地修改时显式设 `no`（或设 `ask` 逐文件询问）。
+commands / skills 属 OSO 产品资产，升级时默认用当前版本覆盖——**未设置 `BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 时就是覆盖**；需要保留本地修改时显式设 `no`（或设 `ask` 逐文件询问）。
 
 ### 5.3 智能合并
 
