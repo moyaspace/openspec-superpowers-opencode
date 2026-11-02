@@ -231,12 +231,12 @@ async function collectBrownfieldDecisions(options) {
     }
     else {
         decisions.openspec = 'yes';
-        p({ type: 'info', text: t('openspec/ 不存在，已部署', 'openspec/ not found, deployed') });
+        p({ type: 'info', text: t('openspec/config.yaml 不存在，已部署', 'openspec/config.yaml not found, deployed') });
     }
     if (fs.existsSync(path.join(targetDir, '.opencode', 'opencode.json'))) {
         decisions.opencodeJson = await tDecide('BROWN_OVERRIDE_OCODEJSON', '合并 .opencode/opencode.json？', 'Merge .opencode/opencode.json?');
     }
-    const commandOverride = env.BROWN_OVERRIDE_COMMANDS;
+    const commandOverride = env.BROWN_OVERRIDE_COMMANDS?.trim() || undefined;
     if (hasEntries(path.join(targetDir, '.opencode', 'commands')) && commandOverride !== undefined) {
         decisions.commands = await tDecide('BROWN_OVERRIDE_COMMANDS', '覆盖 commands？', 'Overwrite commands?', true);
         if (decisions.commands === 'ask') {
@@ -253,7 +253,7 @@ async function collectBrownfieldDecisions(options) {
             }
         }
     }
-    const skillOverride = env.BROWN_OVERRIDE_SKILLS;
+    const skillOverride = env.BROWN_OVERRIDE_SKILLS?.trim() || undefined;
     if (hasEntries(path.join(targetDir, '.opencode', 'skills')) && skillOverride !== undefined) {
         decisions.skills = await tDecide('BROWN_OVERRIDE_SKILLS', '覆盖 skills？', 'Overwrite skills?', true);
         if (decisions.skills === 'ask') {
@@ -627,11 +627,11 @@ async function initProject(options = {}) {
                 p({ type: 'info', text: `- ${rel} (skip)` });
                 continue;
             }
-            if (op.type === 'write' && op.changed) {
+            if (op.type === 'write' && op.changed === true) {
                 p({ type: 'action', text: `${t('已更新：', 'Updated: ')}${rel}` });
                 continue;
             }
-            if (op.type === 'write' && op.decision === 'overwrite' && op.changed === false)
+            if (op.type === 'write' && op.decision !== undefined && op.decision !== 'create' && op.changed !== true)
                 continue;
             p({ type: 'pass', item: rel });
         }

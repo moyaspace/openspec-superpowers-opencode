@@ -51,7 +51,6 @@ const isOpenSpecData = (p) => p.startsWith('openspec/changes/') || p.startsWith(
 const isOpenSpecSchema = (p) => p.startsWith('openspec/schemas/');
 const isCommand = (p) => p.startsWith('.opencode/commands/');
 const isSkill = (p) => p.startsWith('.opencode/skills/');
-const isProductAsset = (p) => isOpenSpecSchema(p) || isCommand(p) || isSkill(p);
 function createInitPlan(context) {
     const operations = [];
     const brownfield = context.projectKind === 'brownfield';
@@ -102,12 +101,15 @@ function createInitPlan(context) {
                 continue;
             }
             const templateJson = JSON.parse(fs.readFileSync(source, 'utf8'));
-            const userJson = JSON.parse(fs.readFileSync(target, 'utf8'));
+            const existing = fs.readFileSync(target, 'utf8');
+            const userJson = JSON.parse(existing);
+            const mergedContent = `${JSON.stringify(mergeOcodeJson(userJson, templateJson), null, 2)}\n`;
             operations.push({
                 type: 'write',
                 target,
-                content: `${JSON.stringify(mergeOcodeJson(userJson, templateJson), null, 2)}\n`,
+                content: mergedContent,
                 decision: 'overwrite',
+                changed: mergedContent !== existing,
             });
             continue;
         }
@@ -144,8 +146,9 @@ function createInitPlan(context) {
         const target = path.join(context.targetDir, targetName);
         const content = renderedTemplate(source, context.superpowersPath);
         if (brownfield && fs.existsSync(target)) {
+            const existing = fs.readFileSync(target, 'utf8');
             const merged = mergeMarker({
-                existing: fs.readFileSync(target, 'utf8'),
+                existing,
                 managed: content,
                 marker: MANAGED_MARKERS[sourceName],
                 decision: decisions[MANAGED_DECISIONS[sourceName]],
@@ -155,10 +158,11 @@ function createInitPlan(context) {
                 target,
                 content: merged.content,
                 decision: merged.action === 'skip' ? 'skip' : merged.action,
+                changed: merged.content !== existing,
             });
         }
         else {
-            operations.push({ type: 'write', target, content });
+            operations.push({ type: 'write', target, content, changed: false });
         }
     }
     return {

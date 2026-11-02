@@ -134,9 +134,9 @@ main 目录（仓库）                 worktree（AI 办公室）
 
 | 文件                              | 属于目标项目？  | 行为                      | 部署方式                               |
 | --------------------------------- | :-------------: | ------------------------- | -------------------------------------- |
-| `.opencode/commands/`             |       ✅        | 需要，工作流入口          | 不覆盖，不存在才复制                   |
-| `.opencode/skills/`               |       ✅        | 需要，OPSX skill 定义     | 不覆盖，不存在才复制                   |
-| `.opencode/opencode.json`         |       ✅        | 需要，AI 权限规则         | 不覆盖，不存在才复制                   |
+| `.opencode/commands/`             |       ✅        | 需要，工作流入口          | 产品资产，升级默认随版本刷新（未设置→覆盖，`no`→保留，`ask`→逐文件） |
+| `.opencode/skills/`               |       ✅        | 需要，OPSX skill 定义     | 产品资产，升级默认随版本刷新（未设置→覆盖，`no`→保留，`ask`→逐文件） |
+| `.opencode/opencode.json`         |       ✅        | 需要，AI 权限规则         | 不存在才创建；存在时按 `BROWN_OVERRIDE_OCODEJSON` 决定合并 / 保留 |
 | `.opencode/install-manifest.json` |  ❌ 包管理数据  | 仅 reset 用，对项目透明   | 总是写入（记录实际安装文件）           |
 | `openspec/changes/`               |       ✅        | 需要，用户变更数据        | 不存在才创建空目录                     |
 | `openspec/specs/`                 |       ✅        | 需要，用户规格文档        | 不存在才创建空目录                     |

@@ -176,7 +176,7 @@ Brownfield project. Continue with full init?
 
 | 范围 | 环境变量 | 行为 |
 |------|----------|------|
-| 整个 `openspec/`（config + schemas） | `BROWN_OVERRIDE_OPENSPEC` | `yes` 部署并覆盖；否则全部跳过 |
+| `openspec/config.yaml` | `BROWN_OVERRIDE_OPENSPEC` | 不存在时直接部署；存在时询问，`yes` 覆盖；`openspec/schemas/` 属产品资产始终刷新 |
 | `.opencode/opencode.json` | `BROWN_OVERRIDE_OCODEJSON` | 文件存在时询问；`yes` 合并，否则保留 |
 | `.opencode/commands/` | `BROWN_OVERRIDE_COMMANDS` | `yes`/`no`/`ask`，`ask` 时逐个冲突文件询问 |
 | `.opencode/skills/` | `BROWN_OVERRIDE_SKILLS` | 同上 |
@@ -195,7 +195,7 @@ Brownfield project. Continue with full init?
 计划生成在 `lib/setup/planner.js:52`。
 
 - `skills.lock.json`：棕地也会直接覆盖，没有单独询问。
-- `openspec/**`（config.yaml + schemas/）：只有 `BROWN_OVERRIDE_OPENSPEC=yes` 才部署；否则全部跳过。
+- `openspec/**`（config.yaml + schemas/）：`openspec/schemas/` 属产品资产始终刷新；`BROWN_OVERRIDE_OPENSPEC` 仅控制 `openspec/config.yaml`（不存在时直接部署，存在时按决策覆盖 / 保留）。
   - 棕地下 `openspec/changes/**` 和 `openspec/specs/**` 永远 preserve（见 changes/specs 保护章节）。
   - schemas/ 复制时按语言过滤（见 "Schema 复制时的语言过滤"）。
 - `.opencode/opencode.json`：

@@ -20,8 +20,8 @@
   ↓
 [3] 部署维度 2：.opencode/
   ├── opencode.json → 棕地合并（required 强制 allow）/ 绿地复制
-  ├── commands/* → 棕地 y/N/a / 绿地部署
-  └── skills/* → 棕地 y/N/a / 绿地部署
+  ├── commands/* → 棕地默认 Y（未设置即覆盖；n 保留 / a 逐文件）/ 绿地部署
+  └── skills/* → 棕地默认 Y（未设置即覆盖；n 保留 / a 逐文件）/ 绿地部署
   ↓
 [4] 部署维度 3：git
   ├── .gitignore → 创建 / 幂等追加 .worktrees/ 规则
@@ -64,8 +64,8 @@ openspec/ 是整个部署的**门控步骤**，执行顺序**第一**。如果�
 | 文件类型 | Greenfield | Brownfield | Reset |
 |---------|-----------|-----------|-------|
 | opencode.json | 直接复制 | 联合合并（required 强制 allow）+ 通知用户 | 不碰，告知用户 |
-| commands/* | 直接部署 | 分目录 y/N/a 询问，按决策执行，记录到 manifest | 按 manifest 记录执行 |
-| skills/* | 直接部署 | 分目录 y/N/a 询问，按决策执行，记录到 manifest | 按 manifest 记录执行 |
+| commands/* | 直接部署 | 默认 Y（未设置即覆盖）；`n` 保留；`a` 逐文件。按决策执行并记录到 manifest | 按 manifest 记录执行 |
+| skills/* | 直接部署 | 默认 Y（未设置即覆盖）；`n` 保留；`a` 逐文件。按决策执行并记录到 manifest | 按 manifest 记录执行 |
 
 ---
 
@@ -94,6 +94,6 @@ openspec/ 是整个部署的**门控步骤**，执行顺序**第一**。如果�
 | 维度 | 门控 | Brownfield 入口 | Reset 行为 |
 |------|------|----------------|-----------|
 | 1. openspec/ | ✅ 门控，NO 则退出 | YES/NO 询问 | 按 manifest 删 |
-| 2. .opencode/ | — | opencode.json 合并；commands/skills y/N/a | 按记录执行；opencode.json 不碰 |
+| 2. .opencode/ | — | opencode.json 合并；commands/skills 默认 Y（n 保留 / a 逐文件） | 按记录执行；opencode.json 不碰 |
 | 3. git | — | 幂等追加/skip | 不碰 |
 | 4. 已部署内容 | — | AGENTS.md 追加 | 不碰，提醒用户自处理 |
