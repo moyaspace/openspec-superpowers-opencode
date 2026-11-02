@@ -32,6 +32,7 @@ export interface PlanOperation {
     source?: string;
     content?: string;
     decision?: string | undefined;
+    changed?: boolean;
 }
 
 export interface InitDecisions {
@@ -175,11 +176,14 @@ function createInitPlan(context: InitContext): InitPlan {
             operations.push({ type: 'preserve', target, decision: 'skip' });
             continue;
         }
+        const existing = brownfield && fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
+        const content = renderedTemplate(source, context.superpowersPath);
         operations.push({
             type: 'write',
             target,
-            content: renderedTemplate(source, context.superpowersPath),
-            decision: brownfield && fs.existsSync(target) ? 'overwrite' : undefined,
+            content,
+            decision: existing === null ? undefined : 'overwrite',
+            changed: existing !== null && existing !== content,
         });
     }
 

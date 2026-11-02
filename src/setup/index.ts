@@ -759,6 +759,11 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
                 p({ type: 'info', text: `- ${rel} (skip)` });
                 continue;
             }
+            if (op.type === 'write' && op.changed) {
+                p({ type: 'action', text: `${t('已更新：', 'Updated: ')}${rel}` });
+                continue;
+            }
+            if (op.type === 'write' && op.decision === 'overwrite') continue;
             p({ type: 'pass', item: rel });
         }
         p({ type: 'blank' });
