@@ -178,15 +178,15 @@ Brownfield project. Continue with full init?
 |------|----------|------|
 | `openspec/config.yaml` | `BROWN_OVERRIDE_OPENSPEC` | 不存在时直接部署；存在时询问，`yes` 覆盖；`openspec/schemas/` 属产品资产始终刷新 |
 | `.opencode/opencode.json` | `BROWN_OVERRIDE_OCODEJSON` | 文件存在时询问；`yes` 合并，否则保留 |
-| `.opencode/commands/` | `BROWN_OVERRIDE_COMMANDS` | `yes`/`no`/`ask`，`ask` 时逐个冲突文件询问 |
-| `.opencode/skills/` | `BROWN_OVERRIDE_SKILLS` | 同上 |
+| `.opencode/commands/` | `BROWN_OVERRIDE_COMMANDS` | 未设置时默认覆盖；`yes` 覆盖、`no` 保留、`ask` 时逐个冲突文件询问 |
+| `.opencode/skills/` | `BROWN_OVERRIDE_SKILLS` | 同上（未设置时默认覆盖） |
 | `AGENTS.md` 托管区块 | `BROWN_OVERRIDE_AGENTS` | 已有完整 marker 时询问是否替换 |
 | `.gitignore` 托管区块 | `BROWN_OVERRIDE_GITIGNORE` | 同上 |
 | `.gitattributes` 托管区块 | `BROWN_OVERRIDE_GITATTR` | 同上 |
 | `.editorconfig` 托管区块 | `BROWN_OVERRIDE_EDITORCONFIG` | 同上 |
 | `oso-change-registry.json` | `BROWN_OVERRIDE_REGISTRY` | 存在时询问；默认 `no` 不做覆盖 |
 
-没有环境变量且没有 prompt 时，默认决策是 `no`，见 `lib/setup/prompt.js:20`。
+`resolveDecision` 的兜底：既没有环境变量、也无法交互提示时返回 `no`（`lib/setup/prompt.js:20`）。注意该兜底只对**已进入决策**的项生效；commands / skills 在未设置对应开关时不会进入决策，而是默认覆盖。
 
 所有 `BROWN_OVERRIDE_*` 值由 `prompt.js` 统一规范化。支持 `yes`、`no`，commands/skills 额外支持 `ask`；无效值回退到交互询问，不把原始无效值当成决策。
 

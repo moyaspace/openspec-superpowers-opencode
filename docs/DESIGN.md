@@ -138,14 +138,14 @@ main 目录（仓库）                 worktree（AI 办公室）
 | `.opencode/skills/`               |       ✅        | 需要，OPSX skill 定义     | 产品资产，升级默认随版本刷新（未设置→覆盖，`no`→保留，`ask`→逐文件） |
 | `.opencode/opencode.json`         |       ✅        | 需要，AI 权限规则         | 不存在才创建；存在时按 `BROWN_OVERRIDE_OCODEJSON` 决定合并 / 保留 |
 | `.opencode/install-manifest.json` |  ❌ 包管理数据  | 仅 reset 用，对项目透明   | 总是写入（记录实际安装文件）           |
-| `openspec/changes/`               |       ✅        | 需要，用户变更数据        | 不存在才创建空目录                     |
-| `openspec/specs/`                 |       ✅        | 需要，用户规格文档        | 不存在才创建空目录                     |
-| `openspec/schemas/`               | ❌ 工具基础设施 | 只读，AI 不可修改         | 覆盖部署                               |
-| `openspec/config.yaml` | ❌ 工具基础设施 | 只读，AI 不可修改 | 覆盖部署 |
+| `openspec/changes/`               |       ✅        | 需要，用户变更数据        | 棕地方永不创建、永不修改；绿地创建空目录 |
+| `openspec/specs/`                 |       ✅        | 需要，用户规格文档        | 棕地方永不创建、永不修改；绿地创建空目录 |
+| `openspec/schemas/`               | ❌ 工具基础设施 | 只读，AI 不可修改         | 始终刷新（产品资产，不受 `BROWN_OVERRIDE_OPENSPEC` 影响） |
+| `openspec/config.yaml` | ❌ 工具基础设施 | 只读，AI 不可修改 | 不存在时直接写入；存在时询问，`yes` 覆盖 / `no` 保留 |
 | `openspec/oso-change-registry.json` | ❌ 本地开发状态 | 记录活跃 worktree，非项目历史。clone 新机器的人不需要知道别人本地开了哪些 worktree。 | 存在时询问用户 |
-| `AGENTS.md` | ✅ | 需要，AI 指导 | 不覆盖已有 bridge 内容 |
-| `.gitignore`                      |       ✅        | 需要，排除 .worktrees/ 等 | 不存在才创建；已存在只追加基础设施排除 |
-| `.gitattributes`                  |       ✅        | 需要，行尾规范化          | 不存在才创建                           |
+| `AGENTS.md` | ✅ | 需要，AI 指导 | 无标记时追加托管区块；有完整标记时询问是否替换区块内容 |
+| `.gitignore`                      |       ✅        | 需要，排除 .worktrees/ 等 | 不存在时创建；无标记时追加托管区块；有完整标记时询问是否替换 |
+| `.gitattributes`                  |       ✅        | 需要，行尾规范化          | 不存在时创建；无标记时追加托管区块；有完整标记时询问是否替换 |
 | `LICENSE`                         |       ❌        | 包的许可，非项目许可      | 不部署                                 |
 | `skills.lock.json`                |       ❌        | 包校验数据                | 不部署                                 |
 
