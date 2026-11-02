@@ -92,6 +92,12 @@ function renderedTemplate(source: string, superpowersPath: string | undefined): 
     return content.split('{{SUPERPOWERS_BASE_PATH}}').join(replacement);
 }
 
+const isOpenSpecData = (p: string): boolean => p.startsWith('openspec/changes/') || p.startsWith('openspec/specs/');
+const isOpenSpecSchema = (p: string): boolean => p.startsWith('openspec/schemas/');
+const isCommand = (p: string): boolean => p.startsWith('.opencode/commands/');
+const isSkill = (p: string): boolean => p.startsWith('.opencode/skills/');
+const isProductAsset = (p: string): boolean => isOpenSpecSchema(p) || isCommand(p) || isSkill(p);
+
 function createInitPlan(context: InitContext): InitPlan {
     const operations: PlanOperation[] = [];
     const brownfield = context.projectKind === 'brownfield';
@@ -124,11 +130,17 @@ function createInitPlan(context: InitContext): InitPlan {
         if (!portablePath.startsWith('openspec/') && !portablePath.startsWith('.opencode/')) continue;
         const source = path.join(context.templateDir, relativePath);
         const target = path.join(context.targetDir, relativePath);
-        if (brownfield && (portablePath.startsWith('openspec/changes/') || portablePath.startsWith('openspec/specs/'))) {
+        if (brownfield && isOpenSpecData(portablePath)) {
             operations.push({ type: 'preserve', target, decision: 'skip' });
             continue;
         }
-        if (brownfield && portablePath.startsWith('openspec/') && decisions.openspec !== 'yes') {
+        if (
+            brownfield
+            && portablePath.startsWith('openspec/')
+            && !isOpenSpecSchema(portablePath)
+            && fs.existsSync(target)
+            && decisions.openspec !== 'yes'
+        ) {
             operations.push({ type: 'preserve', target, decision: 'skip' });
             continue;
         }
