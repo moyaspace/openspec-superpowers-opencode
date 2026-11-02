@@ -11,17 +11,17 @@
 - Reason: schema 模板必须能补齐，否则 7/8 永远失败。
 - Impact: 非破坏；老项目首次补齐 schema，已有 `config.yaml` 仍受保护。
 
-**BUG022：.opencode/commands/ 与 .opencode/skills/ 改为产品资产**
+**BUG022：.opencode/commands/ 与 .opencode/skills/ 改为产品资产（保留三档开关，只翻转默认值）**
 
-- From: `.opencode/commands/` / `.opencode/skills/` 已存在时询问，支持 `BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 的 yes/no 与逐文件 `ask` 决策。
-- To: 二者按产品资产无条件覆盖 / 新建，不再询问；`BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 保留解析但只打印一行废弃说明。
-- Reason: 产品命令与 schema 模板属于 OSO 资产，升级时必须送达。
-- Impact: 行为变更（用户此前的 `no` 不再生效）；用户自建命令不受影响，因为本变更从不删除文件。
+- From: `.opencode/commands/` / `.opencode/skills/` 已存在时走询问；未设置 override 且无交互 prompt 时 `resolveDecision` 返回 `no` → 命令永不更新（BUG022 根因）。`BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 支持 yes/no/ask 三档。
+- To: 三档功能**完整保留**（`yes` 覆盖 / `no` 保留 / `ask` 逐文件询问）；唯一改变是「未设置 override」这一档：不再询问，默认覆盖。
+- Reason: 产品命令属于 OSO 资产，升级时必须送达；但用户显式拒绝覆盖的能力不应被剥夺。
+- Impact: 行为变更（「未设置」的默认从保留改为覆盖）；显式 `no` 仍然生效。用户自建命令不受影响，因为本变更从不删除文件。
 
-**升级可见性：输出列出被更新的产品资产**
+**升级可见性：输出列出被更新的文件**
 
 - From: 覆盖已有文件时与新建一样输出 `✓ <path>`，无法区分「新装」与「升级」。
-- To: 产品资产目标已存在且内容与渲染结果不同时输出「已更新：<相对路径>」；内容相同不输出；新建仍输出 `✓ <path>`。
+- To: 任何已存在且内容与渲染结果不同的文件，输出「已更新：<相对路径>」；内容相同不输出；新建仍输出 `✓ <path>`。
 - Reason: 升级需要可审计，用户要知道哪些文件被替换。
 - Impact: 非破坏；只影响输出。
 
@@ -39,12 +39,12 @@
 
 ### Modified Capabilities
 
-- `brownfield-init-safety`: 修改「openspec 询问条件」与「已有 commands 答 n 不变」两条需求，新增「产品资产无条件刷新」与「升级可见性输出」两条需求；受管根文件、用户数据保护的既有需求保持不变。
+- `brownfield-init-safety`: 修改「openspec 询问条件」与「已有 commands 答 n 不变」两条需求，新增「产品资产默认刷新（显式 no 保留）」与「升级可见性输出」两条需求；受管根文件、用户数据保护的既有需求保持不变。
 
 ## Impact
 
-- 代码：`src/setup/planner.ts`（路径分类、`changed` 标记）、`src/setup/index.ts`（删除 commands / skills 询问、openspec 询问条件收窄、输出「已更新」、弃用环境变量提示）。
-- 测试：`test/setup-brownfield.test.js`（假 runner + 新夹具 + 4 个新用例 + 2 个旧用例改写）、`test/setup-api.test.js`（per-file ask 用例改写）、`test/setup-planner.test.js`（如路径分类影响既有断言则同步）。
-- 文档：`docs/FEATURES.md` 的 `BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 行需标注为忽略。
+- 代码：`src/setup/planner.ts`（路径分类、`changed` 标记、默认值判定）、`src/setup/index.ts`（未设置 override 时不再询问、openspec 询问条件收窄、输出「已更新」）。
+- 测试：`test/setup-brownfield.test.js`（假 runner + 新夹具 + 5 个新用例 + 2 个旧用例改写）、`test/setup-api.test.js`（ask 用例改写）、`test/setup-planner.test.js`（如路径分类影响既有断言则同步）。
+- 文档：`docs/FEATURES.md` 的 `BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 行补充「未设置时默认覆盖」说明（三档功能保留）。
 - 不受影响：`openspec/config.yaml` 的询问语义、`.opencode/opencode.json` 的 merge、受管根文件 marker 合并、`openspec/changes/**` 与 `openspec/specs/**` 的永久保护；`openspec/schemas/` 与 `openspec/config.yaml` 的 schema 内容语义（属 T004）。
 - 依赖与 API：无新增依赖，无公开 API 变更。

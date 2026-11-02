@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 让棕地 `oso init` 按「产权」刷新 OSO 产品资产（commands / skills / openspec schemas），同时保持用户配置、混合文件与用户数据语义不变。
+**Goal:** 让棕地 `oso init` 默认刷新 OSO 产品资产（commands / skills / openspec schemas），同时保留 `BROWN_OVERRIDE_*` 三档开关，并保持用户配置、混合文件与用户数据语义不变。
 
-**Architecture:** 把产权判定收敛到 `src/setup/planner.ts` 的路径谓词与三分支门禁；`src/setup/index.ts` 删除 commands / skills 询问、收窄 openspec 询问条件、输出「已更新」；测试侧先修假 runner 与夹具，用 RED→GREEN 驱动。
+**Architecture:** 把产权判定收敛到 `src/setup/planner.ts` 的路径谓词与门禁条件（`undefined` = 默认覆盖，`no`/`ask 未答 yes` = 保留）；`src/setup/index.ts` 让 commands / skills 只在显式设置 override 时才进入决策、收窄 openspec 询问条件、输出「已更新」；测试侧先修假 runner 与夹具，用 RED→GREEN 驱动。
 
 **Tech Stack:** TypeScript（ESM，`tsc -p tsconfig.build.json`）、Node `node:test` + `node:assert/strict`、OpenSpec CLI、npm scripts。
 
@@ -12,7 +12,8 @@
 
 ## Global Constraints
 
-- 只改 ① 类产品资产：`.opencode/commands/**`、`.opencode/skills/**`、`openspec/schemas/superpowers-bridge-opencode/**`。
+- ① 类产品资产（`.opencode/commands/**`、`.opencode/skills/**`、`openspec/schemas/superpowers-bridge-opencode/**`）默认刷新；显式 `BROWN_OVERRIDE_COMMANDS=no` / `BROWN_OVERRIDE_SKILLS=no` 时保留。
+- 三档开关（`yes` / `no` / `ask`）功能 MUST 全部保留，行为与修改前一致。
 - ② 类（`openspec/config.yaml`、`.opencode/opencode.json`）、③ 类（4 个受管根文件）、④ 类（`openspec/changes/**`、`openspec/specs/**`）语义 MUST NOT 变。
 - 不使用 `as any` / `@ts-ignore` / `@ts-expect-error`；不删除、不跳过失败测试。
 - 不删除任何用户自建命令；本变更不新增删除逻辑。
@@ -22,10 +23,11 @@
 
 ## Review Focus
 
+- **`BROWN_OVERRIDE_COMMANDS=no` 是否仍能保护文件**（保留功能是本变更的硬约束）→ Task 2 护栏用例 + Task 6 改写断言。
 - **`openspec/config.yaml` 答 n 后是否仍字节不变**（② 类不能被 ① 类刷新误伤）→ Task 3 用例断言逐字相等。
 - **`openspec/schemas/**` 在目标不存在时是否仍被 preserve**（BUG021 的根因是「不存在的文件被 skip」）→ Task 3 用例断言 10 个文件落盘。
 - **`.opencode/commands/` 用户自建文件是否仍在**（覆盖 ≠ 删除）→ Task 2 用例断言 `my-custom.md` 存在且内容不变。
-- **「已更新」计数是否被非产品资产污染**（验收要求恰好 10）→ Task 5 用例用 `lang: 'zh-CN'` 统计，Task 6 夹具让未变更命令逐字相同。
+- **「已更新」计数是否恰好 10** → 夹具让 `config.yaml` 走 preserve、根文件内容一致、schemas 走新建。
 - **假 runner 是否真的会失败**（否则 BUG021/BUG003 继续漏网）→ Task 1 反证用例断言删除 `schema.yaml` 后 init 抛 `schema-validation failed`。
 
 ---
@@ -109,16 +111,16 @@ git commit -m "test(setup): make brownfield fake runner fail on missing schema"
 
 ---
 
-### Task 2: 新增 `seedInstalledProject(t)` 夹具与 4 个 RED 用例
+### Task 2: 新增 `seedInstalledProject(t)` 夹具与 6 个 RED 用例
 
 **Files:**
 - Test: `test/setup-brownfield.test.js`
 
 **Interfaces:**
-- Produces: `seedInstalledProject(t, { superpowersPath, templateDir }) -> { targetDir, configContent, commandNames }`
+- Produces: `seedInstalledProject(t, { superpowersPath }) -> { targetDir, configContent, commandNames }`
 - Constraint: 10 个变更命令写 `OLD v1.1.1 <name>`；`opsx-explore.md` / `opsx-onboard.md` / `opsx-remove.md` 写当前模板渲染结果。
 
-- [ ] **Step 1: 写夹具 + 4 条失败用例**
+- [ ] **Step 1: 写夹具 + 6 条失败用例**
 
 夹具要点：
 
@@ -164,7 +166,7 @@ function seedInstalledProject(t, { superpowersPath }) {
 }
 ```
 
-新增用例（全部使用 `env: { ...BROWN_ENV, BROWN_OVERRIDE_OPENSPEC: undefined }` 与 `prompt: async () => 'n'`）：
+新增用例。**默认场景**使用 `env: { ...BROWN_ENV, BROWN_OVERRIDE_OPENSPEC: undefined, BROWN_OVERRIDE_COMMANDS: undefined }` 与 `prompt: async () => 'n'`（只有 config.yaml 会询问）：
 
 ```js
 test('BUG021：config.yaml 保留 + schemas 为空 → 10 个 schema 落盘且 7/8 通过', ...);
@@ -172,7 +174,7 @@ test('BUG021：config.yaml 保留 + schemas 为空 → 10 个 schema 落盘且 7
 // 断言：fs.readFileSync(config.yaml,'utf8') === configContent
 // 断言：result.success === true；events 中存在 n:7 的 step 且随后有 pass
 
-test('BUG022：v1.1.1 夹具答 n → 10 个命令与模板逐字一致', ...);
+test('BUG022：v1.1.1 夹具 + 未设置开关 → 10 个命令与模板逐字一致', ...);
 // 对 CHANGED_COMMANDS 断言 fs.readFileSync(target) === renderTemplate(...)
 
 test('升级可见性：恰好 10 条「已更新：」', ...);
@@ -183,10 +185,21 @@ test('用户自建命令不被覆盖、不被删除', ...);
 // 预先写 .opencode/commands/my-custom.md = 'my custom\n'；init 后内容仍为 'my custom\n'
 ```
 
-- [ ] **Step 2: 运行，确认 4 条都 FAIL**
+**保留功能用例**（这两条在修复前应当是 PASS 的，作为「不许打破原功能」的护栏）：
+
+```js
+test('保留功能：BROWN_OVERRIDE_COMMANDS=no → 命令文件字节不变', ...);
+// env 加 BROWN_OVERRIDE_COMMANDS: 'no'；对 CHANGED_COMMANDS 断言内容仍为 `OLD v1.1.1 <name>\n`
+
+test('ask 功能：BROWN_OVERRIDE_COMMANDS=ask + 全部答 n → 命令文件字节不变', ...);
+// env 加 BROWN_OVERRIDE_COMMANDS: 'ask'；prompt 对被问到的命令文件答 'n'
+// 注意 prompt 同时会收到 config.yaml 的询问：按问句内容区分，含 'commands' 的答 'n'
+```
+
+- [ ] **Step 2: 运行，确认 4 新用例 FAIL、2 护栏用例 PASS**
 
 Run: `npm run build; node --test test/setup-brownfield.test.js`
-Expected: BUG021 用例因 schema 文件未落盘失败；BUG022 用例因命令仍为 `OLD ...` 失败；「已更新」用例 0 条失败；自建命令用例应通过（先确认它不是误报）。
+Expected: BUG021 用例因 schema 文件未落盘失败；BUG022 用例因命令仍为 `OLD ...` 失败；「已更新」用例 0 条失败；自建命令用例 PASS；两条保留功能用例 PASS（证明现状功能未被前提破坏）。
 
 - [ ] **Step 3: 提交 RED 证据**
 
@@ -250,35 +263,59 @@ git commit -m "fix(setup): stop preserving missing openspec product assets (BUG0
 
 ---
 
-### Task 4: 必改点 2 —— BUG022：commands / skills 改为产品资产
+### Task 4: 必改点 2 —— BUG022：默认刷新，保留三档开关
 
 **Files:**
 - Modify: `src/setup/index.ts:316-359`（`collectBrownfieldDecisions`）
-- Modify: `src/setup/planner.ts:150-175`（删除 commands / skills preserve 门禁）
+- Modify: `src/setup/planner.ts:150-175`（preserve 条件改为「显式 no / ask 未答 yes」）
 
 **Interfaces:**
 - Consumes: Task 3 的谓词。
-- Produces: `collectBrownfieldDecisions` 不再设置 `decisions.commands` / `decisions.skills` / `commandFiles` / `skillFiles`；`planner` 不再读取它们。
+- Produces: `decisions.commands` / `decisions.skills` 在**未设置** override 时保持 `undefined`（不再被解析成 `'no'`）；`planner` 视 `undefined` 为默认覆盖，视 `'no'` / `'ask' 未答 yes` 为 preserve。
 
-- [ ] **Step 1: 删除 planner 的 commands / skills 门禁**
+- [ ] **Step 1: 改 planner 的 preserve 条件**
 
-删除 `planner.ts:150-175` 两个 `if` 块（保留到 write 分支的落点）。
-
-- [ ] **Step 2: 删除 index.ts 的询问与逐文件决策**
-
-删除 `index.ts:328-359` 两个 `if (hasEntries(...))` 块。在 `collectBrownfieldDecisions` 内、`openspecHasContent` 附近加入弃用提示：
+把 `planner.ts:150-175` 两段条件改写为「只有显式拒绝才 preserve」：
 
 ```ts
-if (env.BROWN_OVERRIDE_COMMANDS || env.BROWN_OVERRIDE_SKILLS) {
-    p({
-        type: 'warn',
-        item: t(
-            'BROWN_OVERRIDE_COMMANDS / BROWN_OVERRIDE_SKILLS 已废弃并被忽略：commands 与 skills 属于产品资产，始终随版本覆盖',
-            'BROWN_OVERRIDE_COMMANDS / BROWN_OVERRIDE_SKILLS is deprecated and ignored: commands and skills are product assets and always refreshed',
-        ),
-    });
+const keepCommand = decisions.commands === 'no'
+    || (decisions.commands === 'ask'
+        && decisions.commandFiles
+        && decisions.commandFiles[portablePath] !== 'yes');
+if (brownfield && isCommand(portablePath) && fs.existsSync(target) && keepCommand) {
+    operations.push({ type: 'preserve', target, decision: 'skip' });
+    continue;
+}
+const keepSkill = decisions.skills === 'no'
+    || (decisions.skills === 'ask'
+        && decisions.skillFiles
+        && decisions.skillFiles[portablePath] !== 'yes');
+if (brownfield && isSkill(portablePath) && fs.existsSync(target) && keepSkill) {
+    operations.push({ type: 'preserve', target, decision: 'skip' });
+    continue;
 }
 ```
+
+关键差异：原来的 `decisions.commands !== 'yes'` 让 `undefined` 也 preserve；现在 `undefined` 不匹配 `'no'` 也不匹配 `'ask'` → 落到 write。
+
+- [ ] **Step 2: 改 index.ts 的入口条件，未设置时不进入决策**
+
+`index.ts:328-343`（commands）与 `:344-359`（skills）的 `if (hasEntries(...))` 改为：
+
+```ts
+const commandOverride = env.BROWN_OVERRIDE_COMMANDS;
+if (hasEntries(path.join(targetDir, '.opencode', 'commands')) && commandOverride !== undefined) {
+    decisions.commands = await tDecide('BROWN_OVERRIDE_COMMANDS', '覆盖 commands？', 'Overwrite commands?', true);
+    if (decisions.commands === 'ask') {
+        decisions.commandFiles = {};
+        // 逐文件收集逻辑原样保留
+    }
+}
+```
+
+skills 同理（`skillOverride !== undefined`，`BROWN_OVERRIDE_SKILLS`，`skillFiles`）。
+
+**不要**输出任何「已废弃」提示——三档功能全部保留，不存在需要警告的语义反转。
 
 - [ ] **Step 3: 收窄 openspec 询问条件**
 
@@ -293,13 +330,13 @@ const openspecHasContent = fs.existsSync(path.join(targetDir, 'openspec', 'confi
 - [ ] **Step 4: 运行**
 
 Run: `npm run build; node --test test/setup-brownfield.test.js`
-Expected: BUG022 用例 PASS；自建命令用例 PASS；「已更新」用例仍 RED。
+Expected: BUG022 用例 PASS；两条保留功能用例（`=no` / `=ask`）仍 PASS；自建命令用例 PASS；「已更新」用例仍 RED。
 
 - [ ] **Step 5: 提交**
 
 ```bash
 git add src/setup/index.ts src/setup/planner.ts
-git commit -m "fix(setup): treat commands and skills as product assets (BUG022)"
+git commit -m "fix(setup): refresh commands and skills by default, keep override switches (BUG022)"
 ```
 
 ---
@@ -311,7 +348,6 @@ git commit -m "fix(setup): treat commands and skills as product assets (BUG022)"
 - Modify: `src/setup/index.ts`（`reportOperations`）
 
 **Interfaces:**
-- Consumes: Task 3 的 `isProductAsset` 谓词（`index.ts` 内另写一份同构私有函数）。
 - Produces: `PlanOperation.changed?: boolean`；输出事件 `{ type: 'action', text: '已更新：<rel>' | 'Updated: <rel>' }`。
 
 - [ ] **Step 1: 加字段**
@@ -332,20 +368,15 @@ operations.push({
 });
 ```
 
-- [ ] **Step 3: reportOperations 输出「已更新」**
+- [ ] **Step 3: reportOperations 输出「已更新」（全量，不区分产权）**
 
 ```ts
-const isProductAssetRel = (rel: string): boolean =>
-    rel.startsWith('.opencode/commands/')
-    || rel.startsWith('.opencode/skills/')
-    || rel.startsWith('openspec/schemas/');
-
-// 在既有 preserve-skip 分支之后：
-if (isProductAssetRel(rel) && op.changed) {
+// 保留既有 preserve-skip 分支，然后：
+if (op.type === 'write' && op.changed) {
     p({ type: 'action', text: `${t('已更新：', 'Updated: ')}${rel}` });
     continue;
 }
-if (isProductAssetRel(rel) && op.decision === 'overwrite') continue; // 内容相同，不刷屏
+if (op.type === 'write' && op.decision === 'overwrite') continue; // 已存在但内容相同，不刷屏
 p({ type: 'pass', item: rel });
 ```
 
@@ -358,7 +389,7 @@ Expected: 「已更新」用例 PASS（恰好 10 条）；全部棕地用例 PAS
 
 ```bash
 git add src/setup/planner.ts src/setup/index.ts
-git commit -m "feat(setup): report refreshed product assets during brownfield init"
+git commit -m "feat(setup): report refreshed files during brownfield init"
 ```
 
 ---
@@ -370,19 +401,33 @@ git commit -m "feat(setup): report refreshed product assets during brownfield in
 - Modify: `test/setup-api.test.js:242`
 
 **Interfaces:**
-- Consumes: Task 4 之后的新语义。
+- Consumes: Task 4 之后的新语义（默认覆盖 + 三档保留）。
 
 - [ ] **Step 1: 改写 `schemas 非空时询问` 用例**
 
-新断言：`prompts.length === 0`；`fs.readFileSync(schema.yaml) !== 'stale: true\n'`（被无条件覆盖）。
+新断言：`prompts.length === 0`（只有 config.yaml 触发询问，而该用例无 config.yaml）；`fs.readFileSync(schema.yaml) !== 'stale: true\n'`（被无条件覆盖）。
 
 - [ ] **Step 2: 改写 `已有 commands 且答 n 时文件不变` 用例**
 
-新断言：`fs.readFileSync(opsx-ff.md) === renderTemplate('.opencode/commands/opsx-ff.md', superpowersPath)`，即已被覆盖；`BROWN_OVERRIDE_COMMANDS: 'no'` 不改变结果。
+拆成两条断言，覆盖「新默认」与「保留功能」：
+
+```js
+// 未设置开关：默认覆盖
+const r1 = await initProject({ ..., env: { ...BROWN_ENV, BROWN_OVERRIDE_COMMANDS: undefined } });
+assert.equal(fs.readFileSync(ff, 'utf8'), renderTemplate('.opencode/commands/opsx-ff.md', superpowersPath));
+
+// 显式 no：保留
+const r2 = await initProject({ ..., env: { ...BROWN_ENV, BROWN_OVERRIDE_COMMANDS: 'no' } });
+assert.equal(fs.readFileSync(ff, 'utf8'), renderTemplate('.opencode/commands/opsx-ff.md', superpowersPath));
+```
+
+注意：第二次 init 时目标已是模板内容，`=no` 与否结果相同，无法区分。因此第二条断言改为「先写回 `# 我的自定义命令`，再设 `=no` 跑 init，断言仍是自定义命令」。
 
 - [ ] **Step 3: 改写 `collects per-file command decisions` 用例**
 
-新断言：`prompts.length === 0`；`operation.type === 'write'`；`BROWN_OVERRIDE_COMMANDS: 'ask'` 不再触发逐文件询问。
+拆成两条：
+- 未设置 `BROWN_OVERRIDE_COMMANDS` → `prompts.length === 0`，`operation.type === 'write'`。
+- 设置 `BROWN_OVERRIDE_COMMANDS: 'ask'` → 出现逐文件询问（`prompts.length >= 1`），答 `'no'` 时 `operation.type === 'preserve'`。
 
 - [ ] **Step 4: 运行相关文件**
 
@@ -393,7 +438,7 @@ Expected: 全 PASS。
 
 ```bash
 git add test/setup-brownfield.test.js test/setup-api.test.js
-git commit -m "test(setup): align brownfield tests with product-asset semantics"
+git commit -m "test(setup): align brownfield tests with default-refresh semantics"
 ```
 
 ---
@@ -406,7 +451,7 @@ git commit -m "test(setup): align brownfield tests with product-asset semantics"
 
 - [ ] **Step 1: 更新 FEATURES.md**
 
-两行改为「已废弃并被忽略：commands / skills 属产品资产，始终随版本覆盖」。
+两行改为「yes / no / ask，默认（未设置）覆盖：commands / skills 属产品资产，升级时随版本刷新；设 no 可保留」。
 
 - [ ] **Step 2: 全量回归**
 
@@ -423,11 +468,11 @@ node --test test/setup-brownfield.test.js test/setup-api.test.js test/setup-plan
 
 - [ ] **Step 4: 逐条记录验收证据**
 
-在提交说明或 `verify.md` 中逐项引用 BUG021 / BUG022 的 5 条关闭条件与 3 条回归项，附命令与关键输出。
+在提交说明或 `verify.md` 中逐项引用 BUG021 / BUG022 的 5 条关闭条件、保留功能（`=no` / `=ask`）与 3 条回归项，附命令与关键输出。
 
 - [ ] **Step 5: 提交**
 
 ```bash
 git add docs/FEATURES.md
-git commit -m "docs: mark BROWN_OVERRIDE_COMMANDS/SKILLS as ignored"
+git commit -m "docs: document default-refresh behavior for BROWN_OVERRIDE_COMMANDS/SKILLS"
 ```

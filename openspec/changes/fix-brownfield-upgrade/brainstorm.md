@@ -27,7 +27,7 @@
 
 ### 方案 B：按「产权」分类（已采用）
 
-- **做法**：把模板文件按产权分成四类，只对 ① 类产品资产无条件写；② 类保留询问与 merge；③ 类继续走 marker 合并；④ 类继续永久 preserve。路径判定在 `planner.ts` 内按前缀细分，不做「整个 `openspec/` 无条件化」。
+- **做法**：把模板文件按产权分成四类，只对 ① 类产品资产默认覆盖；② 类保留询问与 merge；③ 类继续走 marker 合并；④ 类继续永久 preserve。路径判定在 `planner.ts` 内按前缀细分，不做「整个 `openspec/` 无条件化」。`BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 三档开关完整保留，仅「未设置」的默认值翻转为覆盖。
 - **优点**：升级能送达（① 类覆盖），用户配置与数据仍受保护（②③④ 类不动）；语义可用一张表讲清，测试也按这张表写；新增命令与 schema 模板走同一条「新建」路径。
 - **缺点**：路径分类需要维护一份 ① 类清单；未来新增模板目录时要同步归类。
 - **为何胜出**：唯一同时满足 BUG021（schema 必须落盘）与 BUG022（命令必须更新）且不破坏既有保护的方案。
@@ -43,18 +43,18 @@
 
 采用方案 B。实现落点：
 
-1. `src/setup/planner.ts`：openspec 门禁按路径细分——`openspec/changes/**` / `openspec/specs/**` 永远 preserve；`openspec/schemas/**`（① 类）无条件 write；其余 `openspec/*`（含 `config.yaml`）保留「存在才询问」语义并补 `fs.existsSync(target)` 守卫（BUG021）。删除 commands / skills 的 preserve 门禁（BUG022）。
-2. `src/setup/index.ts`：删除 commands / skills 的询问分支与逐文件决策；openspec 询问条件收窄为「`openspec/config.yaml` 存在」。`BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 保留读取但只打印一行废弃说明（理由见 design.md）。
-3. 覆盖产品资产时，若目标内容与渲染结果不同，输出一行「已更新：<相对路径>」；相同不列；新建仍用 `✓ <path>`。
-4. 测试：修复假 runner 的 `schema validate` 恒成功问题；新增 `seedInstalledProject(t)` 夹具与 4 个新用例；把 3 个建立在旧语义上的既有用例改写为新语义（不是删除）。
+1. `src/setup/planner.ts`：openspec 门禁按路径细分——`openspec/changes/**` / `openspec/specs/**` 永远 preserve；`openspec/schemas/**`（① 类）无条件 write；其余 `openspec/*`（含 `config.yaml`）保留「存在才询问」语义并补 `fs.existsSync(target)` 守卫（BUG021）。commands / skills 的 preserve 条件改为「显式 `no`，或 `ask` 未答 yes」——`undefined`（未设置）不再被当成 `no`，落到 write（BUG022）。
+2. `src/setup/index.ts`：commands / skills 只在用户**显式设置** `BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 时才进入决策（三档 yes/no/ask 功能完整保留）；未设置时不询问，默认覆盖。openspec 询问条件收窄为「`openspec/config.yaml` 存在」（BUG021）。
+3. 覆盖任何已存在文件时，若目标内容与渲染结果不同，输出一行「已更新：<相对路径>」；相同不列；新建仍用 `✓ <path>`。
+4. 测试：修复假 runner 的 `schema validate` 恒成功问题；新增 `seedInstalledProject(t)` 夹具与 6 个新用例（含 2 条保留功能护栏）；把 3 个建立在旧语义上的既有用例改写为新语义（不是删除）。
 
 ## Key Decisions
 
 - **只改 ① 类**：`openspec/config.yaml`、`.opencode/opencode.json`、受管根文件、`openspec/changes/**`、`openspec/specs/**` 的行为 MUST NOT 变化。
 - **路径细分，不按前缀一刀切**：`openspec/schemas/**` 是产品资产，`openspec/config.yaml` 是用户配置，二者必须走不同分支。
 - **不删除用户自建命令**：本变更只做「写模板文件」，从不做删除；用户自建命令（模板中没有、manifest 中未记录）自然保留。
-- **弃用环境变量**：`BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 保留解析并打印一行说明，让显式设置过 `no` 的用户知道行为已变，而不是静默反转。
-- **升级可见性**：只在「已存在且内容不同」时输出「已更新」，避免每次 init 刷屏。
+- **保留三档开关，只翻转默认值**（用户裁决）：`yes` 覆盖 / `no` 保留 / `ask` 逐文件询问全部保留；唯一变化是「未设置」从「保留」改为「覆盖」。保留交互询问会等于保留 BUG022，故不保留。
+- **升级可见性全量输出**（用户裁决）：任何已存在且内容变化的文件都输出「已更新」，不限于产品资产。
 
 ## Open Questions
 

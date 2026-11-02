@@ -76,23 +76,54 @@ const openspecHasContent = fs.existsSync(path.join(targetDir, 'openspec', 'confi
 
 理由：schemas 已属 ① 类无条件刷新，再为它询问是误导——用户答 n 也拦不住。询问文案改为「覆盖 openspec/config.yaml？」，仍含 `openspec` 关键词，不破坏既有断言 `assert.match(prompts[0], /openspec/i)`。
 
-### D4：删除 commands / skills 的询问与 preserve 门禁
+### D4：commands / skills 保留三档开关，只翻转「未设置」时的默认值
 
-- `index.ts:328-359`：整段删除——不再读 `BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 的 yes/no，不再收集 `commandFiles` / `skillFiles` 的逐文件 `ask`。
-- `planner.ts:150-175`：整段删除。
-- `InitDecisions` 中的 `commands` / `skills` / `commandFiles` / `skillFiles` 字段保留（`[key: string]` 索引签名已能容纳），但从 `index.ts` 的赋值处移除；`planner.ts` 不再读取。保留字段可避免外部调用方（`setup-api` 的 `options.decisions`）类型编译失败，同时为将来显式拒绝预留位置。
+**保留** `BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 的全部原功能（用户裁决：保留原来的功能）：
 
-### D5：`BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` —— 保留解析，打印一行废弃说明
+| 设置 | 行为（修改前后一致） |
+|---|---|
+| `=yes` | 覆盖 |
+| `=no` | 保留（preserve） |
+| `=ask` | 逐文件询问，`commandFiles` / `skillFiles` 记录每个文件的选择 |
+| **未设置** | **修改前：走交互询问，空回答解析为 `no` → 保留（BUG022 根因）；修改后：不询问，默认覆盖** |
 
-选「保留解析 + 打印一行说明」，不选「直接不读取」。理由：
+`index.ts` 的改动只在于「何时进入决策」：
 
-1. **无声反转比报错更危险**：升级前用户可能在 CI 里显式设 `BROWN_OVERRIDE_COMMANDS=no` 来保护命令；升级后如果只是不读取，行为从「保护」静默变成「覆盖」，没有任何信号。打印一行说明把这条语义变更显式化。
-2. **实现成本一行**：`collectBrownfieldDecisions` 在棕地分支内检查 `env.BROWN_OVERRIDE_COMMANDS || env.BROWN_OVERRIDE_SKILLS`，命中则 `p({ type: 'warn', item: t(...) })`，不参与任何决策。
-3. **不引入新开关**：不提供「强制保留」逃生口，避免 ① 类又退化成可配置项。
+```ts
+const commandOverride = env.BROWN_OVERRIDE_COMMANDS;
+if (hasEntries(commandsDir) && commandOverride !== undefined) {
+    decisions.commands = await tDecide('BROWN_OVERRIDE_COMMANDS', ..., true);
+    if (decisions.commands === 'ask') { /* 逐文件收集，逻辑原样保留 */ }
+}
+// 未设置 override 时：不设 decisions.commands，planner 视为默认覆盖
+```
 
-文案（中英双语，走 `t()`）：`BROWN_OVERRIDE_COMMANDS/BROWN_OVERRIDE_SKILLS 已废弃并被忽略：commands 与 skills 属于产品资产，始终随版本覆盖` / `... is deprecated and ignored: commands and skills are product assets and always refreshed`。
+skills 同理。
 
-同时更新 `docs/FEATURES.md` 对应两行，标注「已忽略（产品资产始终覆盖）」。
+`planner.ts` 的改动只在于「什么时候 preserve」：
+
+```ts
+const keepCommand = decisions.commands === 'no'
+    || (decisions.commands === 'ask'
+        && decisions.commandFiles
+        && decisions.commandFiles[portablePath] !== 'yes');
+if (brownfield && isCommand(portablePath) && fs.existsSync(target) && keepCommand) {
+    operations.push({ type: 'preserve', target, decision: 'skip' });
+    continue;
+}
+```
+
+即：`undefined`（未设置）不再被当成 `no`，而是「不 preserve → 落到 write」。
+
+**为什么不保留「未设置时的交互询问」**：那正是 BUG022 的现场——非交互重跑 init 时 `resolveDecision` 无 prompt 直接返回 `no`，命令永远不更新。保留交互询问就等于保留缺陷。用户显式要保护时用 `=no`，能力没有损失。
+
+**`InitDecisions` 的 `commands` / `skills` / `commandFiles` / `skillFiles` 字段全部保留**，语义不变，仅默认值来源改变。
+
+### D5：`BROWN_OVERRIDE_*` 的语义变更只需文档标注，不加运行时警告
+
+因为开关功能完整保留（三档都能用），不存在「设了 `no` 却被静默覆盖」的反转，所以**不需要**废弃提示。只在 `docs/FEATURES.md` 补充「未设置时默认覆盖」这一默认值说明。
+
+（此条是对早期方案「打印废弃说明」的修正——用户明确要求保留原功能，废弃提示的前提已不成立。）
 
 ### D6：`changed` 标记与「已更新」输出
 
@@ -110,16 +141,24 @@ operations.push({
 });
 ```
 
-`index.ts` 的 `reportOperations` 改为：
+`index.ts` 的 `reportOperations` 改为（用户裁决：所有被更新的文件都输出）：
 
 - `preserve && decision === 'skip'` → 维持 `- <rel> (skip)`。
-- `isProductAsset(rel) && op.changed` → `p({ type: 'action', text: `${t('已更新：', 'Updated: ')}${rel}` })`。
-- `isProductAsset(rel) && op.decision === 'overwrite' && !op.changed` → 不输出（相同内容，避免噪声）。
-- 其余 → 维持 `p({ type: 'pass', item: rel })`（新建文件、非产品资产写入）。
+- `op.type === 'write' && op.changed` → `p({ type: 'action', text: `${t('已更新：', 'Updated: ')}${rel}` })`，**不区分产权类别**。
+- `op.type === 'write' && op.decision === 'overwrite' && !op.changed` → 不输出（内容相同，避免噪声）。
+- 其余（新建文件）→ 维持 `p({ type: 'pass', item: rel })`。
 
-`isProductAsset` 在 `index.ts` 内独立实现一份同构谓词（两处都不导出，避免跨模块耦合）；测试用一个私有辅助断言二者一致（可选，不强制）。
+**为什么改为全量输出**：用户明确要求「全都打」。产品资产、`config.yaml`（答 y 时）、受管根文件（托管区块内容变化时）都会在内容变化时输出「已更新」。
 
-**为什么只对产品资产输出「已更新」**：②③ 类的写入本来就有各自的询问/合并语义，混入「已更新」会干扰验收计数（BUG022 要求恰好 10 条）。这也符合「覆盖产品资产时」的原始表述。
+**验收「恰好 10 条」仍然成立**，因为夹具场景下只有 10 个命令的内容发生变化：
+
+| 文件 | 夹具状态 | 输出 |
+|---|---|---|
+| 10 个变更命令 | `OLD v1.1.1 ...` ≠ 模板 | 已更新 ×10 |
+| 3 个未变更命令 | 与模板逐字相同 | 无 |
+| `openspec/config.yaml` | 答 n → preserve | `(skip)` |
+| 4 个受管根文件 | 预置为模板渲染结果，区块内容相同 | 无 |
+| `openspec/schemas/**` | 目录为空 → 新建 | `✓` ×10 |
 
 **i18n**：标签走 `t('已更新：', 'Updated: ')`。`lang: 'zh-CN'` 时输出全角冒号，与验收表述逐字一致；`en` 时输出 `Updated: `。测试用 `lang: 'zh-CN'` 断言 10 条。
 
@@ -150,31 +189,34 @@ operations.push({
 
    - ① BUG021：config.yaml 存在 + schemas 目录空 → 答 n → 10 个 schema 文件存在、config 字节不变、7/8 通过（`result.success === true`，并断言 progress 事件里出现 7/8 的 pass）。
    - ② 假 runner 反向验证：schema.yaml 被删除后 `openspec schema validate` 返回 1，`initProject` 必须 throw（`schema-validation failed`）。该用例可通过直接调用假 runner 或注入「写后删除」的 runner 实现。
-   - ③ BUG022：v1.1.1 夹具 → 答 n → 10 个命令与模板逐字一致。
+   - ③ BUG022：v1.1.1 夹具 → 未设置 `BROWN_OVERRIDE_COMMANDS` → 10 个命令与模板逐字一致。
    - ④ 输出含恰好 10 条「已更新」（`lang: 'zh-CN'`，统计 `event.text` 前缀）。
    - ⑤ 用户自建命令 `my-custom.md` 不被覆盖、不被删除。
+   - ⑥ **保留功能验证**：设 `BROWN_OVERRIDE_COMMANDS=no` → 命令文件字节不变（证明开关仍然有效）。
+   - ⑦ **ask 功能验证**：设 `BROWN_OVERRIDE_COMMANDS=ask` + prompt 全答 n → 命令文件字节不变（证明逐文件决策仍然有效）。
 
 4. **改写既有用例**（语义更新，不是删绿）：
 
-   - `test/setup-brownfield.test.js:435` `棕地已有 commands 且答 n 时文件不变` → 改为「commands 属产品资产，答 n 语义不再存在；已有命令被模板覆盖」。
+   - `test/setup-brownfield.test.js:435` `棕地已有 commands 且答 n 时文件不变` → 改为「未设置 override 时默认覆盖；设 `=no` 时才保留」，两条断言分别覆盖新默认与保留功能。
    - `test/setup-brownfield.test.js:311` `schemas 非空时询问，答 y 时 schema 被覆盖` → 改为「schemas 非空但无 config.yaml 时不询问，schema 被无条件覆盖」。
-   - `test/setup-api.test.js:242` `collects per-file command decisions when the brownfield mode is ask` → 改为「不再请求 commands 决策：BROWN_OVERRIDE_COMMANDS=ask 被忽略，无 prompt，计划为 write」。
+   - `test/setup-api.test.js:242` `collects per-file command decisions when the brownfield mode is ask` → 改为「未设置 override 时不询问」+ 新增「设 `=ask` 时仍逐文件询问」断言。
    - 视 `test/setup-planner.test.js` 结果决定是否补一条「schemas 无条件 write」断言（预期现有 3 条均不回归）。
 
 ## Risks / Trade-offs
 
-- [用户已依赖 `BROWN_OVERRIDE_COMMANDS=no` 保护本地改过的命令] → 升级后会被覆盖。Mitigation：D5 打印废弃说明；本变更不删除文件，用户改过的命令若同名会被覆盖（可预期），但自建命令保留。文档同步标注。
-- [「已更新」计数被其他产品资产污染] → 夹具不 seed `openspec/schemas/`，并用 `lang: 'zh-CN'` 统计；若未来模板新增产品资产目录，测试会先红，提醒更新断言。
+- [用户已依赖 `BROWN_OVERRIDE_COMMANDS=no` 保护本地改过的命令] → 显式 `no` 仍然生效（D4 保留功能），不存在静默反转；只有「未设置」这一档从保留改为覆盖。
+- [未设置的 CI 会覆盖本地手改命令] → 这正是 BUG022 要的升级行为；需要保护时显式设 `=no`。文档标注默认值变更。
+- [「已更新」计数被其他文件污染] → 夹具只让 10 个命令内容变化（`config.yaml` 答 n、根文件预置一致、schemas 目录为空走新建），断言稳定；若未来夹具新增变化文件，测试会先红提醒。
 - [读取目标文件做 diff 引入额外 I/O / 编码问题] → 只读文本模板产物（现状已按 utf8 处理），不读二进制；`skills.lock.json` 走 `copy` 分支不参与 diff。
 - [schemas 无条件覆盖会冲掉用户手改的 schema] → 这正是 ① 类定义；schema 内容变更的语义由 T004 负责，本变更只保证文件到达。
-- [删除 index.ts 询问分支后，`InitDecisions.commands` 仍可能由调用方传入] → planner 不再读取，属无害死字段；保留字段是为了不让 `setup-api` 的调用方编译失败。
 
 ## Migration Plan
 
-1. 合并后对已安装项目重跑 `oso init`：默认答 n 时 `config.yaml` 保留，schema 与 commands 刷新。
-2. 回滚：`git revert` 单个 change 提交即可；无数据迁移、无 schema 变更、无持久化状态。
-3. 发布说明需写明：`BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 已失效；commands 与 schemas 升级时会被覆盖。
+1. 合并后对已安装项目重跑 `oso init`：默认（未设 override）会刷新 schema 与 commands；`config.yaml` 未答 y 时仍保留。
+2. 需要保护本地命令的用户：显式设置 `BROWN_OVERRIDE_COMMANDS=no` / `BROWN_OVERRIDE_SKILLS=no`（功能未变）。
+3. 回滚：`git revert` 单个 change 提交即可；无数据迁移、无 schema 变更、无持久化状态。
+4. 发布说明需写明：`BROWN_OVERRIDE_COMMANDS` / `BROWN_OVERRIDE_SKILLS` 三档功能保留，但「未设置」的默认值从「保留」改为「覆盖」。
 
 ## Open Questions
 
-无。方案与验收条件已由用户裁决；实现层面的取舍（D1 路径谓词、D5 弃用提示、D6 输出范围）均在此文档给出理由。
+无。方案与验收条件已由用户裁决；实现层面的取舍（D1 路径谓词、D4 默认值翻转、D6 全量「已更新」输出）均在此文档给出理由。
