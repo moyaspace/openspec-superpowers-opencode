@@ -313,11 +313,10 @@ async function collectBrownfieldDecisions(options: BrownfieldOptions): Promise<B
         }
         return files.sort();
     };
-    const openspecHasContent = fs.existsSync(path.join(targetDir, 'openspec', 'config.yaml'))
-        || hasEntries(path.join(targetDir, 'openspec', 'schemas'));
+    const openspecHasContent = fs.existsSync(path.join(targetDir, 'openspec', 'config.yaml'));
     const decisions: InitDecisions = {};
     if (env.BROWN_OVERRIDE_OPENSPEC || openspecHasContent) {
-        decisions.openspec = await tDecide('BROWN_OVERRIDE_OPENSPEC', '覆盖 openspec/ 配置和 schema？', 'Overwrite OpenSpec config and schemas?');
+        decisions.openspec = await tDecide('BROWN_OVERRIDE_OPENSPEC', '覆盖 openspec/config.yaml？', 'Overwrite openspec/config.yaml?');
     } else {
         decisions.openspec = 'yes';
         p({ type: 'info', text: t('openspec/ 不存在，已部署', 'openspec/ not found, deployed') });
@@ -325,7 +324,8 @@ async function collectBrownfieldDecisions(options: BrownfieldOptions): Promise<B
     if (fs.existsSync(path.join(targetDir, '.opencode', 'opencode.json'))) {
         decisions.opencodeJson = await tDecide('BROWN_OVERRIDE_OCODEJSON', '合并 .opencode/opencode.json？', 'Merge .opencode/opencode.json?');
     }
-    if (hasEntries(path.join(targetDir, '.opencode', 'commands'))) {
+    const commandOverride = env.BROWN_OVERRIDE_COMMANDS;
+    if (hasEntries(path.join(targetDir, '.opencode', 'commands')) && commandOverride !== undefined) {
         decisions.commands = await tDecide('BROWN_OVERRIDE_COMMANDS', '覆盖 commands？', 'Overwrite commands?', true);
         if (decisions.commands === 'ask') {
             decisions.commandFiles = {};
@@ -341,7 +341,8 @@ async function collectBrownfieldDecisions(options: BrownfieldOptions): Promise<B
             }
         }
     }
-    if (hasEntries(path.join(targetDir, '.opencode', 'skills'))) {
+    const skillOverride = env.BROWN_OVERRIDE_SKILLS;
+    if (hasEntries(path.join(targetDir, '.opencode', 'skills')) && skillOverride !== undefined) {
         decisions.skills = await tDecide('BROWN_OVERRIDE_SKILLS', '覆盖 skills？', 'Overwrite skills?', true);
         if (decisions.skills === 'ask') {
             decisions.skillFiles = {};

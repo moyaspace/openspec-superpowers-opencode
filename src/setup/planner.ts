@@ -159,29 +159,19 @@ function createInitPlan(context: InitContext): InitPlan {
             });
             continue;
         }
-        if (
-            brownfield
-            && portablePath.startsWith('.opencode/commands/')
-            && fs.existsSync(target)
-            && (
-                decisions.commands === 'ask'
-                    ? decisions.commandFiles && decisions.commandFiles[portablePath] !== 'yes'
-                    : decisions.commands !== 'yes'
-            )
-        ) {
+        const keepCommand = decisions.commands === 'no'
+            || (decisions.commands === 'ask'
+                && decisions.commandFiles
+                && decisions.commandFiles[portablePath] !== 'yes');
+        if (brownfield && isCommand(portablePath) && fs.existsSync(target) && keepCommand) {
             operations.push({ type: 'preserve', target, decision: 'skip' });
             continue;
         }
-        if (
-            brownfield
-            && portablePath.startsWith('.opencode/skills/')
-            && fs.existsSync(target)
-            && (
-                decisions.skills === 'ask'
-                    ? decisions.skillFiles && decisions.skillFiles[portablePath] !== 'yes'
-                    : decisions.skills !== 'yes'
-            )
-        ) {
+        const keepSkill = decisions.skills === 'no'
+            || (decisions.skills === 'ask'
+                && decisions.skillFiles
+                && decisions.skillFiles[portablePath] !== 'yes');
+        if (brownfield && isSkill(portablePath) && fs.existsSync(target) && keepSkill) {
             operations.push({ type: 'preserve', target, decision: 'skip' });
             continue;
         }
