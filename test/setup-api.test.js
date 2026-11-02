@@ -309,4 +309,40 @@ describe('setup public API', () => {
         assert.ok(prompts.length >= 1);
         assert.equal(operation.type, 'preserve');
     });
+
+    it('applies per-file command decisions when the brownfield mode is ask and the user accepts', async (t) => {
+        const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-brown-ask-yes-'));
+        const targetDir = path.join(parentDir, 'project');
+        const superpowersPath = path.join(parentDir, 'superpowers', 'skills');
+        const existingCommand = path.join(targetDir, '.opencode', 'commands', 'opsx-ff.md');
+        const prompts = [];
+        t.after(() => fs.rmSync(parentDir, { recursive: true, force: true }));
+        fs.mkdirSync(path.join(targetDir, 'openspec'), { recursive: true });
+        fs.writeFileSync(path.join(targetDir, 'openspec', 'config.yaml'), 'user config');
+        fs.mkdirSync(path.dirname(existingCommand), { recursive: true });
+        fs.writeFileSync(existingCommand, 'user command');
+        fs.mkdirSync(superpowersPath, { recursive: true });
+        fs.writeFileSync(path.join(path.dirname(superpowersPath), 'package.json'), JSON.stringify({ version: '6.1.1' }));
+
+        const result = await setup.dryRunProject({
+            targetDir,
+            templateDir: path.resolve(__dirname, '..', 'template'),
+            shimDeps: ACTIVE_SHIM,
+            superpowersPath,
+            runner: { run: () => ({ code: 0, stdout: '1.0.0', stderr: '' }) },
+            env: {
+                BROWN_OVERRIDE_INIT: 'yes',
+                BROWN_OVERRIDE_OPENSPEC: 'no',
+                BROWN_OVERRIDE_COMMANDS: 'ask',
+            },
+            prompt: async question => {
+                prompts.push(question);
+                return 'yes';
+            },
+        });
+        const operation = result.operations.find(candidate => candidate.target === existingCommand);
+
+        assert.equal(prompts.length, 1);
+        assert.equal(operation.type, 'write');
+    });
 });
