@@ -101,6 +101,64 @@ const BROWN_ENV = {
     BROWN_OVERRIDE_REGISTRY: 'yes',
 };
 
+function listFilesRecursive(root) {
+    if (!fs.existsSync(root)) return [];
+    const files = [];
+    for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+        const child = path.join(root, entry.name);
+        if (entry.isDirectory()) files.push(...listFilesRecursive(child));
+        else if (entry.isFile()) files.push(child);
+    }
+    return files.sort();
+}
+
+function renderTemplate(relative, superpowersPath) {
+    const replacement = superpowersPath.endsWith(path.sep) ? superpowersPath : `${superpowersPath}${path.sep}`;
+    return fs.readFileSync(path.join(templateDir, ...relative.split('/')), 'utf8')
+        .split('{{SUPERPOWERS_BASE_PATH}}').join(replacement);
+}
+
+const CHANGED_COMMANDS = [
+    'opsx-apply.md', 'opsx-archive.md', 'opsx-bulk-archive.md', 'opsx-continue.md',
+    'opsx-ff.md', 'opsx-finish.md', 'opsx-new.md', 'opsx-propose.md',
+    'opsx-sync.md', 'opsx-verify.md',
+];
+
+/**
+ * 建一个「已安装 v1.1.1」的棕地项目：
+ * - 10 个变更命令内容为 `OLD v1.1.1 <name>`，其余 3 个与当前模板逐字一致；
+ * - openspec/config.yaml 为固定字节；schemas 目录存在但为空（BUG021 现场）；
+ * - 4 个受管根文件直接写入模板渲染结果（模板本身已含完整 marker 对，
+ *   若再外包一层会让 mergeMarker 看到 4 个 marker 并抛错）。
+ */
+function seedInstalledProject(t, { superpowersPath }) {
+    const targetDir = seedBrownfield(t);
+    const commandsDir = path.join(targetDir, '.opencode', 'commands');
+    fs.mkdirSync(commandsDir, { recursive: true });
+    const all = fs.readdirSync(path.join(templateDir, '.opencode', 'commands'))
+        .filter(name => name.endsWith('.md'));
+    for (const name of all) {
+        const content = CHANGED_COMMANDS.includes(name)
+            ? `OLD v1.1.1 ${name}\n`
+            : renderTemplate(`.opencode/commands/${name}`, superpowersPath);
+        fs.writeFileSync(path.join(commandsDir, name), content);
+    }
+    fs.mkdirSync(path.join(targetDir, 'openspec', 'schemas', 'superpowers-bridge-opencode'), { recursive: true });
+    const configContent = 'schema: spec-driven\n# user config, must not change\n';
+    fs.writeFileSync(path.join(targetDir, 'openspec', 'config.yaml'), configContent);
+    fs.writeFileSync(path.join(targetDir, '.opencode', 'install-manifest.json'),
+        JSON.stringify({ project: 'openspec-superpowers-opencode', files: [], overwriteDecisions: {} }, null, 2) + '\n');
+    for (const [source, dest] of [
+        ['_gitignore', '.gitignore'],
+        ['_gitattributes', '.gitattributes'],
+        ['_editorconfig', '.editorconfig'],
+        ['_AGENTS.md', 'AGENTS.md'],
+    ]) {
+        fs.writeFileSync(path.join(targetDir, dest), renderTemplate(source, superpowersPath));
+    }
+    return { targetDir, configContent, commandNames: all };
+}
+
 test('棕地：无 marker 的 .gitignore 追加托管区块，用户原有行零删除', async (t) => {
     const targetDir = seedBrownfield(t);
     const userLines = ['node_modules/', '.env', 'dist/', 'logs/', ''];
@@ -482,4 +540,186 @@ test('假 runner：schema.yaml 缺失时 7/8 必须失败（BUG021 反证）', a
         }),
         /schema-validation failed/,
     );
+});
+
+test('BUG021：config.yaml 保留 + schemas 为空 → 10 个 schema 落盘且 7/8 通过', async (t) => {
+    const superpowersPath = makeSuperpowers(t);
+    const { targetDir, configContent } = seedInstalledProject(t, { superpowersPath });
+    const events = [];
+    let result = null;
+    let error = null;
+    try {
+        result = await initProject({
+            targetDir,
+            templateDir,
+            superpowersPath,
+            runner: initRunner(),
+            lang: 'en',
+            shimDeps: ACTIVE_SHIM,
+            progress: event => events.push(event),
+            prompt: async () => 'n',
+            env: { ...BROWN_ENV, BROWN_OVERRIDE_OPENSPEC: undefined, BROWN_OVERRIDE_COMMANDS: undefined },
+        });
+    } catch (caught) {
+        error = caught;
+    }
+
+    const schemaFiles = listFilesRecursive(path.join(targetDir, 'openspec', 'schemas', 'superpowers-bridge-opencode'));
+    assert.equal(
+        schemaFiles.length,
+        10,
+        `BUG021：10 个 schema 文件必须落盘（实际 ${schemaFiles.length}；init 错误：${error ? error.message : '无'}）`,
+    );
+    assert.equal(
+        fs.readFileSync(path.join(targetDir, 'openspec', 'config.yaml'), 'utf8'),
+        configContent,
+        '答 n 后 config.yaml 必须逐字不变',
+    );
+    assert.equal(error, null, `init 必须成功：${error ? error.message : '无'}`);
+    assert.equal(result.success, true);
+    const stepIndex = events.findIndex(event => event.type === 'step' && event.n === 7);
+    assert.ok(stepIndex >= 0, 'progress 必须包含 7/8 step');
+    assert.ok(
+        events.slice(stepIndex + 1).some(event => event.type === 'pass'),
+        '7/8 之后必须出现 pass',
+    );
+});
+
+test('BUG022：v1.1.1 夹具 + 未设置开关 → 10 个命令与模板逐字一致', async (t) => {
+    const superpowersPath = makeSuperpowers(t);
+    const { targetDir } = seedInstalledProject(t, { superpowersPath });
+    let error = null;
+    // BUG021 未修复时 7/8 会因 schema 缺失抛错；先取证，再单独断言 init 必须成功。
+    try {
+        await initProject({
+            targetDir,
+            templateDir,
+            superpowersPath,
+            runner: initRunner(),
+            lang: 'en',
+            shimDeps: ACTIVE_SHIM,
+            prompt: async () => 'n',
+            env: { ...BROWN_ENV, BROWN_OVERRIDE_OPENSPEC: undefined, BROWN_OVERRIDE_COMMANDS: undefined },
+        });
+    } catch (caught) {
+        error = caught;
+    }
+
+    for (const name of CHANGED_COMMANDS) {
+        assert.equal(
+            fs.readFileSync(path.join(targetDir, '.opencode', 'commands', name), 'utf8'),
+            renderTemplate(`.opencode/commands/${name}`, superpowersPath),
+            `${name} 必须刷新为当前模板渲染结果`,
+        );
+    }
+    assert.equal(error, null, `init 必须成功：${error ? error.message : '无'}`);
+});
+
+test('升级可见性：恰好 10 条「已更新：」', async (t) => {
+    const superpowersPath = makeSuperpowers(t);
+    const { targetDir } = seedInstalledProject(t, { superpowersPath });
+    const events = [];
+    let error = null;
+    try {
+        await initProject({
+            targetDir,
+            templateDir,
+            superpowersPath,
+            runner: initRunner(),
+            lang: 'zh-CN',
+            shimDeps: ACTIVE_SHIM,
+            progress: event => events.push(event),
+            prompt: async () => 'n',
+            env: { ...BROWN_ENV, BROWN_OVERRIDE_OPENSPEC: undefined, BROWN_OVERRIDE_COMMANDS: undefined },
+        });
+    } catch (caught) {
+        error = caught;
+    }
+
+    const updated = events.filter(event => (event.text || '').startsWith('已更新：'));
+    assert.equal(updated.length, 10, `升级后必须恰好输出 10 条「已更新：」（实际 ${updated.length}）`);
+    for (const name of ['opsx-explore', 'opsx-onboard', 'opsx-remove']) {
+        assert.equal(
+            updated.some(event => event.text.includes(name)),
+            false,
+            `${name} 未变更，不得出现在「已更新：」中`,
+        );
+    }
+    assert.equal(error, null, `init 必须成功：${error ? error.message : '无'}`);
+});
+
+test('用户自建命令不被覆盖、不被删除', async (t) => {
+    const superpowersPath = makeSuperpowers(t);
+    const { targetDir } = seedInstalledProject(t, { superpowersPath });
+    const customPath = path.join(targetDir, '.opencode', 'commands', 'my-custom.md');
+    fs.writeFileSync(customPath, 'my custom\n');
+
+    const result = await initProject({
+        targetDir,
+        templateDir,
+        superpowersPath,
+        runner: initRunner(),
+        lang: 'en',
+        shimDeps: ACTIVE_SHIM,
+        prompt: async () => 'n',
+        env: { ...BROWN_ENV, BROWN_OVERRIDE_COMMANDS: undefined },
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(fs.existsSync(customPath), true, '用户自建命令不得被删除');
+    assert.equal(fs.readFileSync(customPath, 'utf8'), 'my custom\n', '用户自建命令不得被覆盖');
+});
+
+test('保留功能：BROWN_OVERRIDE_COMMANDS=no → 命令文件字节不变', async (t) => {
+    const superpowersPath = makeSuperpowers(t);
+    const { targetDir } = seedInstalledProject(t, { superpowersPath });
+
+    const result = await initProject({
+        targetDir,
+        templateDir,
+        superpowersPath,
+        runner: initRunner(),
+        lang: 'en',
+        shimDeps: ACTIVE_SHIM,
+        env: { ...BROWN_ENV, BROWN_OVERRIDE_COMMANDS: 'no' },
+    });
+
+    assert.equal(result.success, true);
+    for (const name of CHANGED_COMMANDS) {
+        assert.equal(
+            fs.readFileSync(path.join(targetDir, '.opencode', 'commands', name), 'utf8'),
+            `OLD v1.1.1 ${name}\n`,
+            `${name} 在 =no 下必须保持 v1.1.1 原始字节`,
+        );
+    }
+});
+
+test('ask 功能：BROWN_OVERRIDE_COMMANDS=ask + 全部答 n → 命令文件字节不变', async (t) => {
+    const superpowersPath = makeSuperpowers(t);
+    const { targetDir } = seedInstalledProject(t, { superpowersPath });
+    const prompts = [];
+
+    const result = await initProject({
+        targetDir,
+        templateDir,
+        superpowersPath,
+        runner: initRunner(),
+        lang: 'en',
+        shimDeps: ACTIVE_SHIM,
+        prompt: async question => {
+            prompts.push(question);
+            return 'n';
+        },
+        env: { ...BROWN_ENV, BROWN_OVERRIDE_COMMANDS: 'ask' },
+    });
+
+    assert.equal(result.success, true);
+    assert.ok(prompts.length > 0, 'ask 模式必须逐个询问已存在的命令文件');
+    for (const name of CHANGED_COMMANDS) {
+        assert.equal(
+            fs.readFileSync(path.join(targetDir, '.opencode', 'commands', name), 'utf8'),
+            `OLD v1.1.1 ${name}\n`,
+            `${name} 在 =ask + 答 n 下必须保持 v1.1.1 原始字节`,
+        );
+    }
 });
