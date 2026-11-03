@@ -79,6 +79,8 @@ oso init                                  # 或: openspec-superpowers-opencode i
 /opsx-finish              # test → merge → cleanup
 ```
 
+`oso init` auto-checks and installs the `openspec` shim. If it can't, init still completes and prints the exact command to run (system npm on Unix: `sudo oso install-shims`; nvm/user-level prefix: no sudo; Windows: run as Administrator).
+
 ## Features
 
 | # | Feature | One-liner |

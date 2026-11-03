@@ -15,6 +15,17 @@ npm install -g @moyaspace/openspec-superpowers-opencode
 npm install -g ./<name>-<version>.tgz
 ```
 
+### 权限说明
+
+`oso init` 会自动检查并安装 `openspec` 垫片。垫片写在 **`openspec` 命令所在的 bin 目录**，
+所以需不需要提权，取决于 `openspec` 是怎么装的：
+
+- **系统 npm**（`npm i -g` 装到 `/usr/local/bin` 等系统前缀）：该目录通常属于 root，需要 `sudo oso install-shims`。
+- **nvm / 用户级 prefix**（如 `npm config set prefix ~/.npm-global`）：目录属于当前用户，**无需 sudo**。
+- **Windows**：以管理员身份打开 PowerShell，然后运行 `oso install-shims`；若装了 gsudo，可用 `gsudo oso install-shims` 代替。
+
+怎么确认：`which openspec`（Windows 用 `where openspec`）看它落在哪个目录，再用 `ls -ld <目录>` 判断当前用户是否可写。
+
 ### 验证安装
 
 ```bash
@@ -23,6 +34,9 @@ oso --help                                  # 或: openspec-superpowers-opencode
 
 依赖：`openspec` CLI v1.3+、`opencode` CLI、`git`、Superpowers 插件。
 安装后 setup 脚本会自动检测这些工具是否可用。
+
+`oso init` 会自动检查并安装 `openspec` 垫片；装不上**不会中止 init**，而是继续完成初始化，
+并在结尾提示该运行哪条命令（见上面的「权限说明」）。装好后无需重跑 init。
 
 ## 初始化项目
 
