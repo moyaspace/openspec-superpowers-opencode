@@ -189,6 +189,58 @@ test('initProject：垫片修复失败 → 继续完成、exit success、输出 
   assert.ok(banner.includes('oso install-shims'));
 });
 
+test('initProject：Windows 垫片失败 → 提示管理员 PowerShell 与 gsudo 备选', async (t) => {
+  const parent = tempDir(t);
+  const targetDir = path.join(parent, 'project');
+  const events = [];
+  const result = await initProject({
+    targetDir,
+    templateDir,
+    superpowersPath: superpowersFixture(t),
+    runner: runner(),
+    lang: 'en',
+    progress: (event) => events.push(event),
+    shimDeps: { ...BROKEN_SHIM, isWin: true, findOpenspec: () => path.join('C:\\fake\\bin', 'openspec'), install: () => ({ success: false, binDir: 'C:\\fake\\bin', details: ['EACCES'] }) },
+  });
+
+  assert.equal(result.success, true);
+  const text = events.map((e) => `${e.item || ''} ${e.text || ''} ${e.detail || ''}`).join('\n');
+  assert.ok(text.includes('PowerShell'), 'must mention PowerShell');
+  assert.ok(text.includes('gsudo'), 'must mention gsudo');
+  assert.ok(text.includes('C:\\fake\\bin'), 'must show actual binDir');
+});
+
+test('initProject：Unix 可写 binDir → 提示无需 sudo 且命令不含 sudo', async (t) => {
+  const parent = tempDir(t);
+  const targetDir = path.join(parent, 'project');
+  const binDir = path.join(parent, 'writable-bin');
+  fs.mkdirSync(binDir, { recursive: true });
+  const events = [];
+  const result = await initProject({
+    targetDir,
+    templateDir,
+    superpowersPath: superpowersFixture(t),
+    runner: runner(),
+    lang: 'en',
+    progress: (event) => events.push(event),
+    shimDeps: {
+      isWin: false,
+      findOpenspec: () => path.join(binDir, 'openspec'),
+      findShimFile: () => null,
+      findOpenspecOrig: () => null,
+      install: () => ({ success: false, binDir, details: ['EACCES'] }),
+    },
+  });
+
+  assert.equal(result.success, true);
+  const commandLines = events
+    .map((e) => `${e.item || ''} ${e.text || ''}`)
+    .filter((line) => line.includes('oso install-shims'));
+  assert.ok(commandLines.length > 0, 'must print a copy-paste command');
+  assert.ok(commandLines.some((line) => line.includes(binDir)), 'command line must include binDir');
+  assert.ok(commandLines.every((line) => !line.includes('sudo')), 'writable dir must not suggest sudo');
+});
+
 test('initProject：垫片未生效但修复成功 → 继续到完成，并报告自动安装', async (t) => {
     const parent = tempDir(t);
     const targetDir = path.join(parent, 'project');

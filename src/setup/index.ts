@@ -904,11 +904,12 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
 
     if (shimSkipped) {
         const isWin = options.shimDeps?.isWin ?? process.platform === 'win32';
+        const binDirLabel = shimBinDir ?? t('未探测到 openspec bin 目录', 'openspec bin dir not found');
         p({ type: 'blank' });
         p({ type: 'section', label: t('openspec 垫片未安装', 'openspec shim not installed') });
         p({ type: 'info', text: `  ${t('原因', 'reason')}: ${shimDetails.join('; ')}` });
         if (isWin) {
-            p({ type: 'info', text: `  ${t('以管理员身份打开 PowerShell，然后运行', 'Open PowerShell as Administrator, then run')}: oso install-shims   (bin dir: ${shimBinDir})` });
+            p({ type: 'info', text: `  ${t('以管理员身份打开 PowerShell，然后运行', 'Open PowerShell as Administrator, then run')}: oso install-shims   (bin dir: ${binDirLabel})` });
             p({ type: 'info', text: `  ${t('若已安装 gsudo，可用', 'If gsudo is installed, you can use')}: gsudo oso install-shims` });
         } else {
             let writable = false;
@@ -924,10 +925,10 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
             p({
                 type: 'info',
                 text: writable
-                    ? t('无需 sudo（当前用户对该目录有写权限；nvm / 用户级 prefix 通常如此）', 'no sudo needed (your user can write to this dir; typical for nvm / user-level prefixes)')
-                    : t('该目录属于系统 npm 前缀；nvm / 用户级 prefix 用户无需 sudo', 'this dir belongs to the system npm prefix; nvm / user-level prefix users need no sudo'),
+                    ? t('当前用户对该目录有写权限，无需 sudo（nvm / 用户级 prefix 通常如此）', 'your user can write to this dir, no sudo needed (typical for nvm / user-level prefixes)')
+                    : t('若你用的是 nvm 或用户级 prefix，正常无需 sudo；当前 bin 目录不可写，请用下面的 sudo 命令，或检查 npm prefix 配置', 'If you use nvm or a user-level prefix you normally need no sudo; this bin dir is not writable, so use the sudo command below or check your npm prefix'),
             });
-            p({ type: 'info', text: `  ${command}   (bin dir: ${shimBinDir})` });
+            p({ type: 'info', text: `  ${command}   (bin dir: ${binDirLabel})` });
         }
         p({ type: 'info', text: t('装好后无需重跑 init，只需执行上面这一条命令', 'No need to re-run init after this — just run that one command') });
         p({ type: 'blank' });
