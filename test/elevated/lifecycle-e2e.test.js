@@ -26,8 +26,8 @@ const workRoot = mkdtempSync(join(tmpdir(), 'oso-lifecycle-'));
 /**
  * 隔离 bin 目录：把**真实的 openspec 可执行文件复制一份**放进去，并前置到 PATH。
  *
- * 为什么需要：`npm install <tarball>` 的 postinstall 与 `oso init` 的 ensureShim
- * 都会执行 installShims，其 findOpenspecBinDir 用 `where`/`which openspec` 定位 bin。
+ * 为什么需要：`oso init` 的 ensureShim 会执行 installShims，其 findOpenspecBinDir
+ * 用 `where`/`which openspec` 定位 bin。
  * 不隔离就会写进**机器全局** npm bin，TOOL_DIR 指向随后被删除的临时项目，
  * 收尾时把开发机的 openspec 弄坏（ps1/cmd 指向不存在的目录）。
  *
