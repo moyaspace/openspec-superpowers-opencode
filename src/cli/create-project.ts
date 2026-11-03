@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// create-openspec-superpowers-opencode — 别名：相当于 openspec-superpowers-opencode init <dir>
+// create-openspec-superpowers-opencode — 别名：相当于 oso init <dir>
 
 const args = process.argv.slice(2);
 
@@ -23,7 +23,7 @@ if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
   create-openspec-superpowers-opencode <target-dir>
 
 等同于:
-  openspec-superpowers-opencode init <target-dir>
+  oso init <target-dir>
 
 示例:
   create-openspec-superpowers-opencode my-project
@@ -34,7 +34,7 @@ Usage:
   create-openspec-superpowers-opencode <target-dir>
 
 Equivalent to:
-  openspec-superpowers-opencode init <target-dir>
+  oso init <target-dir>
 
 Example:
   create-openspec-superpowers-opencode my-project

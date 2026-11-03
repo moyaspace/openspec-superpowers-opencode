@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// openspec-superpowers-opencode — 项目 CLI 工具
+// oso — 项目 CLI 工具
 //
 // 用法：
-//   cd my-project && openspec-superpowers-opencode init
-//   openspec-superpowers-opencode init my-project
+//   cd my-project && oso init
+//   oso init my-project
 //   create-openspec-superpowers-opencode my-project                   别名
 
 import fs from 'node:fs';
@@ -53,19 +53,19 @@ function t(zh: string, en: string): string {
 
 const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
  用法:
-    openspec-superpowers-opencode init [目录] [--lang zh-CN|zh-TW|en]  初始化项目
-    openspec-superpowers-opencode reset             重置项目配置
-    openspec-superpowers-opencode dry-run [--lang zh-CN|zh-TW|en]     预览变更
-    openspec-superpowers-opencode ensure-worktree <name>    确保 worktree 已创建
-    openspec-superpowers-opencode registry add <name> <worktree> [--base <branch>]  注册表添加变更
-    openspec-superpowers-opencode registry remove <name>    注册表删除变更
-    openspec-superpowers-opencode registry list             列出所有活跃变更
-    openspec-superpowers-opencode registry reset            重置注册表为空
-    openspec-superpowers-opencode verify                   验证系统完整性（5 项检查）
-    openspec-superpowers-opencode registry verify           轻量验证（仅 oso-change-registry.json + worktree）
-    openspec-superpowers-opencode install-shims             安装/修复垫片脚本
-    openspec-superpowers-opencode uninstall-shims           卸除垫片脚本，恢复原始 openspec
-    openspec-superpowers-opencode remove-worktree <name>    删除 worktree 和分支
+    oso init [目录] [--lang zh-CN|zh-TW|en]  初始化项目
+    oso reset             重置项目配置
+    oso dry-run [--lang zh-CN|zh-TW|en]     预览变更
+    oso ensure-worktree <name>    确保 worktree 已创建
+    oso registry add <name> <worktree> [--base <branch>]  注册表添加变更
+    oso registry remove <name>    注册表删除变更
+    oso registry list             列出所有活跃变更
+    oso registry reset            重置注册表为空
+    oso verify                   验证系统完整性（5 项检查）
+    oso registry verify           轻量验证（仅 oso-change-registry.json + worktree）
+    oso install-shims             安装/修复垫片脚本
+    oso uninstall-shims           卸除垫片脚本，恢复原始 openspec
+    oso remove-worktree <name>    删除 worktree 和分支
 
   语言:
     --lang zh-CN    简体中文
@@ -77,7 +77,7 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
 
   示例:
     mkdir my-project && cd my-project
-    openspec-superpowers-opencode init --lang en
+    oso init --lang en
 
   说明:
     复制模板 → git init → 安装配置 → 首次提交
@@ -90,19 +90,19 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     /opsx-archive        归档变更
 ` : `
  Usage:
-    openspec-superpowers-opencode init [dir] [--lang zh-CN|zh-TW|en]  Init project
-    openspec-superpowers-opencode reset              Reset project config
-    openspec-superpowers-opencode dry-run [--lang zh-CN|zh-TW|en]    Preview changes
-    openspec-superpowers-opencode ensure-worktree <name>    Ensure worktree exists
-    openspec-superpowers-opencode registry add <name> <worktree> [--base <branch>]  Add change to registry
-    openspec-superpowers-opencode registry remove <name>    Remove change from registry
-    openspec-superpowers-opencode registry list             List active changes
-    openspec-superpowers-opencode registry reset            Reset registry to empty
-    openspec-superpowers-opencode verify                   Verify system integrity (5 checks)
-    openspec-superpowers-opencode registry verify           Lightweight verify (only oso-change-registry.json + worktree)
-    openspec-superpowers-opencode install-shims             Install/repair shim scripts
-    openspec-superpowers-opencode uninstall-shims           Uninstall shim scripts, restore original openspec
-    openspec-superpowers-opencode remove-worktree <name>    Remove worktree and clean branch
+    oso init [dir] [--lang zh-CN|zh-TW|en]  Init project
+    oso reset              Reset project config
+    oso dry-run [--lang zh-CN|zh-TW|en]    Preview changes
+    oso ensure-worktree <name>    Ensure worktree exists
+    oso registry add <name> <worktree> [--base <branch>]  Add change to registry
+    oso registry remove <name>    Remove change from registry
+    oso registry list             List active changes
+    oso registry reset            Reset registry to empty
+    oso verify                   Verify system integrity (5 checks)
+    oso registry verify           Lightweight verify (only oso-change-registry.json + worktree)
+    oso install-shims             Install/repair shim scripts
+    oso uninstall-shims           Uninstall shim scripts, restore original openspec
+    oso remove-worktree <name>    Remove worktree and clean branch
 
   Language:
     --lang zh-CN    Simplified Chinese
@@ -114,7 +114,7 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
 
   Examples:
     mkdir my-project && cd my-project
-    openspec-superpowers-opencode init --lang en
+    oso init --lang en
 
   Description:
     Copy template → git init → install config → first commit
@@ -127,6 +127,116 @@ const helpText = lang === 'zh-CN' || lang === 'zh-TW' ? `
     /opsx-archive       Archive change
 `;
 
+const KNOWN_SUBCOMMANDS = ['init', 'reset', 'dry-run', 'ensure-worktree', 'registry', 'verify', 'install-shims', 'uninstall-shims', 'remove-worktree'];
+
+interface SubcommandHelp {
+    usage: string;
+    description: string;
+    examples: string[];
+}
+
+function buildSubcommandHelp(subcommand: string, lang: string): string {
+    const isZh = lang === 'zh-CN' || lang === 'zh-TW';
+    const pick = (zh: string, en: string): string => (isZh ? zh : en);
+
+    const entries: Record<string, SubcommandHelp> = {
+        init: {
+            usage: 'oso init [dir] [--lang zh-CN|zh-TW|en]',
+            description: pick(
+                '初始化项目：复制模板 → git init → 安装配置 → 首次提交。',
+                'Initialize a project: copy template → git init → install config → first commit.',
+            ),
+            examples: ['oso init', 'oso init my-project', 'oso init --lang zh-CN'],
+        },
+        reset: {
+            usage: 'oso reset [--lang zh-CN|zh-TW|en]',
+            description: pick(
+                '重置项目配置：依据安装清单回滚已部署文件。',
+                'Reset project config: roll back deployed files using the install manifest.',
+            ),
+            examples: ['oso reset', 'oso reset --lang zh-CN'],
+        },
+        'dry-run': {
+            usage: 'oso dry-run [--lang zh-CN|zh-TW|en]',
+            description: pick(
+                '预览初始化将产生的变更，不写入任何文件。',
+                'Preview the changes init would make without writing any files.',
+            ),
+            examples: ['oso dry-run'],
+        },
+        'ensure-worktree': {
+            usage: 'oso ensure-worktree <name>',
+            description: pick(
+                '确保变更的隔离 worktree 已创建（幂等，不会破坏已有分支）。',
+                'Ensure the change worktree exists (idempotent, never clobbers an existing branch).',
+            ),
+            examples: ['oso ensure-worktree add-user-auth'],
+        },
+        registry: {
+            usage: 'oso registry <add|remove|list|verify|reset> [args...]',
+            description: pick(
+                '管理活跃变更注册表：add 添加、remove 删除、list 列出、reset 重置、verify 轻量校验。',
+                'Manage the active-change registry: add, remove, list, reset, verify.',
+            ),
+            examples: [
+                'oso registry add add-user-auth .worktrees/add-user-auth',
+                'oso registry list',
+                'oso registry remove add-user-auth',
+            ],
+        },
+        verify: {
+            usage: 'oso verify',
+            description: pick(
+                '验证系统完整性（5 项检查）。',
+                'Verify system integrity (5 checks).',
+            ),
+            examples: ['oso verify'],
+        },
+        'install-shims': {
+            usage: 'oso install-shims',
+            description: pick(
+                '安装/修复 openspec 垫片脚本。权限说明：Unix 下若 openspec 装在系统 npm prefix（如 /usr/local/bin），需要 sudo oso install-shims；用 nvm 或用户级 prefix 时无需 sudo。Windows 需以管理员身份运行 PowerShell，若已安装 gsudo 可用 gsudo oso install-shims 代替。',
+                'Install/repair the openspec shim scripts. Permissions: on Unix, if openspec lives under a system npm prefix (e.g. /usr/local/bin), run sudo oso install-shims; with nvm or a user-level prefix sudo is not needed. On Windows, run PowerShell as Administrator, or use gsudo oso install-shims when gsudo is installed.',
+            ),
+            examples: ['oso install-shims', 'sudo oso install-shims', 'gsudo oso install-shims'],
+        },
+        'uninstall-shims': {
+            usage: 'oso uninstall-shims',
+            description: pick(
+                '卸除垫片脚本，恢复原始 openspec。',
+                'Uninstall the shim scripts and restore the original openspec.',
+            ),
+            examples: ['oso uninstall-shims'],
+        },
+        'remove-worktree': {
+            usage: 'oso remove-worktree <name>',
+            description: pick(
+                '删除 worktree 和对应分支。',
+                'Remove the worktree and its branch.',
+            ),
+            examples: ['oso remove-worktree add-user-auth'],
+        },
+    };
+
+    const entry = entries[subcommand];
+    if (!entry) return '';
+
+    return [
+        pick(`用法: ${entry.usage}`, `Usage: ${entry.usage}`),
+        '',
+        entry.description,
+        '',
+        pick('示例:', 'Examples:'),
+        ...entry.examples.map(example => `  ${example}`),
+    ].join('\n');
+}
+
+const wantsSubHelp = args.some(a => a === '--help' || a === '-h');
+if (isEntry && wantsSubHelp && subcommand !== undefined && KNOWN_SUBCOMMANDS.includes(subcommand)) {
+    console.log(buildSubcommandHelp(subcommand, lang));
+    process.exit(0);
+}
+
 if (isEntry && isHelp) {
     console.log(helpText);
     process.exit(0);
@@ -138,7 +248,7 @@ function runCli(): void {
         void runSetupCli(subcommand, targetDir, lang);
     } else if (subcommand === 'ensure-worktree') {
         if (!subarg) {
-            console.error(t('用法: openspec-superpowers-opencode ensure-worktree <name>', 'Usage: openspec-superpowers-opencode ensure-worktree <name>'));
+            console.error(t('用法: oso ensure-worktree <name>', 'Usage: oso ensure-worktree <name>'));
             process.exit(1);
         }
         runEnsureWorktree(subarg, process.cwd());
@@ -153,15 +263,18 @@ function runCli(): void {
     } else if (subcommand === 'remove-worktree') {
         if (!subarg) {
             console.error(t(
-                '用法: openspec-superpowers-opencode remove-worktree <name>',
-                'Usage: openspec-superpowers-opencode remove-worktree <name>'
+                '用法: oso remove-worktree <name>',
+                'Usage: oso remove-worktree <name>'
             ));
             process.exit(1);
         }
         runRemoveWorktree(subarg, process.cwd());
     } else {
         console.error(t(`未知子命令: ${subcommand}`, `Unknown subcommand: ${subcommand}`));
-        console.error(t('可用命令: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims, remove-worktree', 'Available commands: init, reset, dry-run, ensure-worktree, registry, verify, install-shims, uninstall-shims, remove-worktree'));
+        console.error(t(
+            '可用命令: oso init, oso reset, oso dry-run, oso ensure-worktree, oso registry, oso verify, oso install-shims, oso uninstall-shims, oso remove-worktree',
+            'Available commands: oso init, oso reset, oso dry-run, oso ensure-worktree, oso registry, oso verify, oso install-shims, oso uninstall-shims, oso remove-worktree'
+        ));
         process.exit(1);
     }
 }
@@ -392,8 +505,8 @@ async function handleRegistry(registryArgs: string[]): Promise<void> {
 
     if (!action || (action !== 'verify' && action !== 'list' && action !== 'add' && action !== 'remove' && action !== 'reset')) {
         console.error(t(
-            '用法: openspec-superpowers-opencode registry <add|remove|list|verify|reset> [参数...]',
-            'Usage: openspec-superpowers-opencode registry <add|remove|list|verify|reset> [args...]'
+            '用法: oso registry <add|remove|list|verify|reset> [参数...]',
+            'Usage: oso registry <add|remove|list|verify|reset> [args...]'
         ));
         process.exit(1);
     }
@@ -408,8 +521,8 @@ async function handleRegistry(registryArgs: string[]): Promise<void> {
 
     if (!projectRoot) {
         console.error(t(
-            '错误: 不在 OpenSpec 项目中（不在 git 仓库或项目未初始化，请先执行 openspec-superpowers-opencode init）',
-            'Error: Not in an OpenSpec project (not in a git repo or project not initialized, run openspec-superpowers-opencode init first)'
+            '错误: 不在 OpenSpec 项目中（不在 git 仓库或项目未初始化，请先执行 oso init）',
+            'Error: Not in an OpenSpec project (not in a git repo or project not initialized, run oso init first)'
         ));
         process.exit(1);
     }

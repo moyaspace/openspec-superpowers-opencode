@@ -13,7 +13,7 @@
  * 2. 删除垫片文件
  * 3. 恢复 openspec-orig → openspec
  *
- * 被 `openspec-superpowers-opencode install-shims` 和 `uninstall-shims` 调用。
+ * 被 `oso install-shims` 和 `uninstall-shims` 调用。
  */
 
 import fs from 'node:fs';

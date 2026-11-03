@@ -12,7 +12,7 @@
  * 输出格式：
  *   ✓ openspec: installed at /usr/local/bin/openspec
  *   ⚠ openspec-orig: not found
- *     修复：openspec-superpowers-opencode install-shims
+ *     修复：oso install-shims
  *
  * exit code: 全 ✓/∼/⚠(warn) → 0, 有 fail → 1
  */
@@ -251,7 +251,7 @@ function runAllChecks(
                 check: 'openspec-orig',
                 status: 'fail',
                 message: 'not found',
-                fix: 'openspec-superpowers-opencode install-shims'
+                fix: 'oso install-shims'
             });
         }
 
@@ -274,7 +274,7 @@ function runAllChecks(
                 check: 'openspec (shim)',
                 status: 'fail',
                 message: 'not shim script',
-                fix: 'openspec-superpowers-opencode install-shims'
+                fix: 'oso install-shims'
             });
         }
     } else {
@@ -309,8 +309,8 @@ function runAllChecks(
                 status: 'fail',
                 message: regCheck.error === 'not found' ? 'not found' : 'parse error',
                 fix: regCheck.error === 'not found'
-                    ? '在项目根目录创建 openspec/oso-change-registry.json 或运行 openspec-superpowers-opencode init'
-                    : 'openspec-superpowers-opencode registry reset'
+                    ? '在项目根目录创建 openspec/oso-change-registry.json 或运行 oso init'
+                    : 'oso registry reset'
             });
         }
 
@@ -337,7 +337,7 @@ function runAllChecks(
                     check: `worktree (${m.name})`,
                     status: 'fail',
                     message: `not found at ${m.worktree}`,
-                    fix: `openspec-superpowers-opencode registry remove ${m.name}`
+                    fix: `oso registry remove ${m.name}`
                 });
             }
         }

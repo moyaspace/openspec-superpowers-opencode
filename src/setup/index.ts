@@ -584,8 +584,8 @@ async function dryRunProject(options: SetupOptions = {}): Promise<InitPlan | { m
     p({ type: 'action', text: '- openspec schema validate' });
     p({ type: 'action', text: `- ${t('OpenSpec 工作流验证', 'OpenSpec workflow validation')}` });
     p({ type: 'blank' });
-    p({ type: 'info', text: t('重置： openspec-superpowers-opencode reset', 'Reset: openspec-superpowers-opencode reset') });
-    p({ type: 'info', text: t('预览： openspec-superpowers-opencode dry-run', 'Preview: openspec-superpowers-opencode dry-run') });
+    p({ type: 'info', text: t('重置： oso reset', 'Reset: oso reset') });
+    p({ type: 'info', text: t('预览： oso dry-run', 'Preview: oso dry-run') });
 
     return plan;
 }
