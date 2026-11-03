@@ -300,4 +300,15 @@ describe('oso command guidance', () => {
         const reset = fs.readFileSync(path.join(repoRoot, 'src', 'setup', 'reset.ts'), 'utf8');
         assert.ok(reset.includes("'openspec-superpowers-opencode'"), 'reset.ts 的 manifest 归属校验必须保留长名');
     });
+
+    // 直接覆盖「未知子命令以非零退出」——原 test/imp16-tarball-equivalence.test.js
+    // 的唯一此类断言随该文件删除，这里补回自动化回归保护。
+    test('unknown subcommand exits non-zero and lists available commands', () => {
+        const result = runCli('__no_such_command__');
+        assert.notStrictEqual(result.code, 0, '未知子命令必须以非零退出');
+        const output = `${result.stdout}\n${result.stderr}`;
+        assert.match(output, /__no_such_command__/, '错误信息应回显未知子命令名');
+        assert.match(output, /init/, '错误信息应列出可用命令');
+        assert.doesNotMatch(output, /(?<!create-)openspec-superpowers-opencode/, '报错不得使用长名');
+    });
 });

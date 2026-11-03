@@ -4,9 +4,10 @@
  * 把全局 openspec 垫片恢复为「机器上正式安装的 oso」，无论测试成功还是失败。
  *
  * 为什么需要：
- *   在 `.worktrees/<name>/` 里执行 `npm ci` 时，包的 `install` 生命周期会调用
- *   `installShims()`，把全局垫片的 TOOL_DIR 改写为该 worktree 路径。测试期间
- *   指向 V1 代码是必要的（有测试要验证垫片拦截），但 worktree 用完即删——
+ *   测试会调用 `installShims()`（`oso init` 的 `ensureShim`、`install-shims`
+ *   子命令、以及垫片相关用例），把全局垫片的 TOOL_DIR 改写为当前工作区或临时
+ *   目录。测试期间指向 V1 代码是必要的（有测试要验证垫片拦截），但临时目录
+ *   / worktree 用完即删——
  *   一旦垫片还指着它，下一次 `openspec` 调用就会触发自愈降级（还原成原版、
  *   删掉 openspec-orig），全局跨 worktree 合并能力静默消失。
  *
