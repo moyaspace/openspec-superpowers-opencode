@@ -8,7 +8,7 @@
 
 | 命令 | 权限 | 耗时 | 覆盖 |
 |---|---|---|---|
-| `npm test` | Windows：普通用户（首次弹一次 UAC，`gsudo cache on` 可缓存）；Unix/CI：普通用户，无需提权 | ~5 分钟（含构建与 E2E） | typecheck + build + **全局 bin 守卫 + 主套件 + elevated 套件**，一遍全绿（标准 Gate） |
+| `npm test` | Windows：普通用户（首次弹一次 UAC，`gsudo cache on` 可缓存）；Unix/CI：普通用户，无需提权 | ~5 分钟（含构建与 E2E） | typecheck + build + **全局 bin 守卫 + 主套件 + elevated 套件**，一遍全绿（标准 Gate）；收尾自动把全局垫片恢复为正式安装版本 |
 | `node --test "test/*.test.js"` | 普通用户 | ~3.5 分钟 | 仅主套件（300+ 用例；跳过 elevated 与全局 bin 守卫） |
 | `node --test test/<file>.test.js` | 普通用户 | 秒级 | 单文件（改哪跑哪，见 §3） |
 | 宿主探针（见 §2 探针层） | 普通用户 | 1-2 分钟 + 模型调用 | 宿主兼容性（仅版本组合变化时） |
@@ -51,6 +51,7 @@
 - **安全防护用例不可删**：`setup-deploy`/`setup-reset` 的 symlink 穿越、路径逃逸拒绝用例是安全基线。
 - **测试不得写机器全局状态**：`init` / `npm install`（带生命周期脚本）/ `installShims` 会用 `where openspec` 找到**全局** npm bin 并写垫片。测试必须把临时 bin 目录前置到 `PATH`，否则每跑一次就污染开发机（事故链见 `docs/GLOBAL-BIN-TEST-POLLUTION-POSTMORTEM.md`）。
 - **守卫**：`npm test` 用 `scripts/assert-global-bin-unchanged.mjs` 包住主套件与 elevated，对比运行前后全局 `openspec*` 的 SHA-256；有变化直接判失败并指名文件。找不到全局 openspec 时自动跳过。
+- **垫片恢复（`npm test` 收尾，无论成败）**：在 `.worktrees/<name>/` 里跑 `npm ci` 会通过 `install` 生命周期把全局垫片的 `TOOL_DIR` 指向该 worktree——测试期间指向 V1 是必要的，但 worktree 用完即删，垫片若还指着它就会自愈降级。因此 `scripts/run-tests.mjs` 在 `finally` 中调用全局 `oso install-shims`，把 `TOOL_DIR` 还回**正式安装版本**（`npm root -g` 下的包目录）；未装全局 oso（CI）时自动跳过。调试可用 `OSO_SKIP_SHIM_RESTORE=1` 关闭。
 - **失败纪律**：不得删除失败测试求绿；先判断是环境问题（如 EPERM→gsudo）还是回归。
 
 ## 5. 指针区
