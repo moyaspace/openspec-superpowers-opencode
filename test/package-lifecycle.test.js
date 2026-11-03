@@ -30,7 +30,7 @@ describe('package lifecycle', () => {
 
 test('dist/ is ignored and untracked', () => {
   const gitignore = fs.readFileSync(path.join(root, '.gitignore'), 'utf8');
-  assert.match(gitignore, /^dist\/$/m);
+  assert.match(gitignore, /^\/dist\/$/m);
   const tracked = child_process.execFileSync('git', ['ls-files', 'dist'], { cwd: root, encoding: 'utf8' }).trim();
   assert.equal(tracked, '');
 });
