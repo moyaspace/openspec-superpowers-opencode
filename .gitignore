@@ -16,6 +16,9 @@ Thumbs.db
 
 # Serena tool data
 .serena/
+
+# Build output (rebuilt by prepare before pack)
+dist/
 # ↑ Manual gitignore entries go ABOVE this line (outside auto-generated block) ↑
 
 # <!-- openspec-superpowers-opencode_gitignore -->
