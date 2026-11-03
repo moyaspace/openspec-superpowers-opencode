@@ -194,7 +194,7 @@ function makeIsolatedBin() {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-clihelp-'));
     const bin = path.join(tmp, 'bin');
     fs.mkdirSync(bin);
-    fs.writeFileSync(path.join(bin, 'openspec'), '#!/bin/sh\nexit 0\n');
+    fs.writeFileSync(path.join(bin, 'openspec'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
     fs.writeFileSync(path.join(bin, 'openspec.cmd'), '@echo off\r\nexit /b 0\r\n');
     fs.writeFileSync(path.join(bin, 'openspec.ps1'), 'exit 0\r\n');
     return { tmp, bin };
@@ -237,7 +237,7 @@ describe('oso command guidance', () => {
             const result = runCliIsolated(tmp, bin, 'install-shims', '--help');
 
             assert.equal(result.code, 0, `stderr: ${result.stderr}`);
-            assert.match(result.stdout, /install-shims/);
+            assert.match(result.stdout, /(Usage|用法): oso install-shims/);
             assert.match(result.stdout, /sudo|管理员|gsudo|PowerShell/, `missing permission guidance:\n${result.stdout}`);
 
             assert.deepEqual(fs.readdirSync(bin).sort(), binBefore, 'bin 目录不得有任何变化');
@@ -258,7 +258,7 @@ describe('oso command guidance', () => {
             assert.equal(result.code, 0, `stderr: ${result.stderr}`);
             assert.match(result.stdout, /add/);
             assert.match(result.stdout, /list/);
-            assert.match(result.stdout, /oso registry/, '子命令说明必须使用 oso 短命令');
+            assert.match(result.stdout, /(Usage|用法): oso registry <add\|remove\|list\|verify\|reset>/, '必须命中子命令级用法行');
 
             assert.deepEqual(fs.readdirSync(bin).sort(), binBefore, 'bin 目录不得有任何变化');
             assert.deepEqual(fs.readdirSync(tmp).sort(), tmpBefore, '工作目录不得产生新文件（如 .worktrees）');
@@ -267,9 +267,10 @@ describe('oso command guidance', () => {
         }
     });
 
-    test('long command --version matches oso --version and is wired in package.json', () => {
+    test('long command bin mapping points at the same entry as oso and --version agrees', () => {
         const repoRoot = path.resolve(__dirname, '..');
         const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+        // 长名与 oso 在 package.json 里映射到同一个 dist/cli/index.js，因此执行 cliPath 等价于执行长命令
         assert.equal(pkg.bin['openspec-superpowers-opencode'], 'dist/cli/index.js');
 
         const longVersion = child_process
