@@ -245,20 +245,33 @@ function installShimScripts(toolDir: string, binDir: string, isWin: boolean): st
 
     const written: string[] = [];
 
-    for (const tmpl of templates) {
+    templates.forEach((tmpl, i) => {
         const tmplPath = path.join(shimsDir, tmpl);
-        if (!fs.existsSync(tmplPath)) continue;
+        if (!fs.existsSync(tmplPath)) return;
 
         let content = fs.readFileSync(tmplPath, 'utf8');
         // 替换 {{TOOL_DIR}} 占位符
         content = content.replace(/{{TOOL_DIR}}/g, toolDir);
 
         const destPath = path.join(binDir, tmpl);
-        // 先删除已有文件/符号链接，避免 writeFileSync 跟随链接覆盖目标文件
-        try { fs.unlinkSync(destPath); } catch { /* 不存在则忽略 */ }
-        fs.writeFileSync(destPath, content, 'utf8');
-        written.push(tmpl);
-    }
+        // 同目录临时文件 + rename 原子替换：写入失败时目标原文件保持不变
+        const tmpPath = path.join(binDir, `openspec.tmp-${process.pid}-${Date.now()}-${i}`);
+        try {
+            fs.writeFileSync(tmpPath, content, 'utf8');
+            try {
+                fs.renameSync(tmpPath, destPath);
+            } catch (renameErr) {
+                if (!isWin) throw renameErr;
+                // Windows 上 rename 无法覆盖已存在的文件：先删除再重试
+                fs.unlinkSync(destPath);
+                fs.renameSync(tmpPath, destPath);
+            }
+            written.push(tmpl);
+        } finally {
+            // rename 成功后临时文件已不存在，失败时清理残留
+            try { fs.unlinkSync(tmpPath); } catch { /* 不存在则忽略 */ }
+        }
+    });
 
     return written;
 }
@@ -267,17 +280,25 @@ function installShimScripts(toolDir: string, binDir: string, isWin: boolean): st
  * 设置可执行权限。
  * @param binDir
  * @param files
+ * @param isWin
+ * @returns string[] 设置失败的文件名列表
  */
-function setExecutable(binDir: string, files: string[]): void {
-    if (process.platform === 'win32') return; // Windows 不需要 chmod
+function setExecutable(
+    binDir: string,
+    files: string[],
+    isWin: boolean = process.platform === 'win32',
+): string[] {
+    if (isWin) return []; // Windows 不需要 chmod
+    const failed: string[] = [];
     for (const f of files) {
         const p = path.join(binDir, f);
         try {
             fs.chmodSync(p, 0o755);
         } catch {
-            // 权限不足时静默跳过
+            failed.push(f);
         }
     }
+    return failed;
 }
 
 /**
@@ -370,15 +391,28 @@ function installShims(toolDir: string, isWin: boolean): ShimOperationResult {
         written = installShimScripts(toolDir, binDir, isWin);
         details.push(`installed shim scripts: ${written.join(', ')}`);
     } catch (e) {
+        const err = e as NodeJS.ErrnoException;
+        const permissionDetails: string[] = [];
+        if (err.code === 'EACCES' || err.code === 'EPERM') {
+            permissionDetails.push(`missing write permission in bin dir: ${binDir}`);
+            permissionDetails.push('fix permissions and retry: oso install-shims');
+        }
         return {
             success: false,
             binDir,
-            details: [...details, `failed to install shim scripts: ${(e as NodeJS.ErrnoException).message}`]
+            details: [...details, `failed to install shim scripts: ${err.message}`, ...permissionDetails]
         };
     }
 
     // 4. 设置可执行权限
-    setExecutable(binDir, written);
+    const chmodFailed = setExecutable(binDir, written, isWin);
+    if (chmodFailed.length > 0) {
+        details.push(`failed to set executable permission: ${chmodFailed.join(', ')}`);
+    }
+    if (!isWin && chmodFailed.includes('openspec')) {
+        details.push('main entry "openspec" is not executable — fix permissions and retry: oso install-shims');
+        return { success: false, binDir, details };
+    }
 
     return { success: true, binDir, details };
 }

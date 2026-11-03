@@ -211,6 +211,24 @@ describe('installShimScripts()', () => {
         const content = fs.readFileSync(path.join(binDir, 'openspec'), 'utf8');
         assert.strictEqual(content, `TOOL_DIR=${base}\nPATH=$PATH:${base}/bin`);
     });
+
+    test('leaves original intact and no temp files when write fails', (t) => {
+        const base = tmpDir();
+        const { toolDir } = setupToolDir(base);
+        const binDir = path.join(base, 'bin');
+        fs.mkdirSync(binDir);
+        fs.writeFileSync(path.join(binDir, 'openspec'), 'ORIGINAL');
+
+        const realWrite = fs.writeFileSync;
+        t.mock.method(fs, 'writeFileSync', (p, ...rest) => {
+            if (String(p).includes('openspec.tmp-')) throw new Error('EACCES: simulated');
+            return realWrite(p, ...rest);
+        });
+
+        assert.throws(() => shimsInstaller.installShimScripts(toolDir, binDir, false), /simulated/);
+        assert.equal(fs.readFileSync(path.join(binDir, 'openspec'), 'utf8'), 'ORIGINAL');
+        assert.deepEqual(fs.readdirSync(binDir).filter((f) => f.includes('.tmp-')), []);
+    });
 });
 
 // ============================================================
@@ -306,6 +324,31 @@ describe('installShims()', () => {
 
         const result = shimsInstaller.installShims(base, false);
         assert.strictEqual(result.success, true);
+    });
+
+    test('EACCES details include binDir and copy-paste command', (t) => {
+        const base = tmpDir();
+        const { toolDir, binDir } = setupEnvironment(base);
+        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+        t.mock.method(fs, 'renameSync', () => { const e = new Error('EACCES'); e.code = 'EACCES'; throw e; });
+
+        const result = shimsInstaller.installShims(toolDir, false);
+        assert.equal(result.success, false);
+        assert.ok(result.details.some((d) => d.includes(binDir)));
+        assert.ok(result.details.some((d) => d.includes('oso install-shims')));
+    });
+
+    test('chmod failure on openspec marks install as failed (unix)', (t) => {
+        const base = tmpDir();
+        const { toolDir, binDir } = setupEnvironment(base);
+        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+        t.mock.method(fs, 'chmodSync', (p) => {
+            if (path.basename(String(p)) === 'openspec') { const e = new Error('EPERM'); e.code = 'EPERM'; throw e; }
+        });
+
+        const result = shimsInstaller.installShims(toolDir, false);
+        assert.equal(result.success, false);
+        assert.ok(result.details.some((d) => d.includes('openspec')));
     });
 });
 
