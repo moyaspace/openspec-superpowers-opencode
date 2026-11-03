@@ -20,11 +20,12 @@ npm install -g ./<name>-<version>.tgz
 `oso init` 会自动检查并安装 `openspec` 垫片。垫片写在 **`openspec` 命令所在的 bin 目录**，
 所以需不需要提权，取决于 `openspec` 是怎么装的：
 
-- **系统 npm**（`npm i -g` 装到 `/usr/local/bin` 等系统前缀）：该目录通常属于 root，需要 `sudo oso install-shims`。
+- **系统 npm**（`npm i -g` 装到 `/usr/local/bin` 等系统前缀）：该目录通常属于 root，需要 `sudo oso install-shims`；Homebrew 等前缀若属当前用户则无需 sudo——最终以该目录是否可写为准。
 - **nvm / 用户级 prefix**（如 `npm config set prefix ~/.npm-global`）：目录属于当前用户，**无需 sudo**。
 - **Windows**：以管理员身份打开 PowerShell，然后运行 `oso install-shims`；若装了 gsudo，可用 `gsudo oso install-shims` 代替。
 
-怎么确认：`which openspec`（Windows 用 `where openspec`）看它落在哪个目录，再用 `ls -ld <目录>` 判断当前用户是否可写。
+怎么确认：Unix 上 `which openspec` 看它落在哪个目录，再用 `ls -ld <目录>` 判断当前用户是否可写；
+Windows 上 `where openspec` 同样能看到目录，PowerShell 用 `(Get-Acl <目录>).Owner` 查看所有者，日常直接用上面的管理员方案即可。
 
 ### 验证安装
 
