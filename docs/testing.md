@@ -8,8 +8,8 @@
 
 | 命令 | 权限 | 耗时 | 覆盖 |
 |---|---|---|---|
-| `npm test` | 普通用户（首次弹一次 UAC，`gsudo cache on` 可缓存） | ~5 分钟（含构建与 E2E） | typecheck + build + **全局 bin 守卫 + 278 主套件 + elevated 套件**（shim 端到端 3 + 真实 CLI 集成 3 + 生命周期 4），一遍全绿（标准 Gate） |
-| `node --test "test/*.test.js"` | 普通用户 | ~3.5 分钟 | 仅 278 主套件（跳过 elevated 与全局 bin 守卫） |
+| `npm test` | Windows：普通用户（首次弹一次 UAC，`gsudo cache on` 可缓存）；Unix/CI：普通用户，无需提权 | ~5 分钟（含构建与 E2E） | typecheck + build + **全局 bin 守卫 + 主套件 + elevated 套件**，一遍全绿（标准 Gate） |
+| `node --test "test/*.test.js"` | 普通用户 | ~3.5 分钟 | 仅主套件（300+ 用例；跳过 elevated 与全局 bin 守卫） |
 | `node --test test/<file>.test.js` | 普通用户 | 秒级 | 单文件（改哪跑哪，见 §3） |
 | 宿主探针（见 §2 探针层） | 普通用户 | 1-2 分钟 + 模型调用 | 宿主兼容性（仅版本组合变化时） |
 
@@ -19,8 +19,8 @@
 
 | 层 | 位置 | 验证什么 | 外部依赖 | 何时跑 |
 |---|---|---|---|---|
-| **自动化单测**（278 主套件） | `test/*.test.js`（node:test，import dist 产物） | 全部模块行为基线 + CommonJS 禁用扫描 + tarball 行为等价 | 无（临时目录夹具） | 每次 `npm test` |
-| **E2E 端到端**（10 用例，提权套件） | `test/elevated/`（npm test 尾声经 gsudo 自动提权；npm pack→install -g→init 真实链路） | shim 全链路拦截（3）、真实 openspec CLI 集成（3）、全生命周期串联（4） | 真实全局 shim 环境、openspec CLI | 每次 `npm test`（同一遍）；无 gsudo 时 SKIPPED |
+| **自动化单测**（300+ 主套件） | `test/*.test.js`（node:test，import dist 产物） | 全部模块行为基线 + CommonJS 禁用扫描 + tarball 行为等价 | 无（临时目录夹具） | 每次 `npm test` |
+| **E2E 端到端**（提权套件） | `test/elevated/`（npm test 尾声自动运行；npm pack→本地安装→init 真实链路） | 全生命周期串联（4）、symlink 夹具（1） | 真实 openspec CLI | 每次 `npm test`（同一遍）；**Unix/CI 直接运行**，仅 Windows 无 gsudo 时 SKIPPED |
 | **宿主探针**（test/host-probe/） | `test/host-probe/test/`（npm pack + 真实 opencode run） | 真实 tarball 双入口隔离、真实 OpenCode 加载/Hook/工具链路 | npm registry、opencode CLI、模型 API | **仅版本组合变化时**（换 opencode 或 @opencode-ai/plugin 版本必跑）；运行方法见 §5 本地文档 |
 
 ## 3. 「改 X 跑 Y」映射
@@ -46,7 +46,7 @@
 
 - **框架与形态**：node:test + node:assert/strict；测试文件 `test/<模块>.test.js`，行为测试以 `<模块>.behavior.test.js` 命名；ESM——测试直接 `import` `dist/` 编译产物（先 build 再 test，`npm test` 已保证顺序）。
 - **夹具**：一律临时目录（`mkdtempSync` + try/finally 清理）；不写入仓库工作区、不依赖固定路径；预期值从代码/模板提取，不硬编码 hash 与绝对路径。
-- **提权边界（全仓库唯一）**：`test/elevated/shims-installer.elevated.test.js`（symlink 夹具用例）需要管理员权限——`npm test` 通过 `test/elevated/run.mjs` 自动经 gsudo 提权运行它（Windows 建链为特权操作；产品代码在 Windows 不走 symlink 分支，与此用例无关）。无 gsudo 时该用例打印 SKIPPED、其余照常。Unix/CI 无需提权直接可跑。
+- **提权边界（全仓库唯一）**：`test/elevated/shims-installer.elevated.test.js`（symlink 夹具用例）在 **Windows** 上建链属特权操作，需要管理员权限——`npm test` 通过 `test/elevated/run.mjs` 自动经 gsudo 提权运行它。**Unix / CI 无需提权，直接运行**（`run.mjs` 在非 win32 平台跳过 gsudo 检测）；仅 Windows 无 gsudo 时该用例打印 SKIPPED、其余照常。
 - **红线**：`test/no-cjs.test.js` 固化扫描——`dist/` 禁止 require/module.exports/`__dirname`；新业务代码不得引入 CommonJS。
 - **安全防护用例不可删**：`setup-deploy`/`setup-reset` 的 symlink 穿越、路径逃逸拒绝用例是安全基线。
 - **测试不得写机器全局状态**：`init` / `npm install`（带生命周期脚本）/ `installShims` 会用 `where openspec` 找到**全局** npm bin 并写垫片。测试必须把临时 bin 目录前置到 `PATH`，否则每跑一次就污染开发机（事故链见 `docs/GLOBAL-BIN-TEST-POLLUTION-POSTMORTEM.md`）。

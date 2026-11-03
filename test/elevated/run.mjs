@@ -2,16 +2,19 @@
 /**
  * 提权测试套件编排器：npm test 的收尾步骤。
  *
- * 用一遍 npm test 跑完 199（主）+ 提权套件（elevated）：
- *   1. 主 glob 测试后，检测 gsudo 是否可用；
- *   2. 可用 → `gsudo node --test --test-concurrency=1 test/elevated/*.test.js` 提权运行
- *      （symlink 夹具 + 生命周期端到端）。必须串行：lifecycle-e2e 安装 tarball 会改写
- *      全局 openspec 垫片，与其他套件并发会让后者的 openspec 调用指向临时项目而失败；
- *      不可用 → 打印 SKIPPED 说明，不视为失败；
- *   3. 任一环节失败则以非零码退出。
+ * 用一遍 npm test 跑完主套件 + elevated 套件：
+ *   1. Unix（Linux / macOS）：elevated 套件不需要提权，直接串行运行。
+ *      lifecycle-e2e 用本地安装 + 隔离 bin 目录，不写机器全局 npm bin；
+ *   2. Windows：检测 gsudo 是否可用；
+ *      - 可用 → `gsudo node --test --test-concurrency=1 test/elevated/*.test.js`
+ *        （symlink 夹具在 Windows 建链属特权操作）；
+ *      - 不可用 → 打印 SKIPPED 说明，不视为失败；
+ *   3. 必须串行（--test-concurrency=1）：lifecycle-e2e 安装 tarball 会改写隔离 bin，
+ *      与其他套件并发会让后者的 openspec 调用指向临时项目而失败；
+ *   4. 任一环节失败则以非零码退出。
  *
- * 用户视角：一次 `npm test`，199 + elevated 全绿（首次 gsudo 弹一次 UAC，
- * `gsudo cache on` 可缓存凭据）。Unix/CI 无需 gsudo，直接跑 elevated 文件。
+ * 用户视角：一次 `npm test`，主套件 + elevated 全绿（Windows 首次 gsudo 弹一次 UAC，
+ * `gsudo cache on` 可缓存凭据；Unix/CI 无需提权）。
  */
 import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
@@ -27,6 +30,26 @@ if (elevatedFiles.length === 0) {
   process.exit(1);
 }
 
+function runDirect() {
+  const r = spawnSync(
+    process.execPath,
+    ["--test", "--test-concurrency=1", ...elevatedFiles],
+    { stdio: "inherit", shell: false },
+  );
+  if (r.error) {
+    console.error(`elevated suite failed to start: ${r.error.message}`);
+    return 1;
+  }
+  return r.status ?? 1;
+}
+
+// Unix（Linux / macOS）：elevated 套件无需提权，直接运行。
+if (process.platform !== "win32") {
+  console.log(`ELEVATED: running ${elevatedFiles.length} elevated test file(s) ...`);
+  process.exit(runDirect());
+}
+
+// Windows：symlink 夹具需要管理员权限，经 gsudo 提权运行。
 const gsudoCheck = spawnSync("gsudo", ["--version"], { encoding: "utf8", shell: false });
 
 if (gsudoCheck.error || gsudoCheck.status !== 0) {
