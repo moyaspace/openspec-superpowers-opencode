@@ -2,45 +2,56 @@ name: PR Check
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'release/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**']
+  workflow_dispatch:
 
 jobs:
   check:
     strategy:
+      # 三个平台都跑完再汇总，避免一个失败就取消其余平台
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          # package.json engines 要求 >=22.9.0
+          node-version: 22
+          cache: npm
 
-      # ── CLI 可用性 ──
+      - name: Install dependencies
+        run: npm ci
+
+      # npm test = typecheck + build + 主套件 + elevated
+      # （非 Windows 无 gsudo 时 elevated 自动 SKIP，由 test/elevated/run.mjs 处理）
+      - name: Run tests
+        run: npm test
+
+      # ── CLI 可用性（必须放在 npm test 之后：dist/ 由 test 里的 build 步骤生成）──
       - name: CLI --version
-        run: node bin/cli.js --version
+        run: node dist/cli/index.js --version
 
       - name: CLI -v
-        run: node bin/cli.js -v
+        run: node dist/cli/index.js -v
 
       - name: CLI --help
-        run: node bin/cli.js --help
+        run: node dist/cli/index.js --help
 
       - name: CLI --help (zh-CN)
-        run: node bin/cli.js --lang zh-CN --help
+        run: node dist/cli/index.js --lang zh-CN --help
 
       - name: CLI create-project alias --help
-        run: node bin/create-project.js --help
+        run: node dist/cli/create-project.js --help
 
       # ── oso 别名验证 ──
       - name: Verify oso alias in package.json
         run: node -e "const p=require('./package.json'); console.log('✅ oso alias:', p.bin.oso)"
-
-      - name: Run tests
-        run: npm test
 
       # ── Tarball 构建 ──
       - name: npm pack
@@ -57,9 +68,19 @@ jobs:
           # 将 tar 列表写入临时文件，避免 pipe+grep 的兼容性问题
           tar -tzf "$PACKAGE" > /tmp/tarlist.txt
 
+          # 精确整行匹配（-qxF），避免 *.js 误匹配 *.js.map
           for file in \
-            "package/bin/cli.js" \
-            "package/bin/create-project.js" \
+            "package/dist/cli/index.js" \
+            "package/dist/cli/create-project.js" \
+            "package/dist/registry.js" \
+            "package/dist/registry-utils.js" \
+            "package/dist/setup/index.js" \
+            "package/dist/setup/planner.js" \
+            "package/dist/setup/merge.js" \
+            "package/dist/setup/shim-check.js" \
+            "package/assets/shims/openspec" \
+            "package/assets/shims/openspec.cmd" \
+            "package/assets/shims/openspec.ps1" \
             "package/.gitattributes" \
             "package/package.json" \
             "package/template/_AGENTS.md" \
@@ -70,14 +91,9 @@ jobs:
             "package/template/_gitignore" \
             "package/template/_editorconfig" \
             "package/template/_gitattributes" \
-            "package/lib/setup/index.js" \
-            "package/lib/setup/planner.js" \
-            "package/lib/setup/deploy.js" \
-            "package/lib/setup/reset.js" \
-            "package/lib/setup/verify.js" \
             "package/docs/QUICKSTART.md" \
             "package/LICENSE"; do
-            if grep -q "$file" /tmp/tarlist.txt; then
+            if grep -qxF "$file" /tmp/tarlist.txt; then
               echo "  ✅ $file"
             else
               echo "  ❌ $file"
@@ -88,7 +104,7 @@ jobs:
           for removed in \
             "package/scripts/setup.sh" \
             "package/scripts/setup.ps1"; do
-            if grep -q "$removed" /tmp/tarlist.txt; then
+            if grep -qxF "$removed" /tmp/tarlist.txt; then
               echo "  ❌ removed file is still packaged: $removed"
               errors=$((errors + 1))
             fi
