@@ -14,7 +14,8 @@
 | 删除 imp16 前（Task 7 Step 0） | 333 | 318 + 本变更新增用例 15 条 |
 | 删除 imp16 后（`9ad4512`） | 332 | **333 − 1 = 332**，恰好只减 1 条，无静默少收集 |
 | 补「未知子命令」用例后（`f57ce41b`） | 333 | 补回 imp16 独有的 `__no_such_command__` 断言 |
-| 验收期修复 null binDir 用例后（`3e69954e`） | **334** | 最终值 |
+| 验收期修复 null binDir 用例后（`3e69954e`） | 334 | 验收探针发现的缺陷修复 |
+| 终审修复权限提示后（`a9754725`） | **336** | 新增 2 条 sudo 方向用例，最终值 |
 
 **R3 裁决说明**：spec 的「318 → 317」是在「本变更不新增其他用例」前提下写的绝对值；本变更在 Task 1/2/5/6/7 中新增了用例，因此绝对值必然上升。真正的不变量是**删除 imp16 恰好移除 1 条**，已由 `333 → 332` 实测证明。`verify.md` 必须同时记录三个点，否则只看 HEAD 无法复现该不变量。
 
@@ -143,7 +144,7 @@ Test-Path <tmp>/dist/cli/index.js → True         # 由 prepare 构建生成
 
 ```
 npm test（完整链路：typecheck → build → 主套件 → elevated → 恢复全局垫片）
-主套件：tests 334 / pass 334 / fail 0 / suites 60
+主套件：tests 336 / pass 336 / fail 0 / suites 60
 elevated：tests 5 / pass 5 / fail 0 / suites 2
 guard：✓ 全局 bin 未被修改（7 个文件）
 [shim] ✓ 全局垫片已恢复为正式安装版本
