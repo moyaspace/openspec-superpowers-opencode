@@ -628,17 +628,23 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
     p({ type: 'blank' });
 
     // ---- 垫片自检（BUG004）：0/8 之后确认 openspec 已是垫片且 openspec-orig 存在 ----
-    // 垫片是全局状态，不属于本次 init 写入目标目录的内容，因此失败即中止而不是回滚。
+    // 垫片是全局状态，不属于本次 init 写入目标目录的内容。失败不中止 init：
+    // 只提示、跳过，走完 1/8…8/8，结尾给出可照抄的修复命令。
     const shimToolDir = options.toolRoot ?? resolveToolRoot();
     const shimResult = ensureShim(shimToolDir, options.shimDeps ?? {});
+    let shimSkipped = false;
+    let shimDetails: string[] = [];
+    let shimBinDir: string | null = null;
     if (!shimResult.ok) {
-        throw new Error(
-            `${t('openspec 垫片未生效且自动安装失败', 'openspec shim is inactive and auto-install failed')}: `
-            + `${shimResult.details.join('; ')}\n`
-            + t('请运行 `oso install-shims`（Windows 需管理员权限）', 'Run `oso install-shims` (administrator required on Windows)'),
-        );
-    }
-    if (shimResult.repaired) {
+        shimSkipped = true;
+        shimDetails = shimResult.details;
+        shimBinDir = checkShim(options.shimDeps ?? {}).binDir;
+        p({
+            type: 'warn',
+            item: t('openspec 垫片未安装', 'openspec shim is not installed'),
+            detail: t('跨 worktree 合并不可用；其余功能不受影响', 'cross-worktree merge unavailable; everything else still works'),
+        });
+    } else if (shimResult.repaired) {
         p({ type: 'pass', item: t('已自动安装垫片', 'openspec shim installed automatically') });
     } else {
         p({ type: 'pass', item: t('openspec 垫片已生效', 'openspec shim active') });
@@ -895,6 +901,37 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
     p({ type: 'milestone', text: t('部署后验证通过', 'Post-deploy verification passed') });
 
     p({ type: 'blank' });
+
+    if (shimSkipped) {
+        const isWin = options.shimDeps?.isWin ?? process.platform === 'win32';
+        p({ type: 'blank' });
+        p({ type: 'section', label: t('openspec 垫片未安装', 'openspec shim not installed') });
+        p({ type: 'info', text: `  ${t('原因', 'reason')}: ${shimDetails.join('; ')}` });
+        if (isWin) {
+            p({ type: 'info', text: `  ${t('以管理员身份打开 PowerShell，然后运行', 'Open PowerShell as Administrator, then run')}: oso install-shims   (bin dir: ${shimBinDir})` });
+            p({ type: 'info', text: `  ${t('若已安装 gsudo，可用', 'If gsudo is installed, you can use')}: gsudo oso install-shims` });
+        } else {
+            let writable = false;
+            if (shimBinDir !== null) {
+                try {
+                    fs.accessSync(shimBinDir, fs.constants.W_OK);
+                    writable = true;
+                } catch {
+                    writable = false;
+                }
+            }
+            const command = writable ? 'oso install-shims' : 'sudo oso install-shims';
+            p({
+                type: 'info',
+                text: writable
+                    ? t('无需 sudo（当前用户对该目录有写权限；nvm / 用户级 prefix 通常如此）', 'no sudo needed (your user can write to this dir; typical for nvm / user-level prefixes)')
+                    : t('该目录属于系统 npm 前缀；nvm / 用户级 prefix 用户无需 sudo', 'this dir belongs to the system npm prefix; nvm / user-level prefix users need no sudo'),
+            });
+            p({ type: 'info', text: `  ${command}   (bin dir: ${shimBinDir})` });
+        }
+        p({ type: 'info', text: t('装好后无需重跑 init，只需执行上面这一条命令', 'No need to re-run init after this — just run that one command') });
+        p({ type: 'blank' });
+    }
 
     p({ type: 'banner-init' });
     p({ type: 'blank' });

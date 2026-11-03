@@ -168,30 +168,25 @@ const BROKEN_SHIM = {
     findOpenspecOrig: () => null,
 };
 
-test('initProject：垫片未生效且修复失败 → 中止且错误含 oso install-shims', async (t) => {
-    const parent = tempDir(t);
-    const targetDir = path.join(parent, 'project');
-    const events = [];
+test('initProject：垫片修复失败 → 继续完成、exit success、输出 banner', async (t) => {
+  const parent = tempDir(t);
+  const targetDir = path.join(parent, 'project');
+  const events = [];
+  const result = await initProject({
+    targetDir,
+    templateDir,
+    superpowersPath: superpowersFixture(t),
+    runner: runner(),
+    lang: 'en',
+    progress: (event) => events.push(event),
+    shimDeps: { ...BROKEN_SHIM, install: () => ({ success: false, binDir: '/fake/bin', details: ['EACCES'] }) },
+  });
 
-    await assert.rejects(
-        () => initProject({
-            targetDir,
-            templateDir,
-            superpowersPath: superpowersFixture(t),
-            runner: runner(),
-            lang: 'en',
-            progress: event => events.push(event),
-            shimDeps: { ...BROKEN_SHIM, install: () => ({ success: false, binDir: '/fake/bin', details: ['EACCES'] }) },
-        }),
-        /oso install-shims/,
-    );
-
-    assert.equal(
-        events.some(event => event.type === 'pass' && /shim|垫片/i.test(event.item || event.text || '')),
-        false,
-        '修复失败时不得报告垫片已生效',
-    );
-    assert.equal(fs.existsSync(targetDir), false, '垫片检查失败必须发生在写目标目录之前');
+  assert.equal(result.success, true);
+  assert.ok(events.some((e) => e.type === 'warn' && /shim|垫片/i.test(e.item || e.text || '')));
+  const banner = events.filter((e) => /oso install-shims/.test(e.text || e.item || '')).map((e) => e.text || e.item).join('\n');
+  assert.ok(banner.includes('/fake/bin'));
+  assert.ok(banner.includes('oso install-shims'));
 });
 
 test('initProject：垫片未生效但修复成功 → 继续到完成，并报告自动安装', async (t) => {
