@@ -53,6 +53,16 @@ jobs:
       - name: Verify oso alias in package.json
         run: node -e "const p=require('./package.json'); console.log('✅ oso alias:', p.bin.oso)"
 
+      # ── 守卫：构建产物不得回潮进 git，构建不得写脏工作区 ──
+      - name: Guard tracked build artifacts
+        shell: bash
+        run: |
+          tracked=$(git ls-files dist | wc -l)
+          [ "$tracked" -eq 0 ] || { echo "FAIL: dist/ is tracked by git ($tracked files)"; exit 1; }
+
+          dirty=$(git status --porcelain)
+          [ -z "$dirty" ] || { echo "FAIL: working tree dirty after build:"; echo "$dirty"; exit 1; }
+
       # ── Tarball 构建 ──
       - name: npm pack
         run: npm pack
@@ -67,6 +77,15 @@ jobs:
 
           # 将 tar 列表写入临时文件，避免 pipe+grep 的兼容性问题
           tar -tzf "$PACKAGE" > /tmp/tarlist.txt
+
+          # 迁移自 test/imp16-tarball-equivalence.test.js 的独有断言
+          tar -xzf "$PACKAGE" -O package/assets/shims/openspec.ps1 | grep -q 'Join-Path \$TOOL_DIR "lib"' \
+            && { echo "FAIL: ps1 shim still references lib"; exit 1; }
+
+          grep -qxF "package/tsconfig.json" /tmp/tarlist.txt \
+            && { echo "FAIL: tarball contains tsconfig"; exit 1; }
+          grep -q "^package/src/" /tmp/tarlist.txt \
+            && { echo "FAIL: tarball contains src"; exit 1; }
 
           # 精确整行匹配（-qxF），避免 *.js 误匹配 *.js.map
           for file in \
