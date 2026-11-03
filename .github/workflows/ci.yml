@@ -28,8 +28,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # elevated 套件在非 Windows 平台直接运行（不经 gsudo），其中 lifecycle-e2e 会跑
+      # `oso init`，需要真实 openspec CLI 才能走完 8/8。
+      - name: Install openspec CLI (for elevated lifecycle test)
+        run: npm i -g @fission-ai/openspec
+
       # npm test = typecheck + build + 主套件 + elevated
-      # （非 Windows 无 gsudo 时 elevated 自动 SKIP，由 test/elevated/run.mjs 处理）
+      # （Windows 无 gsudo 时 elevated 自动 SKIP，由 test/elevated/run.mjs 处理）
       - name: Run tests
         run: npm test
 

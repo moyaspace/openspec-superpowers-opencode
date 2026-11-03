@@ -33,8 +33,7 @@ Windows 上 `where openspec` 同样能看到目录，PowerShell 用 `(Get-Acl <�
 oso --help                                  # 或: openspec-superpowers-opencode --help
 ```
 
-依赖：`openspec` CLI v1.3+、`opencode` CLI、`git`、Superpowers 插件。
-安装后 setup 脚本会自动检测这些工具是否可用。
+依赖：`openspec` CLI v1.3+、`opencode` CLI、`git`、Superpowers 插件。`oso init` 会检测这些工具是否可用。
 
 `oso init` 会自动检查并安装 `openspec` 垫片；装不上**不会中止 init**，而是继续完成初始化，
 并在结尾提示该运行哪条命令（见上面的「权限说明」）。装好后无需重跑 init。

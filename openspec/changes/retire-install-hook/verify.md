@@ -249,6 +249,44 @@ oso registry --help       → exit 0，bin 目录前后哈希一致（True），
 | R12–R15 | 收紧 CLI help 断言 / 夹具 chmod / 测试改名 | 原断言可被全局 help 满足（假绿），已用失效实验证明新断言能捕获回归 | 测试级 |
 | — | 新增 null-binDir 分支（计划外） | 验收发现真实缺陷 | 新增 1 个分支 + 1 条用例 |
 
+## 终审（whole-branch review）后的修复
+
+终审发现 2 项 Important，已修复并复验：
+
+### A. `oso install-shims` 在 Unix 不可写时不给出 sudo 命令（spec MUST 未满足）
+
+`specs/shim-install-safety/spec.md` 的 Scenario 要求 `oso install-shims` 输出含 `sudo oso install-shims` 形态命令，但 `installShims` 只输出 `oso install-shims`；且「不可写 bin 目录」的首个失败点在 `copyOpenspecToOrig`（`copyFileSync`/`symlinkSync` 先抛 EACCES），该 catch 完全没有权限提示。
+
+修复：
+- 新增 `permissionHint(binDir, isWin)`（`src/shims-installer.ts`）：Unix 上按 `fs.accessSync(binDir, W_OK)` 区分 `sudo oso install-shims` 与 `oso install-shims`；Windows 上提示从管理员 shell 重跑。
+- `copyOpenspecToOrig` 与 `installShimScripts` 两个 catch 都改用该 helper（原先只有后者、且无 sudo）。
+- 新增两条用例：`unwritable binDir on unix suggests sudo install-shims`（RED → GREEN）、`writable binDir on unix does not suggest sudo`。
+- 顺带：临时垫片文件改为 `writeFileSync(tmp, content, { mode: 0o755 })`，执行位随 inode 原子生效，避免 chmod 失败留下不可执行的 `openspec`。
+
+### B. 新增 CI 守卫在 ubuntu/macOS 上不可达
+
+`test/elevated/run.mjs:47-50` 在非 Windows 平台**直接运行** elevated（不经 gsudo），`lifecycle-e2e` 会真跑 `oso init`，需要真实 `openspec` CLI；CI 未安装它 → `npm test` 失败 → 守卫步骤被跳过（`ci.yml` 的 `Guard tracked build artifacts` 在 `npm test` 之后）。同时 `ci.yml` 原注释「非 Windows 无 gsudo 时 elevated 自动 SKIP」与实际相反。
+
+修复：CI 在 `npm ci` 之后增加 `npm i -g @fission-ai/openspec`，并更正该注释。
+
+### 同轮修正的文档陈旧项
+
+- `docs/testing.md:41` 不再指向已删除的 `test/imp16-tarball-equivalence.test.js`，改为 `test/package-lifecycle.test.js`。
+- `docs/testing.md` 的「测试不得写机器全局状态」「垫片恢复」两条不再把原因归给 `npm install` 的 `install` 生命周期。
+- `docs/QUICKSTART.md` 的「安装后 setup 脚本会自动检测」改为「`oso init` 会检测」（本包已零安装期脚本）。
+- `docs/GLOBAL-BIN-TEST-POLLUTION-POSTMORTEM.md` 增加一段「后续变化」注记，保留历史事实同时避免误读。
+- `design.md` 的回滚说明明确 `138db7c15` 必须与 `84115256d` + `67d952bb7` 成套回退。
+
+### 复验
+
+```
+npm run typecheck → exit 0
+npm run build     → exit 0
+npm test          → 主套件 336/336 pass、elevated 5/5 pass、fail 0
+```
+
+最终计数：**336**（334 + 2 条权限提示用例）。
+
 ## 已知未覆盖项（供后续跟进）
 
 1. **npm 12 真机安装**（9.2）：需在 npm 12 环境复跑。

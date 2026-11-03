@@ -109,7 +109,7 @@ npm 11.16+ 起带生命周期脚本的包默认锁死脚本；npm 12 默认 soft
 8. 更新文档。
 9. 全量验证：`npm run typecheck`、`npm run build`、`npm test`（317 + 5 elevated）、tarball 检查、权限/原子替换手工验收。
 
-回滚：本 change 全部在 `feature/retire-install-hook` 分支；单个 commit 可 revert。`dist/` 取消跟踪的 commit 只改索引，不删磁盘文件；若需回滚把 `dist/` 重新 `git add` 即可。
+回滚：本 change 全部在 `feature/retire-install-hook` 分支；单个 commit 可 revert，但有两组必须成套回退——`138db7c15`（退役 `install` 钩子）单独 revert 会复现「干净 clone 上 `npm ci` 需要 `dist/`」的死循环，必须与 `84115256d`（`dist/` 取消跟踪）+ `67d952bb7`（`.gitignore` 锚定）一起回退；`dist/` 取消跟踪的 commit 只改索引，不删磁盘文件，若需回滚把 `dist/` 重新 `git add` 即可。
 
 ## Open Questions
 

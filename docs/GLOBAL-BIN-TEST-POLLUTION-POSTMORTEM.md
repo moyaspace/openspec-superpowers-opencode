@@ -71,6 +71,8 @@ node --test "test/create-project.behavior.test.js" "test/openspec-cli-integratio
 | `test/imp16-tarball-equivalence.test.js` | `npm install <tarball>` 触发包自己的 `install` 生命周期脚本 |
 | `test/elevated/lifecycle-e2e.test.js` | `npm install` 的 postinstall + `oso init` |
 
+> 后续变化（`retire-install-hook` 变更）：npm `install` 生命周期钩子已退役，`test/imp16-tarball-equivalence.test.js` 已删除；现在唯一的触发路径是 `oso init` 的 `ensureShim` 与 `oso install-shims`。上文为事故当时的事实记录，保留原样。
+
 后果不只是「随机 9009」：这些测试跑完后，全局 `openspec.ps1` 会指向**已被删除的临时项目**，开发机上从此 `openspec` 处于半坏状态（cmd 下正常，PowerShell 下走自愈或报错）。
 
 ## 顺带发现的真 bug：ps1 垫片在 Windows PowerShell 5.1 下报错

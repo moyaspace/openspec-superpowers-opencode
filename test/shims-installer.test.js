@@ -338,6 +338,31 @@ describe('installShims()', () => {
         assert.ok(result.details.some((d) => d.includes('oso install-shims')));
     });
 
+    test('unwritable binDir on unix suggests sudo install-shims', (t) => {
+        const base = tmpDir();
+        const { toolDir, binDir } = setupEnvironment(base);
+        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+        t.mock.method(fs, 'accessSync', () => { const e = new Error('EACCES'); e.code = 'EACCES'; throw e; });
+        t.mock.method(fs, 'copyFileSync', () => { const e = new Error('EACCES'); e.code = 'EACCES'; throw e; });
+
+        const result = shimsInstaller.installShims(toolDir, false);
+        assert.equal(result.success, false);
+        assert.ok(result.details.some((d) => d.includes(binDir)), 'must name the actual bin dir');
+        assert.ok(result.details.some((d) => d.includes('sudo oso install-shims')), 'must give a sudo command');
+    });
+
+    test('writable binDir on unix does not suggest sudo', (t) => {
+        const base = tmpDir();
+        const { toolDir, binDir } = setupEnvironment(base);
+        t.mock.method(child_process, 'execSync', () => path.join(binDir, 'openspec'));
+        t.mock.method(fs, 'copyFileSync', () => { const e = new Error('EACCES'); e.code = 'EACCES'; throw e; });
+
+        const result = shimsInstaller.installShims(toolDir, false);
+        assert.equal(result.success, false);
+        assert.ok(result.details.some((d) => d.includes('oso install-shims')));
+        assert.equal(result.details.some((d) => d.includes('sudo')), false, 'writable dir must not suggest sudo');
+    });
+
     test('chmod failure on openspec marks install as failed (unix)', (t) => {
         const base = tmpDir();
         const { toolDir, binDir } = setupEnvironment(base);

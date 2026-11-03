@@ -257,12 +257,13 @@ function installShimScripts(toolDir: string, binDir: string, isWin: boolean): st
         // 同目录临时文件 + rename 原子替换：写入失败时目标原文件保持不变
         const tmpPath = path.join(binDir, `openspec.tmp-${process.pid}-${Date.now()}-${i}`);
         try {
-            fs.writeFileSync(tmpPath, content, 'utf8');
+            // 直接以可执行权限落盘：执行位随 inode 原子生效，chmod 失败也不会留下不可执行的 openspec
+            fs.writeFileSync(tmpPath, content, { encoding: 'utf8', mode: 0o755 });
             try {
                 fs.renameSync(tmpPath, destPath);
             } catch (renameErr) {
                 if (!isWin) throw renameErr;
-                // Windows 上 rename 无法覆盖已存在的文件：先删除再重试
+                // 部分 Windows 环境下 rename 覆盖已存在文件会失败：删除目标后重试（窗口极小）
                 fs.unlinkSync(destPath);
                 fs.renameSync(tmpPath, destPath);
             }
@@ -350,6 +351,30 @@ interface ShimOperationResult {
 }
 
 /**
+ * 权限类失败的可照抄指引。
+ * Unix 上 binDir 不可写时只能提权，Windows 上则要以管理员身份重跑。
+ * @param binDir — 实际探测到的 openspec bin 目录
+ * @param isWin
+ * @returns string[] 追加到 details 的行
+ */
+function permissionHint(binDir: string, isWin: boolean): string[] {
+    const lines = [`missing write permission in bin dir: ${binDir}`];
+    if (isWin) {
+        lines.push('retry from an elevated (Administrator) shell: oso install-shims');
+        return lines;
+    }
+    let writable = false;
+    try {
+        fs.accessSync(binDir, fs.constants.W_OK);
+        writable = true;
+    } catch {
+        writable = false;
+    }
+    lines.push(`fix permissions and retry: ${writable ? 'oso install-shims' : 'sudo oso install-shims'}`);
+    return lines;
+}
+
+/**
  * 主入口：安装垫片脚本。
  * @param toolDir — 工具安装根目录
  * @param isWin
@@ -378,10 +403,14 @@ function installShims(toolDir: string, isWin: boolean): ShimOperationResult {
         const backupDesc = stat && stat.isSymbolicLink() ? `symlink` : `file`;
         details.push(`openspec-orig: ${origName} (${backupDesc})`);
     } catch (e) {
+        const err = e as NodeJS.ErrnoException;
+        const permissionDetails = err.code === 'EACCES' || err.code === 'EPERM'
+            ? permissionHint(binDir, isWin)
+            : [];
         return {
             success: false,
             binDir,
-            details: [...details, `failed to create openspec-orig: ${(e as NodeJS.ErrnoException).message}`]
+            details: [...details, `failed to create openspec-orig: ${err.message}`, ...permissionDetails]
         };
     }
 
@@ -392,11 +421,9 @@ function installShims(toolDir: string, isWin: boolean): ShimOperationResult {
         details.push(`installed shim scripts: ${written.join(', ')}`);
     } catch (e) {
         const err = e as NodeJS.ErrnoException;
-        const permissionDetails: string[] = [];
-        if (err.code === 'EACCES' || err.code === 'EPERM') {
-            permissionDetails.push(`missing write permission in bin dir: ${binDir}`);
-            permissionDetails.push('fix permissions and retry: oso install-shims');
-        }
+        const permissionDetails = err.code === 'EACCES' || err.code === 'EPERM'
+            ? permissionHint(binDir, isWin)
+            : [];
         return {
             success: false,
             binDir,

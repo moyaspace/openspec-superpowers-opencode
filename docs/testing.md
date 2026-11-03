@@ -38,7 +38,7 @@
 | `src/verify.ts` | `node --test test/verify.test.js` | 37 用例 |
 | `src/shims-installer.ts` | `node --test test/shims-installer.test.js test/elevated/shims-installer.elevated.test.js test/openspec-shim-e2e.test.js` | shim 变更后 elevated 套件由 `npm test` 自动覆盖 |
 | `src/cli/index.ts` / `cli/create-project.ts` | `node --test test/cli.test.js test/create-project.behavior.test.js` | |
-| `package.json`（files/exports/bin/engines） | `node --test test/setup-package.test.js test/no-cjs.test.js test/imp16-tarball-equivalence.test.js` | 发布相关，建议全量 |
+| `package.json`（files/exports/bin/engines） | `node --test test/setup-package.test.js test/no-cjs.test.js test/package-lifecycle.test.js` | 发布相关，建议全量 |
 | 任何 `src/**`（收尾） | `npm test` | 提交前标准动作 |
 | 换 opencode / @opencode-ai/plugin 版本 | host-probe 全跑（见 §2） | 换版本必过探针 |
 
@@ -49,9 +49,9 @@
 - **提权边界（全仓库唯一）**：`test/elevated/shims-installer.elevated.test.js`（symlink 夹具用例）在 **Windows** 上建链属特权操作，需要管理员权限——`npm test` 通过 `test/elevated/run.mjs` 自动经 gsudo 提权运行它。**Unix / CI 无需提权，直接运行**（`run.mjs` 在非 win32 平台跳过 gsudo 检测）；仅 Windows 无 gsudo 时该用例打印 SKIPPED、其余照常。
 - **红线**：`test/no-cjs.test.js` 固化扫描——`dist/` 禁止 require/module.exports/`__dirname`；新业务代码不得引入 CommonJS。
 - **安全防护用例不可删**：`setup-deploy`/`setup-reset` 的 symlink 穿越、路径逃逸拒绝用例是安全基线。
-- **测试不得写机器全局状态**：`init` / `npm install`（带生命周期脚本）/ `installShims` 会用 `where openspec` 找到**全局** npm bin 并写垫片。测试必须把临时 bin 目录前置到 `PATH`，否则每跑一次就污染开发机（事故链见 `docs/GLOBAL-BIN-TEST-POLLUTION-POSTMORTEM.md`）。
+- **测试不得写机器全局状态**：`init` / `installShims` 会用 `where openspec` 找到**全局** npm bin 并写垫片。测试必须把临时 bin 目录前置到 `PATH`，否则每跑一次就污染开发机（事故链见 `docs/GLOBAL-BIN-TEST-POLLUTION-POSTMORTEM.md`）。
 - **守卫**：`npm test` 用 `scripts/assert-global-bin-unchanged.mjs` 包住主套件与 elevated，对比运行前后全局 `openspec*` 的 SHA-256；有变化直接判失败并指名文件。找不到全局 openspec 时自动跳过。
-- **垫片恢复（`npm test` 收尾，无论成败）**：在 `.worktrees/<name>/` 里跑 `npm ci` 会通过 `install` 生命周期把全局垫片的 `TOOL_DIR` 指向该 worktree——测试期间指向 V1 是必要的，但 worktree 用完即删，垫片若还指着它就会自愈降级。因此 `scripts/run-tests.mjs` 在 `finally` 中调用全局 `oso install-shims`，把 `TOOL_DIR` 还回**正式安装版本**（`npm root -g` 下的包目录）；未装全局 oso（CI）时自动跳过。调试可用 `OSO_SKIP_SHIM_RESTORE=1` 关闭。
+- **垫片恢复（`npm test` 收尾，无论成败）**：测试会调用 `installShims()`（`oso init` 的 `ensureShim`、`install-shims` 子命令、垫片相关用例），把全局垫片的 `TOOL_DIR` 指向当前工作区或临时目录——测试期间指向 V1 是必要的，但临时目录 / worktree 用完即删，垫片若还指着它就会自愈降级。因此 `scripts/run-tests.mjs` 在 `finally` 中调用全局 `oso install-shims`，把 `TOOL_DIR` 还回**正式安装版本**（`npm root -g` 下的包目录）；未装全局 oso（CI）时自动跳过。调试可用 `OSO_SKIP_SHIM_RESTORE=1` 关闭。
 - **失败纪律**：不得删除失败测试求绿；先判断是环境问题（如 EPERM→gsudo）还是回归。
 
 ## 5. 指针区
