@@ -908,18 +908,20 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
         p({ type: 'blank' });
         p({ type: 'section', label: t('openspec 垫片未安装', 'openspec shim not installed') });
         p({ type: 'info', text: `  ${t('原因', 'reason')}: ${shimDetails.join('; ')}` });
-        if (isWin) {
+        if (shimBinDir === null) {
+            // openspec 不在 PATH：这不是权限问题，sudo 帮不上忙，必须先装 openspec。
+            p({ type: 'info', text: `  ${t('未在 PATH 中找到 openspec，请先安装', 'openspec CLI not found in PATH — install it first')}: npm i -g @fission-ai/openspec` });
+            p({ type: 'info', text: `  ${t('安装后再运行', 'then run')}: oso install-shims` });
+        } else if (isWin) {
             p({ type: 'info', text: `  ${t('以管理员身份打开 PowerShell，然后运行', 'Open PowerShell as Administrator, then run')}: oso install-shims   (bin dir: ${binDirLabel})` });
             p({ type: 'info', text: `  ${t('若已安装 gsudo，可用', 'If gsudo is installed, you can use')}: gsudo oso install-shims` });
         } else {
             let writable = false;
-            if (shimBinDir !== null) {
-                try {
-                    fs.accessSync(shimBinDir, fs.constants.W_OK);
-                    writable = true;
-                } catch {
-                    writable = false;
-                }
+            try {
+                fs.accessSync(shimBinDir, fs.constants.W_OK);
+                writable = true;
+            } catch {
+                writable = false;
             }
             const command = writable ? 'oso install-shims' : 'sudo oso install-shims';
             p({

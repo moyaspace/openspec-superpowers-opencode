@@ -241,6 +241,33 @@ test('initProject：Unix 可写 binDir → 提示无需 sudo 且命令不含 sud
   assert.ok(commandLines.every((line) => !line.includes('sudo')), 'writable dir must not suggest sudo');
 });
 
+test('initProject：openspec 不在 PATH（binDir 为 null）→ 不得建议 sudo，应先装 openspec', async (t) => {
+  const parent = tempDir(t);
+  const targetDir = path.join(parent, 'project');
+  const events = [];
+  const result = await initProject({
+    targetDir,
+    templateDir,
+    superpowersPath: superpowersFixture(t),
+    runner: runner(),
+    lang: 'en',
+    progress: (event) => events.push(event),
+    shimDeps: {
+      isWin: false,
+      findOpenspec: () => null,
+      findShimFile: () => null,
+      findOpenspecOrig: () => null,
+      install: () => ({ success: false, binDir: null, details: ['openspec CLI not found in PATH'] }),
+    },
+  });
+
+  assert.equal(result.success, true);
+  const text = events.map((e) => `${e.item || ''} ${e.text || ''} ${e.detail || ''}`).join('\n');
+  assert.ok(!/sudo/.test(text), '非权限类失败不得硬套 sudo');
+  assert.match(text, /npm i -g @fission-ai\/openspec/, '应给出安装 openspec 的命令');
+  assert.match(text, /oso install-shims/, '仍应说明装好垫片的命令');
+});
+
 test('initProject：垫片未生效但修复成功 → 继续到完成，并报告自动安装', async (t) => {
     const parent = tempDir(t);
     const targetDir = path.join(parent, 'project');
