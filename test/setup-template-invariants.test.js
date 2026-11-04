@@ -485,6 +485,14 @@ describe('creating commands stop on an occupied name', () => {
         );
         assert.ok(newStep5.includes('/opsx-continue'), 'opsx-new.md: must offer /opsx-continue');
         assert.ok(newStep5.includes('/opsx-ff'), 'opsx-new.md: must offer /opsx-ff');
+        assert.ok(
+            newStep5.includes('失败（exit 1）→ 停下报告'),
+            'opsx-new.md: Step 5 must stop and report when creation fails',
+        );
+        assert.ok(
+            newStep5.includes('不得覆盖已有 change'),
+            'opsx-new.md: Step 5 must forbid overwriting the existing change',
+        );
         assert.equal(
             newStep5.includes('openspec list'),
             false,
