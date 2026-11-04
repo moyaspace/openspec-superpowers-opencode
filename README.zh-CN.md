@@ -1,5 +1,7 @@
 # openspec-superpowers-opencode（简称 oso）
 
+**🌐 Read this in other languages:** [English](README.md) | [中文](README.zh-CN.md)
+
 > 将 Superpowers + OpenSpec 工作流桥接到 OpenCode，强制执行 worktree 隔离。
 
 [![GitHub last commit](https://img.shields.io/github/last-commit/moyaspace/openspec-superpowers-opencode?style=flat-square&logo=github&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
@@ -86,7 +88,7 @@ oso init                                  # 或: openspec-superpowers-opencode i
 | 3 | **一键初始化** | `oso init` → 部署模板 + 配置 + `git init` + 首次提交 |
 | 4 | **桥接 OpenSpec + Superpowers** | 预配置 schema + skill 映射 + 锁校验，一条命令部署 |
 | 5 | **绿地/棕地双模式** | 新项目自动部署；已有项目安全合并 |
-| 6 | **跨平台 + 多语言** | Unified JS 安装器（`lib/setup/`）支持 Windows/Linux/macOS，`--lang zh-CN \| zh-TW \| en` |
+| 6 | **跨平台 + 多语言** | Unified TypeScript 安装器（`src/setup/`）支持 Windows/Linux/macOS，`--lang zh-CN \| zh-TW \| en` |
 | 7 | **SHA-256 锁** | 部署时自动校验 skill 文件完整性 |
 | 8 | **多层架构** | Superpowers（HOW）→ OpenSpec（WHAT）→ Worktree（WHERE）→ 命令（WHEN） |
 | 9 | **worktree + openspec change 全面支持** | 创建变更自动注册、`openspec list` 智能拦截、`verify` 一键健康检查 |
@@ -98,28 +100,29 @@ oso init                                  # 或: openspec-superpowers-opencode i
 
 | 文档 | 说明 |
 |------|------|
-| [快速开始](QUICKSTART.md) | 10 分钟完成第一个变更 |
-| [工作原理](HOW-IT-WORKS.md) | 命令执行链路详解 |
-| [Worktree 创建机制](WORKTREE-CREATION.md) | 三层代码级保障 |
-| [设计决策](DESIGN.md) | ADR：架构权衡记录 |
-| [测试说明](testing.md) | 测试分层、命令与约定 |
-| [为什么用 oso](WHY-OSO.md) | 深度分析：OpenSpec 和 Superpowers 之间的 6 道鸿沟 |
+| [快速开始](docs/QUICKSTART.md) | 10 分钟完成第一个变更 |
+| [工作原理](docs/HOW-IT-WORKS.md) | 命令执行链路详解 |
+| [Worktree 创建机制](docs/WORKTREE-CREATION.md) | 三层代码级保障 |
+| [设计决策](docs/DESIGN.md) | ADR：架构权衡记录 |
+| [测试说明](docs/testing.md) | 测试分层、命令与约定 |
+| [发布流程](docs/RELEASING.md) | 版本号、验证、tag、publish 全流程 |
+| [为什么用 oso](docs/WHY-OSO.md) | 深度分析：OpenSpec 和 Superpowers 之间的 6 道鸿沟 |
 
 ## 前置条件
 
-- Node.js >= 16（推荐）
+- Node.js >= 22.9.0
 - `openspec` CLI v1.3+
 - `opencode` CLI
 - `git`
 - Superpowers 插件
 
-setup 脚本会自动检查以上工具是否可用。
+运行 `oso verify` 可检查环境是否就绪。
 
 ## 本地开发
 
 ```bash
-node bin/cli.js init test-project   # 本地测试
-npm publish                         # 发布到 npm
+npm run build && node dist/cli/index.js init test-project   # 本地测试
+npm publish                                                 # 发布到 npm
 ```
 
 ## 社区
@@ -138,7 +141,7 @@ npm publish                         # 发布到 npm
 扫描下方二维码添加维护者微信，备注 **oso**，由维护者邀请进群。好友申请较多时请耐心等待。
 
 <div align="center">
-  <img src="images/wechat-group-join-qrcode.png" alt="oso 维护者微信" width="200">
+  <img src="docs/images/wechat-group-join-qrcode.png" alt="oso 维护者微信" width="200">
 </div>
 
 **进群须知：**

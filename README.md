@@ -13,7 +13,7 @@
 
 > If you find this useful, consider giving it a ⭐ on GitHub!
 
-**🌐 Read this in other languages:** [English](README.md) | [中文](docs/README.zh.md)
+**🌐 Read this in other languages:** [English](README.md) | [中文](README.zh-CN.md)
 
 ---
 
@@ -90,7 +90,7 @@ oso init                                  # 或: openspec-superpowers-opencode i
 | 3 | **One-command init** | `oso init` → deploy templates + config + `git init` + first commit |
 | 4 | **Bridged OpenSpec + Superpowers** | Pre-configured schema + skill mapping + lock verification, one-command deploy |
 | 5 | **Greenfield/brownfield** | Auto-deploy on new projects; safe merge on existing ones |
-| 6 | **Cross-platform + i18n** | Unifed JS installer (`lib/setup/`) on Windows/Linux/macOS, `--lang zh-CN \| zh-TW \| en` |
+| 6 | **Cross-platform + i18n** | Unified TypeScript installer (`src/setup/`) on Windows/Linux/macOS, `--lang zh-CN \| zh-TW \| en` |
 | 7 | **SHA-256 lock** | Skill file integrity verified on deploy |
 | 8 | **Layered architecture** | Superpowers (HOW) → OpenSpec (WHAT) → Worktree (WHERE) → Commands (WHEN) |
 | 9 | **Full worktree + openspec change support** | Auto-register on change creation, smart `openspec list` interception, `verify` one-click health check |
@@ -107,23 +107,24 @@ oso init                                  # 或: openspec-superpowers-opencode i
 | [Worktree creation](docs/WORKTREE-CREATION.md) | Three-layer code-level guarantees |
 | [Design decisions](docs/DESIGN.md) | ADRs: architecture tradeoffs |
 | [Testing](docs/testing.md) | Test layers, commands, and conventions |
+| [Releasing](docs/RELEASING.md) | Release process: bump, verify, tag, publish |
 | [Why oso](docs/WHY-OSO.md) | Deep dive: 6 gaps between OpenSpec and Superpowers |
 
 ## Prerequisites
 
-- Node.js >= 16 (recommended)
+- Node.js >= 22.9.0
 - `openspec` CLI v1.3+
 - `opencode` CLI
 - `git`
 - Superpowers plugin
 
-Setup script checks these automatically.
+Run `oso verify` to check your environment.
 
 ## Local Development
 
 ```bash
-node bin/cli.js init test-project   # test locally
-npm publish                         # publish to npm
+npm run build && node dist/cli/index.js init test-project   # test locally
+npm publish                                                 # publish to npm
 ```
 
 ## Community
