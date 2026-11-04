@@ -370,3 +370,97 @@ describe('opsx-apply.md delegates the v6+ branch to upstream SDD', () => {
         }
     });
 });
+
+describe('opsx-ff.md converges from any state', () => {
+    it('Step 4 gates creation behind `test -d`', () => {
+        const content = readCommand('opsx-ff.md');
+        const step4 = sectionOf('opsx-ff.md', content, '### Step 4', '#### Step 4a');
+        assert.ok(
+            step4.includes('test -d openspec/changes/<name>'),
+            'opsx-ff.md: Step 4 must check `test -d openspec/changes/<name>`',
+        );
+        const commands = fencedCommands(step4);
+        assert.equal(
+            commands[0],
+            'test -d openspec/changes/<name>',
+            `opsx-ff.md: Step 4 first fenced command must be the existence check, got ${JSON.stringify(commands)}`,
+        );
+    });
+
+    it('Step 4 does not run `openspec new change` unconditionally', () => {
+        const content = readCommand('opsx-ff.md');
+        const step4 = sectionOf('opsx-ff.md', content, '### Step 4', '#### Step 4a');
+        const commands = fencedCommands(step4);
+        assert.ok(
+            commands.includes('openspec new change "<name>"'),
+            'opsx-ff.md: Step 4 must still create the change when missing',
+        );
+        assert.notEqual(
+            commands[0],
+            'openspec new change "<name>"',
+            'opsx-ff.md: creation must be behind the existence check',
+        );
+        assert.ok(step4.includes('不存在'), 'opsx-ff.md: Step 4 must branch on the missing case');
+    });
+
+    it('Step 4 forbids `openspec list` and archive checks', () => {
+        const content = readCommand('opsx-ff.md');
+        const step4 = sectionOf('opsx-ff.md', content, '### Step 4', '#### Step 4a');
+        assert.equal(
+            fencedCommands(step4).some((command) => command.includes('openspec list')),
+            false,
+            'opsx-ff.md: Step 4 must not run `openspec list` as an existence check',
+        );
+        assert.equal(
+            step4.includes('test -d openspec/changes/archive'),
+            false,
+            'opsx-ff.md: Step 4 must not test archived changes',
+        );
+    });
+
+    it('Step 6 guards the commit with `git diff --cached --quiet`', () => {
+        const content = readCommand('opsx-ff.md');
+        const step6 = sectionOf('opsx-ff.md', content, '### Step 6', '### Output');
+        assert.ok(
+            step6.includes('git diff --cached --quiet'),
+            'opsx-ff.md: Step 6 must skip the commit when nothing is staged',
+        );
+        assert.equal(
+            step6.includes('git add -A && git commit'),
+            false,
+            'opsx-ff.md: Step 6 must not chain `git add -A && git commit`',
+        );
+    });
+});
+
+describe('creating commands stop on an occupied name', () => {
+    it('propose Step 4 and new Step 5 both check `test -d` first', () => {
+        const propose = readCommand('opsx-propose.md');
+        const proposeStep4 = sectionOf('opsx-propose.md', propose, '### Step 4', '#### Step 4a');
+        assert.ok(
+            proposeStep4.includes('test -d openspec/changes/<name>'),
+            'opsx-propose.md: Step 4 must check `test -d openspec/changes/<name>`',
+        );
+        assert.ok(proposeStep4.includes('/opsx-continue'), 'opsx-propose.md: must offer /opsx-continue');
+        assert.ok(proposeStep4.includes('/opsx-ff'), 'opsx-propose.md: must offer /opsx-ff');
+        assert.equal(
+            fencedCommands(proposeStep4).some((command) => command.includes('openspec list')),
+            false,
+            'opsx-propose.md: Step 4 must not run `openspec list` as an existence check',
+        );
+
+        const newCmd = readCommand('opsx-new.md');
+        const newStep5 = sectionOf('opsx-new.md', newCmd, '### Step 5', '#### Step 5a');
+        assert.ok(
+            newStep5.includes('test -d openspec/changes/<name>'),
+            'opsx-new.md: Step 5 must check `test -d openspec/changes/<name>`',
+        );
+        assert.ok(newStep5.includes('/opsx-continue'), 'opsx-new.md: must offer /opsx-continue');
+        assert.ok(newStep5.includes('/opsx-ff'), 'opsx-new.md: must offer /opsx-ff');
+        assert.equal(
+            newStep5.includes('openspec list'),
+            false,
+            'opsx-new.md: Step 5 must not use `openspec list` as an existence check',
+        );
+    });
+});
