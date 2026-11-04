@@ -449,6 +449,10 @@ describe('opsx-ff.md converges from any state', () => {
             'opsx-ff.md: Step 5 must stop only when no artifact remains processable',
         );
         assert.ok(
+            step5.includes('循环直到没有可处理的 artifact'),
+            'opsx-ff.md: step 5e must terminate when nothing is processable, not when applyRequires is done',
+        );
+        assert.ok(
             step5.includes('不得生成'),
             'opsx-ff.md: Step 5 must forbid generating post-apply artifacts',
         );

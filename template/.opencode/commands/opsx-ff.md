@@ -156,7 +156,7 @@ c. 使用 `template` 结构 + `instruction` 指引创建文件
 
 d. 显示 "✓ Created <artifact-id>"
 
-e. 循环直到 `openspec status --change "<name>" --json` 中所有 `applyRequires` 为 `"done"`
+e. 循环直到没有可处理的 artifact——即所有非 post-apply artifact 均为 `"done"`
 
 ### Step 6: 提交 artifacts 并退出 worktree（cd 回项目根，不切换分支）
 
