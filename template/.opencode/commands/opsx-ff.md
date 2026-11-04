@@ -140,7 +140,11 @@ openspec-superpowers-opencode registry add <name> .worktrees/<name> --base "<BAS
 
 使用 **TodoWrite** 追踪 artifact 进度。
 
-按依赖顺序处理所有 `status` 为 `"ready"` 的 artifacts，但排除 post-apply artifacts——`requires` 链包含 `applyRequires` 中任一 artifact 的那些（`verify`、`retrospective`），它们由后续阶段生成，`ff` **不得生成**。没有可处理的 artifact 时**立即停止**。已 `done` 的 artifact **不得重建**，其数量记为本次跳过的 `<M>`。
+按依赖顺序处理 artifacts，每轮处理后重新读取 `openspec status --change "<name>" --json`：
+
+- **处理范围**：只处理 `status` 为 `"ready"` 的 artifacts；已 `done` 的 **不得重建**，其数量在进入 Step 5 时统计为 `<M>`。
+- **排除 post-apply**：`requires` 链包含 `applyRequires` 中任一 artifact 的（`verify`、`retrospective`）由后续阶段生成，`ff` **不得生成**。`requires` 链取 `openspec instructions <artifact-id> --change "<name>" --json` 的 `dependencies` 递归展开（不含 artifact 自身）。
+- **停止**：没有可处理的 artifact 时立即停止。
 
 对各 artifact：
 
@@ -177,7 +181,7 @@ cd <project-root>
 - 分支：`feature/<name>`
 - 基础分支：`<BASE_BRANCH>`
 - 已创建：`<N>` 个 artifacts
-- 本次跳过：`<M>` 个已完成 artifacts（`openspec status --change "<name>" --json` 中 `status` 为 `done` 的数量）
+- 本次跳过：`<M>` 个已完成 artifacts（进入 Step 5 时，`openspec status --change "<name>" --json` 中 `status` 为 `done` 的数量）
 - 若 `<N>` 为 0：提示「全部 artifacts 已就绪，可运行 `/opsx-apply` 开始实现，或 `/opsx-archive` 归档」
 - 提示：`/opsx-apply` 开始实现
 

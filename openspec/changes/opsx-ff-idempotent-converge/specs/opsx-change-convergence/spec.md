@@ -40,7 +40,7 @@ The template commands `opsx-ff.md`, `opsx-propose.md`, and `opsx-new.md` MUST ju
 
 ### Requirement: ff tops up only unfinished artifacts and treats zero created as success
 
-`opsx-ff.md` Step 5 SHALL loop only over artifacts whose status is not `done`, terminating when every artifact listed in `applyRequires` from `openspec status --change "<name>" --json` is `done`. When all required artifacts are already done, the command SHALL finish normally and its Output SHALL state that all artifacts are ready and suggest `/opsx-apply` or `/opsx-archive`.
+`opsx-ff.md` Step 5 SHALL process only artifacts whose status is `ready` and whose transitive `requires` chain does not contain any artifact listed in `applyRequires`; post-apply artifacts are produced after the apply phase and `ff` MUST NOT generate them. Step 5 SHALL terminate when no such artifact remains, and MUST NOT terminate merely because every `applyRequires` artifact is `done` — a pre-apply artifact outside the `applyRequires` closure (for example `design`) MUST still be topped up. When no artifact remains to be created, the command SHALL finish normally and its Output SHALL state that all artifacts are ready and suggest `/opsx-apply` or `/opsx-archive`.
 
 #### Scenario: a partially completed change is topped up
 
