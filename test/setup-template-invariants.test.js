@@ -493,6 +493,30 @@ describe('creating commands stop on an occupied name', () => {
             newStep5.includes('不得覆盖已有 change'),
             'opsx-new.md: Step 5 must forbid overwriting the existing change',
         );
+        assert.ok(
+            proposeStep4.includes('不得重试'),
+            'opsx-propose.md: Step 4 creation failure must forbid retry and manual mkdir',
+        );
+        assert.ok(
+            newStep5.includes('不得重试'),
+            'opsx-new.md: Step 5 creation failure must forbid retry and manual mkdir',
+        );
+        assert.ok(
+            proposeStep4.includes('未创建、未覆盖任何 change'),
+            'opsx-propose.md: Step 4 abort must describe the side effects accurately',
+        );
+        assert.ok(
+            newStep5.includes('未创建、未覆盖任何 change'),
+            'opsx-new.md: Step 5 abort must describe the side effects accurately',
+        );
+        assert.ok(
+            proposeStep4.includes('cd <project-root>'),
+            'opsx-propose.md: Step 4 abort must return to the project root',
+        );
+        assert.ok(
+            newStep5.includes('cd <project-root>'),
+            'opsx-new.md: Step 5 abort must return to the project root',
+        );
         assert.equal(
             newStep5.includes('openspec list'),
             false,

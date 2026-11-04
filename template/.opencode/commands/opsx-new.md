@@ -126,15 +126,15 @@ test -d openspec/changes/<name>
   openspec new change "<name>"
   ```
 
-  成功（exit 0）→ 进入 Step 5a；失败（exit 1）→ 停下报告。
+  成功（exit 0）→ 进入 Step 5a；失败（exit 1）→ 停下报告，不得重试、不得手工建目录。
 
 - **存在（exit 0）** → **STOP**，向用户报告：
 
-  > 变更 `<name>` 已存在，本次未做任何改动。继续的方式：
+  > 变更 `<name>` 已存在，未创建、未覆盖任何 change。继续的方式：
   > - `/opsx-continue <name>` — 每次生成一个 artifact，逐个确认
   > - `/opsx-ff <name>` — 一次补齐所有剩余 artifact
 
-  不得继续，不得覆盖已有 change。
+  不得继续，不得覆盖已有 change。Step 4 可能已创建 worktree 并复制 schemas/config；离开前先 `cd <project-root>`，不要停在 worktree 内。
 
 > 已归档的同名变更不视为冲突，不检测。
 
