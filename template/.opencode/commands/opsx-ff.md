@@ -140,7 +140,7 @@ openspec-superpowers-opencode registry add <name> .worktrees/<name> --base "<BAS
 
 使用 **TodoWrite** 追踪 artifact 进度。
 
-按依赖顺序处理 `status: "ready"` 的 artifacts，直到 `openspec status --change "<name>" --json` 中所有 `applyRequires` 均为 `done`；此时**立即停止**。`applyRequires` 之外的 post-apply artifacts（`verify`、`retrospective`）由后续阶段生成，`ff` **不得生成**。已 `done` 的 artifact **不得重建**，其数量记为本次跳过的 `<M>`。
+按依赖顺序处理所有 `status` 为 `"ready"` 的 artifacts，但排除 post-apply artifacts——`requires` 链包含 `applyRequires` 中任一 artifact 的那些（`verify`、`retrospective`），它们由后续阶段生成，`ff` **不得生成**。没有可处理的 artifact 时**立即停止**。已 `done` 的 artifact **不得重建**，其数量记为本次跳过的 `<M>`。
 
 对各 artifact：
 

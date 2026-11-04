@@ -437,12 +437,16 @@ describe('opsx-ff.md converges from any state', () => {
         const content = readCommand('opsx-ff.md');
         const step5 = sectionOf('opsx-ff.md', content, '### Step 5', '### Step 6');
         assert.ok(
-            step5.includes('按依赖顺序处理 `status: "ready"` 的 artifacts'),
-            'opsx-ff.md: Step 5 must drive the loop from the artifacts that are `ready`',
+            step5.includes('按依赖顺序处理所有 `status` 为 `"ready"` 的 artifacts'),
+            'opsx-ff.md: Step 5 must drive the loop from every artifact that is `ready`',
         );
         assert.ok(
-            step5.includes('applyRequires` 均为 `done`'),
-            'opsx-ff.md: Step 5 must stop once every applyRequires artifact is done',
+            step5.includes('`requires` 链包含 `applyRequires`'),
+            'opsx-ff.md: Step 5 must exclude post-apply artifacts by their `requires` chain, not by name',
+        );
+        assert.ok(
+            step5.includes('没有可处理的 artifact 时'),
+            'opsx-ff.md: Step 5 must stop only when no artifact remains processable',
         );
         assert.ok(
             step5.includes('不得生成'),
