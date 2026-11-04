@@ -44,12 +44,12 @@ The template commands `opsx-ff.md`, `opsx-propose.md`, and `opsx-new.md` MUST ju
 
 #### Scenario: a partially completed change is topped up
 
-- **WHEN** a change has some artifacts done and one artifact deleted
+- **WHEN** a change has some artifacts done and one pre-apply artifact deleted
 - **THEN** re-running `/opsx-ff` creates only the missing artifact, without duplicating or overwriting the existing ones
 
 #### Scenario: all artifacts done is a successful no-op
 
-- **WHEN** every `applyRequires` artifact reports `done`
+- **WHEN** every non-post-apply artifact reports `done`
 - **THEN** `/opsx-ff` exits successfully and prompts `/opsx-apply` or `/opsx-archive`
 
 ### Requirement: ff commits only when there are staged changes

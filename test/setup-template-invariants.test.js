@@ -454,6 +454,10 @@ describe('opsx-ff.md converges from any state', () => {
             'opsx-ff.md: Step 5 must exclude post-apply artifacts by their `requires` chain',
         );
         assert.ok(
+            step5.includes('（`verify`、`retrospective`）'),
+            'opsx-ff.md: Step 5 must exclude exactly `verify` and `retrospective`, not an open-ended list',
+        );
+        assert.ok(
             step5.includes('`dependencies` 递归展开'),
             'opsx-ff.md: Step 5 must name the data source for the `requires` chain',
         );

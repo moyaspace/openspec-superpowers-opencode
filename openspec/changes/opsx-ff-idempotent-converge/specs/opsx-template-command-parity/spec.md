@@ -27,7 +27,7 @@ The `Output` section of `opsx-propose.md` and `opsx-ff.md` SHALL report the numb
 
 #### Scenario: ff reports skipped artifacts and zero-created completion
 
-- **WHEN** `/opsx-ff` finds every required artifact already done
+- **WHEN** `/opsx-ff` finds every non-post-apply artifact already done
 - **THEN** its Output reports `<N>` as 0 and `<M>` as the number of skipped completed artifacts, and prompts `/opsx-apply` or `/opsx-archive`
 
 ### Requirement: Artifact Creation Guidelines block is present
