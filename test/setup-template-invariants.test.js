@@ -67,9 +67,10 @@ function fencedCommands(body) {
             continue;
         }
         const command = line.replace(/\s+#.*$/, '').trim();
-        if (command) {
-            commands.push(command);
+        if (!command || command.startsWith('#')) {
+            continue;
         }
+        commands.push(command);
     }
     return commands;
 }
