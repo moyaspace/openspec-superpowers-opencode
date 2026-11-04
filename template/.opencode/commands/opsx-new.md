@@ -112,11 +112,22 @@ test -f openspec/config.yaml && test -f openspec/schemas/superpowers-bridge-open
 
 命令不存在或初始化失败不阻断流程，继续下一步。
 
-### Step 5: 在 worktree 内创建变更
+### Step 5: 在 worktree 内创建变更骨架（本命令为创建语义）
+
+`new` 是**创建**语义：名字已被占用时停下并给出继续方式。
 
 ```bash
-openspec new change "<name>"
+test -d openspec/changes/<name>
 ```
+
+- **不存在（exit 1）** → `openspec new change "<name>"`，成功后进入 Step 5a
+- **存在（exit 0）** → **STOP**，向用户报告：
+
+  > 变更 `<name>` 已存在，本次未做任何改动。继续的方式：
+  > - `/opsx-continue <name>` — 每次生成一个 artifact，逐个确认
+  > - `/opsx-ff <name>` — 一次补齐所有剩余 artifact
+
+> 已归档的同名变更不视为冲突，不检测。
 
 #### Step 5a: 注册变更到 registry
 
@@ -162,6 +173,6 @@ cd <project-root>
 
 ### Guardrails
 
-- 如果同名变更已存在，建议用 `/opsx-continue`
+- 同名变更已存在时由 Step 5 中止，不再继续
 - 不要创建任何 artifact——只展示第一个的 template
 - worktree 创建后自动 `cd .worktrees/<name>`，后续命令（`/opsx-continue`）需检测 worktree

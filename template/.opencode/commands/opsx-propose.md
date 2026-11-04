@@ -98,11 +98,32 @@ test -f openspec/config.yaml && test -f openspec/schemas/superpowers-bridge-open
 
 命令不存在或初始化失败不阻断流程，继续下一步。
 
-### Step 4: 在 worktree 内创建变更
+### Step 4: 创建变更（本命令为创建语义）
+
+`propose` 是**创建**语义：名字已被占用时停下并给出继续方式，不覆盖已有 change。
 
 ```bash
-openspec new change "<name>"
+test -d openspec/changes/<name>
 ```
+
+- **不存在（exit 1）** → 执行创建：
+
+  ```bash
+  openspec new change "<name>"
+  ```
+
+  成功（exit 0）→ 进入 Step 4a；失败（exit 1）→ 停下报告。
+
+- **存在（exit 0）** → **STOP**，向用户报告：
+
+  > 变更 `<name>` 已存在，本次未做任何改动。继续的方式：
+  > - `/opsx-continue <name>` — 每次生成一个 artifact，逐个确认
+  > - `/opsx-ff <name>` — 一次补齐所有剩余 artifact
+
+  不得继续，不得覆盖已有 change。
+
+> MUST NOT 用 `openspec list` 判断存在性（返回的是注册表内容，不是磁盘目录）。
+> 已归档的同名变更不视为冲突，不检测。
 
 #### Step 4a: 注册变更到 registry
 
@@ -163,4 +184,4 @@ cd <project-root>
 - 始终先读依赖 artifact 再创建新 artifact
 - 上下文不清晰时优先用 **question** 工具
 - 确认每个 artifact 文件已写入后再继续下一个
-- 如果同名变更已存在，建议用 `/opsx-continue`
+- 同名变更已存在时由 Step 4 中止，不再继续
