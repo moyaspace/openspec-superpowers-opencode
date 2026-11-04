@@ -432,6 +432,33 @@ describe('opsx-ff.md converges from any state', () => {
             'opsx-ff.md: Step 6 must not chain `git add -A && git commit`',
         );
     });
+
+    it('Step 5 tops up only unfinished artifacts and defines the skipped count', () => {
+        const content = readCommand('opsx-ff.md');
+        const step5 = sectionOf('opsx-ff.md', content, '### Step 5', '### Step 6');
+        assert.ok(
+            step5.includes('不为 `done`'),
+            'opsx-ff.md: Step 5 must loop only over artifacts whose status is not `done`',
+        );
+        assert.ok(
+            step5.includes('不得重建'),
+            'opsx-ff.md: Step 5 must forbid rebuilding already-done artifacts',
+        );
+        const output = sectionOf('opsx-ff.md', content, '### Output', '### Artifact Creation Guidelines');
+        assert.ok(
+            output.includes('本次跳过'),
+            'opsx-ff.md: Output must report the skipped count',
+        );
+        assert.ok(
+            output.includes('为 `done` 的数量'),
+            'opsx-ff.md: Output must define where the skipped count comes from',
+        );
+        const step6 = sectionOf('opsx-ff.md', content, '### Step 6', '### Output');
+        assert.ok(
+            step6.includes('若 `git commit` 失败'),
+            'opsx-ff.md: Step 6 must stop and report when the commit itself fails',
+        );
+    });
 });
 
 describe('creating commands stop on an occupied name', () => {

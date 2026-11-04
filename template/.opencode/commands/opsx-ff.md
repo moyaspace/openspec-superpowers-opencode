@@ -140,6 +140,8 @@ openspec-superpowers-opencode registry add <name> .worktrees/<name> --base "<BAS
 
 使用 **TodoWrite** 追踪 artifact 进度。
 
+只处理 `openspec status --change "<name>" --json` 中 `status` 不为 `done` 的 artifacts（`ready` 优先）；已 `done` 的 artifact **不得重建**，其数量记为本次跳过的 `<M>`。
+
 按依赖顺序循环（artifacts with `status: "ready"` first）：
 
 对各 artifact：
@@ -168,6 +170,7 @@ cd <project-root>
 
 - 无任何变化时（重复调用、artifacts 已齐）**跳过提交**，不视为失败。
   `git commit` 在无暂存内容时以 exit 1 退出；若直接串联 `&&`，幂等重跑会在最后一步中断。
+- 若 `git commit` 失败（例如 hook 拒绝）→ 停下报告；`git diff --cached --quiet` 的 exit 1 表示「有变化」，不是失败。
 
 ### Output
 
@@ -176,7 +179,7 @@ cd <project-root>
 - 分支：`feature/<name>`
 - 基础分支：`<BASE_BRANCH>`
 - 已创建：`<N>` 个 artifacts
-- 本次跳过：`<M>` 个已完成 artifacts
+- 本次跳过：`<M>` 个已完成 artifacts（`openspec status --change "<name>" --json` 中 `status` 为 `done` 的数量）
 - 若 `<N>` 为 0：提示「全部 artifacts 已就绪，可运行 `/opsx-apply` 开始实现，或 `/opsx-archive` 归档」
 - 提示：`/opsx-apply` 开始实现
 
