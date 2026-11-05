@@ -11,17 +11,17 @@
 
 ## 2. ensure-worktree 判定重写（BUG023 / BUG024 / BUG025 / BUG026）
 
-- [ ] 2.1 在 `src/cli/index.ts` 抽出 `decideWorktreeAction(entries, targetDir, branch, fsFacts)` 纯函数，返回 `reuse | create | abort` 与原因；覆盖文档 §4 的 8 种状态
-- [ ] 2.2 重写 `runEnsureWorktree`：以 `readWorktreeEntries` 为唯一登记源；删除 `fs.existsSync` 作为存在性判据的分支
-- [ ] 2.3 实现状态 E：登记有目标但目录不存在 → `git worktree prune` → 重读登记 → 重新判定
-- [ ] 2.4 实现状态 D：普通空目录删除后继续；非空目录/文件 `ABORT`，零删改
-- [ ] 2.5 实现状态 F：分支被其他 worktree 检出 → `ABORT` 并点名路径
-- [ ] 2.6 实现状态 G/H：分支存在未被检出 → `git worktree add <dir> feature/<name>` 挂回；分支不存在 → `worktree add <dir> -b feature/<name>`
-- [ ] 2.7 删除 `git branch -D feature/<name>` 代码路径；全仓搜索确认不再出现该命令
-- [ ] 2.8 实现状态 C：复用前读取 `--abbrev-ref HEAD`，不等于 `feature/<name>` 时非 0 退出并打印当前分支
-- [ ] 2.9 实现 D3 后置校验（`--show-toplevel`、`--abbrev-ref HEAD`、`--git-common-dir`），失败指明失败项
-- [ ] 2.10 保持既有正常路径输出文案（创建/复用/已在该 worktree 内）不回归
-- [ ] 2.11 运行 `npm run typecheck` 与 `npm run build`，确认 `lsp_diagnostics` 对 `src/cli/index.ts` 干净
+- [x]  在 `src/cli/index.ts` 抽出 `decideWorktreeAction(entries, targetDir, branch, fsFacts)` 纯函数，返回 `reuse | create | abort` 与原因；覆盖文档 §4 的 8 种状态
+- [x]  重写 `runEnsureWorktree`：以 `readWorktreeEntries` 为唯一登记源；删除 `fs.existsSync` 作为存在性判据的分支
+- [x]  实现状态 E：登记有目标但目录不存在 → `git worktree prune` → 重读登记 → 重新判定
+- [x]  实现状态 D：普通空目录删除后继续；非空目录/文件 `ABORT`，零删改
+- [x]  实现状态 F：分支被其他 worktree 检出 → `ABORT` 并点名路径
+- [x]  实现状态 G/H：分支存在未被检出 → `git worktree add <dir> feature/<name>` 挂回；分支不存在 → `worktree add <dir> -b feature/<name>`
+- [x]  删除 `git branch -D feature/<name>` 代码路径；全仓搜索确认不再出现该命令
+- [x]  实现状态 C：复用前读取 `--abbrev-ref HEAD`，不等于 `feature/<name>` 时非 0 退出并打印当前分支
+- [x]  实现 D3 后置校验（`--show-toplevel`、`--abbrev-ref HEAD`、`--git-common-dir`），失败指明失败项
+- [x]  保持既有正常路径输出文案（创建/复用/已在该 worktree 内）不回归
+- [x]  运行 `npm run typecheck` 与 `npm run build`，确认 `lsp_diagnostics` 对 `src/cli/index.ts` 干净
 
 ## 3. 模板侧 worktree 就位校验（GAP010）
 
