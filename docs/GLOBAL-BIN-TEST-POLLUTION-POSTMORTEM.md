@@ -114,6 +114,16 @@ oso install-shims
 
 它会重新定位 bin、备份原始 `openspec`、重写 `.cmd`/`.ps1`。验证后 `TOOL_DIR` 指向当前 oso 安装目录、`openspec-orig.cmd` 存在、cmd 与 pwsh 下 `openspec --version` 都正常。
 
+### 4. 测试编排器的「恢复兜底」已移除（GAP008）
+
+事故修复初期，`scripts/run-tests.mjs` 在 `finally` 中调用全局 `oso install-shims`，作为「万一还有测试写全局 bin」的兜底。三条证据验证后该兜底已删除：
+
+1. 本机 Windows 连续 6 次 `npm test` 全绿（351 主套件 + 5 elevated），每次全局 `openspec.cmd` / `openspec.ps1` 的 `TOOL_DIR` 均指向正式安装版，`openspec-shim-e2e` 稳定收集 3 条；`assert-global-bin-unchanged` 每次报告 7 个文件未变。
+2. 三个会调用 `installShims()` 的测试均已隔离 bin 解析：`create-project.behavior` 与 `elevated/lifecycle-e2e` 把临时 bin 目录前置到 `PATH`，`shims-installer` 用 `execSync` 替身把 binDir 指向临时目录。
+3. 在恢复点临时加的日志证明 `restoreGlobalShim()` 前后所有 `openspec*` 文件哈希与 `TOOL_DIR` 完全一致（no-op）。
+
+因此现在 `npm test` 只靠「测试侧隔离 + 全局 bin 守卫」保证不污染，不再依赖跑完后的恢复。原始证据见 `openspec/changes/settle-v1-residuals/verify.md`（GAP008 段）。
+
 ## 验证
 
 | 检查 | 结果 |
