@@ -74,25 +74,52 @@ git rev-parse --abbrev-ref HEAD   # → BASE_BRANCH
 
 Artifacts 在 feature 分支上生成，不在基础分支上留痕迹。
 
-**3a. 创建 worktree：**
+**3a. 创建 worktree 并校验就位：**
+
+**3a-1. 创建 worktree：**
 
 ```bash
 openspec-superpowers-opencode ensure-worktree <name>
-cd .worktrees/<name>
-# 复制 .gitignore 忽略的 openspec/schemas/ 和 config.yaml 到 worktree
-mkdir -p openspec/schemas/
-cp -r <project-root>/openspec/schemas/* openspec/schemas/ && cp <project-root>/openspec/config.yaml openspec/
 ```
 
-**验证复制是否成功：**
+- **成功（exit 0）** → 进入 3a-2
+- **失败（exit 1）** → 停下报告，不得继续
+
+**3a-2. 进入 worktree（cd 失败必须停下）：**
+
 ```bash
+cd .worktrees/<name> || { echo "STOP: cd 失败"; exit 1; }
+```
+
+- `cd` 失败时立即 `exit 1`，不得进入复制重试
+
+**3a-3. 只读校验：当前目录就是独立 worktree 根：**
+
+```bash
+test "$(git rev-parse --show-toplevel)" = "$(pwd -P)" || { echo "STOP: 不是独立 worktree"; exit 1; }
+```
+
+**3a-4. 只读校验：当前分支为 feature/<name>：**
+
+```bash
+test "$(git rev-parse --abbrev-ref HEAD)" = "feature/<name>" || { echo "STOP: 分支不对"; exit 1; }
+```
+
+- 3a-3 / 3a-4 任一失败 → 停下报告，不得进入 3a-5
+
+**3a-5. 复制 schemas/config 并验证（失败最多重试 1 次）：**
+
+```bash
+mkdir -p openspec/schemas/
+cp -r <project-root>/openspec/schemas/* openspec/schemas/ && cp <project-root>/openspec/config.yaml openspec/
 test -f openspec/config.yaml && test -f openspec/schemas/superpowers-bridge-opencode/schema.yaml && test -f openspec/schemas/superpowers-bridge-opencode/templates/brainstorm.md
 ```
 
-- **成功** → 继续
-- **失败** → 重新执行复制再验证，成功后才能进入下一步
+- **成功** → 进入 3a-6
+- **失败** → 重新执行复制与 `test -f` 验证，**最多重试 1 次**
+- **第二次仍失败** → 停下报告，不得进入下一步
 
-**3b. 初始化代码索引：**
+**3a-6. 初始化代码索引：**
 
 ```
 - codegraph 命令可用 → codegraph init

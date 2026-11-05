@@ -561,3 +561,33 @@ describe('creating commands stop on an occupied name', () => {
         );
     });
 });
+
+describe('opsx template commands validate worktree placement before copying', () => {
+    for (const [file, startMarker, endMarker] of [
+        ['opsx-propose.md', '### Step 3', '### Step 4'],
+        ['opsx-ff.md', '### Step 3', '### Step 4'],
+        ['opsx-new.md', '### Step 4', '### Step 5'],
+    ]) {
+        it(`${file} ${startMarker} carries the cd guard, read-only checks, and copy retry bound`, () => {
+            const content = readCommand(file);
+            const body = sectionOf(file, content, startMarker, endMarker);
+            for (const needle of [
+                'git rev-parse --show-toplevel',
+                'git rev-parse --abbrev-ref HEAD',
+                'pwd -P',
+                'feature/<name>',
+                'cd .worktrees/<name> ||',
+                '最多重试 1 次',
+            ]) {
+                assert.ok(
+                    body.includes(needle),
+                    `${file}: ${startMarker} must contain \`${needle}\``,
+                );
+            }
+            assert.ok(
+                body.includes('exit 1'),
+                `${file}: ${startMarker} must stop with \`exit 1\``,
+            );
+        });
+    }
+});
