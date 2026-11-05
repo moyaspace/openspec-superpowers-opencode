@@ -41,17 +41,23 @@ function gitRun(dir, args) {
 
 /**
  * 规范化路径用于跨平台比较。
- * `git rev-parse --show-toplevel` 在 Windows 下可能返回正斜杠与不同大小写，
- * 因此统一用 `path.resolve` 归一化分隔符，win32 下再转小写。
+ * 先解析符号链接（macOS 的 /var → /private/var，且 git 返回物理路径）；
+ * 路径不存在时回退到 `path.resolve`，避免比较中抛错。
+ * `git rev-parse --show-toplevel` 在 Windows 下还可能返回正斜杠与不同大小写，故 win32 再转小写。
  */
 function normalizePath(p) {
-    const resolved = path.resolve(p);
+    let resolved;
+    try {
+        resolved = fs.realpathSync(path.resolve(p));
+    } catch {
+        resolved = path.resolve(p);
+    }
     return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
-/** 建一个一次性 git 仓库（含首次提交），返回仓库根目录 */
+/** 建一个一次性 git 仓库（含首次提交），返回解析过符号链接的仓库根目录 */
 function makeGitRepo(prefix) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
     gitRun(dir, ['init', '-q', '--initial-branch=main']);
     gitRun(dir, ['config', 'user.email', 'test@example.com']);
     gitRun(dir, ['config', 'user.name', 'Test User']);
