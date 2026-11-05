@@ -42,10 +42,10 @@
 
 ## 5. verify PRECHECK 基准（GAP011）
 
-- [ ] 5.1 `template/openspec/schemas/superpowers-bridge-opencode/schema.yaml` 的 verify PRECHECK 改为 `openspec list --json` 取 `baseBranch` 为主路径，缺失退回 `origin/main` 并要求 verify.md §5 标注基准
-- [ ] 5.2 `openspec/schemas/superpowers-bridge-opencode/schema.yaml` 同步改为相同口径
-- [ ] 5.3 `test/setup-template-invariants.test.js` 新增断言：`template/.../schema.yaml` 的 verify PRECHECK 引用 `openspec list --json` 与 `baseBranch`、不以 `origin/main` merge-base 为主路径；仓库根 `openspec/schemas/.../schema.yaml`（gitignored，CI 可能不存在）在存在时做同样断言
-- [ ] 5.4 以 `release/1.1` 为 base 实跑一次 verify，确认 commit 数与 `git log release/1.1..HEAD` 一致
+- [x]  `template/openspec/schemas/superpowers-bridge-opencode/schema.yaml` 的 verify PRECHECK 改为 `openspec list --json` 取 `baseBranch` 为主路径，缺失退回 `origin/main` 并要求 verify.md §5 标注基准
+- [x]  `openspec/schemas/superpowers-bridge-opencode/schema.yaml` 同步改为相同口径
+- [x]  `test/setup-template-invariants.test.js` 新增断言：`template/.../schema.yaml` 的 verify PRECHECK 引用 `openspec list --json` 与 `baseBranch`、不以 `origin/main` merge-base 为主路径；仓库根 `openspec/schemas/.../schema.yaml`（gitignored，CI 可能不存在）在存在时做同样断言
+- [x]  以 `release/1.1` 为 base 实跑一次 verify，确认 commit 数与 `git log release/1.1..HEAD` 一致
 
 ## 6. 文档与回归
 
