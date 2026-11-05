@@ -591,3 +591,64 @@ describe('opsx template commands validate worktree placement before copying', ()
         });
     }
 });
+
+const SCHEMA_RELATIVE = path.join(
+    'openspec',
+    'schemas',
+    'superpowers-bridge-opencode',
+    'schema.yaml',
+);
+const TEMPLATE_SCHEMA_PATH = path.join(TEMPLATE_DIR, SCHEMA_RELATIVE);
+// The repository's self-hosted copy is gitignored (`.gitignore:44`), so a clean
+// checkout / CI may not have it. Assert when present, skip when absent.
+const REPO_SCHEMA_PATH = path.join(__dirname, '..', SCHEMA_RELATIVE);
+
+const VERIFY_SECTION_START = '  - id: verify';
+const VERIFY_SECTION_END = '  - id: retrospective';
+
+function readVerifySection(file) {
+    assert.ok(fs.existsSync(file), `missing schema file: ${file}`);
+    const content = fs.readFileSync(file, 'utf8');
+    return sectionOf(file, content, VERIFY_SECTION_START, VERIFY_SECTION_END);
+}
+
+function assertVerifyBaseline(file) {
+    const body = readVerifySection(file);
+    for (const needle of [
+        'openspec list --json',
+        'baseBranch',
+        'git log --oneline "$base"..HEAD | wc -l',
+        'baseline: origin/main (registry had no baseBranch)',
+    ]) {
+        assert.ok(
+            body.includes(needle),
+            `${file}: verify PRECHECK must contain \`${needle}\``,
+        );
+    }
+    assert.equal(
+        body.includes('git merge-base HEAD origin/main'),
+        false,
+        `${file}: verify PRECHECK must not use \`git merge-base HEAD origin/main\` as its primary path`,
+    );
+    return body;
+}
+
+describe('verify artifact derives commit evidence from the change baseBranch', () => {
+    it('template schema.yaml verify PRECHECK uses baseBranch and the annotated fallback', () => {
+        assertVerifyBaseline(TEMPLATE_SCHEMA_PATH);
+    });
+
+    it('repository schema.yaml verify PRECHECK matches the template copy when present', (t) => {
+        if (!fs.existsSync(REPO_SCHEMA_PATH)) {
+            t.skip(`repository schema copy absent (gitignored): ${REPO_SCHEMA_PATH}`);
+            return;
+        }
+        const repoBody = assertVerifyBaseline(REPO_SCHEMA_PATH);
+        const templateBody = readVerifySection(TEMPLATE_SCHEMA_PATH);
+        assert.equal(
+            repoBody.replace(/\r\n/g, '\n'),
+            templateBody.replace(/\r\n/g, '\n'),
+            'repository and template verify sections must stay identical (line endings ignored)',
+        );
+    });
+});

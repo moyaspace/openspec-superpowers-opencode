@@ -187,7 +187,20 @@ artifacts:
       yet produced reviewable changes.
 
       1. Commit evidence (must return > 0):
-         git log --oneline $(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD origin/master 2>/dev/null)..HEAD | wc -l
+         Read the baseline from this change's registry entry
+         (primary path):
+           openspec list --json
+         Find the entry whose "name" equals <change-name> and take
+         its "baseBranch" value. Then count the commits on top of
+         that baseline:
+           base="<baseBranch value from the entry>"
+           git log --oneline "$base"..HEAD | wc -l
+         If the entry has no "baseBranch" (registry had no
+         baseBranch), fall back to origin/main:
+           base=origin/main
+           git log --oneline "$base"..HEAD | wc -l
+         and record this exact line in verify.md §5:
+           baseline: origin/main (registry had no baseBranch)
 
       2. Task progress (must return > 0):
          grep -c '^- \[x\]' openspec/changes/<change-name>/tasks.md
