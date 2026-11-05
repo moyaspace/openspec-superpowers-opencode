@@ -28,7 +28,7 @@
 
 - 每次 `assert-global-bin-unchanged` 均报告 `[guard] ✓ 全局 bin 未被修改（7 个文件）`。
 - 每次 `openspec shim end-to-end [real CLI]` 的三个用例均被收集并通过（`--version`、`list` 拦截、`validate --help` 透传）。
-- 局限：本机仅 Windows；CI 的 ubuntu/macos 未在本任务内执行，需 CI 首跑复核（不影响本机三证据判定）。
+- 局限：spec 证据 1 已按本机 Windows 范围修订；CI ubuntu/macos 首跑复核见下（本次未执行，持续记为局限，不影响本机三证据判定）。
 
 ### 5.2 证据 2 — 调用 `installShims()` 的测试隔离审计
 
@@ -107,7 +107,12 @@ verify PRECHECK 的旧主路径 `git merge-base HEAD origin/main`：
 ### 6.3 Git 状态（最终，含文档修复后）
 
 - `git status --short`：**空**（`f06a2321a` 文档修复与本次证据更新提交后均无脏文件）。
-- 最终 HEAD：**本证据更新提交**（`docs(verify): refresh Task 6 evidence after doc fix`）；其父提交 `f06a2321a`（`docs: align worktree creation doc with ensure-worktree behavior`），再上一提交 `c20feaab8`（`docs(changelog): record 1.1.2 residual fixes`）。以 `git rev-parse HEAD` 为准。
+- 本文件最近一次证据更新时 HEAD：`292a7da47`（父 `f06a2321a`，再父 `c20feaab8`）；本次修复提交见 git log。
 - `git rev-parse main` = `7416976a9017f0a6dabac4be331c3e6fcbff58a7`，与开工前一致（未触碰 `main`）。
 - 当前分支：`feature/settle-v1-residuals`（未 rebase/push/切换）。
 - 测试：**文档-only 变更（`docs/WORKTREE-CREATION.md`、本 `verify.md`），未重跑**；上次全量回归见 §6.1（commit `c20feaab8`）：主套件 353 / 353 pass / 0 fail，elevated 5 / 5 pass / 0 fail。
+
+### 6.4 Task 证据补记
+
+- Task 1 RED：commit `b5fb87a63`，`npm run build && node --test test/cli.test.js` → 22 tests / 14 pass / 8 fail（均为新增用例）。
+- GAP011：本地 registry `baseBranch=release/1.1`；Task 5 实施时 `git log --oneline release/1.1..HEAD | wc -l` = 12（后续提交会变化，以 git log 为准）。

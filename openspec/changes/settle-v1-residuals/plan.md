@@ -15,7 +15,7 @@
 - Node >= 22.9.0；`npm test` 入口优先；9009（cmd spawn 环境类失败）时改用 `node --test --test-concurrency=1 "test/*.test.js"` 并记录偏差。
 - 重跑（已就位）必须零副作用、零报错。
 - 绝不删除用户文件；绝不删除含提交的分支；绝不抢占已被其他 worktree 检出的分支。
-- 代码中 MUST NOT 再出现 `git branch -D feature/<name>`。
+- `ensure-worktree` 创建路径中 MUST NOT 再出现 `git branch -D feature/<name>`（`remove-worktree` / `opsx-finish` 的显式删除保留）。
 - 两份 `schema.yaml` 必须同步改。
 - 不改 `Step 2`、`README*.md`、`.opencode/commands/`、V2.0 线、`apply.requires` 与 artifact 图。
 

@@ -8,7 +8,7 @@
 
 | 命令 | 权限 | 耗时 | 覆盖 |
 |---|---|---|---|
-| `npm test` | Windows：普通用户（首次弹一次 UAC，`gsudo cache on` 可缓存）；Unix/CI：普通用户，无需提权 | ~5 分钟（含构建与 E2E） | typecheck + build + **全局 bin 守卫 + 主套件 + elevated 套件**，一遍全绿（标准 Gate）；测试已隔离 bin，守卫兜底，无收尾恢复 |
+| `npm test` | Windows：普通用户（首次弹一次 UAC，`gsudo cache on` 可缓存）；Unix/CI：普通用户，无需提权 | ~5 分钟（含构建与 E2E） | typecheck + build + **全局 bin 守卫 + 主套件 + elevated 套件**，一遍全绿（标准 Gate）；测试已隔离 bin，守卫检测（无全局安装时跳过），无收尾恢复 |
 | `node --test "test/*.test.js"` | 普通用户 | ~3.5 分钟 | 仅主套件（300+ 用例；跳过 elevated 与全局 bin 守卫） |
 | `node --test test/<file>.test.js` | 普通用户 | 秒级 | 单文件（改哪跑哪，见 §3） |
 | 宿主探针（见 §2 探针层） | 普通用户 | 1-2 分钟 + 模型调用 | 宿主兼容性（仅版本组合变化时） |
@@ -51,7 +51,7 @@
 - **安全防护用例不可删**：`setup-deploy`/`setup-reset` 的 symlink 穿越、路径逃逸拒绝用例是安全基线。
 - **测试不得写机器全局状态**：`init` / `installShims` 会用 `where openspec` 找到**全局** npm bin 并写垫片。测试必须把临时 bin 目录前置到 `PATH`，否则每跑一次就污染开发机（事故链见 `docs/GLOBAL-BIN-TEST-POLLUTION-POSTMORTEM.md`）。
 - **守卫**：`npm test` 用 `scripts/assert-global-bin-unchanged.mjs` 包住主套件与 elevated，对比运行前后全局 `openspec*` 的 SHA-256；有变化直接判失败并指名文件。找不到全局 openspec 时自动跳过。
-- **垫片隔离（不再有收尾恢复）**：会调用 `installShims()` 的测试必须把临时 bin 目录前置到 `PATH`（`create-project.behavior`、`elevated/lifecycle-e2e`），或对 `execSync` 做替身（`shims-installer`），使 `where openspec` 只命中临时目录。`scripts/run-tests.mjs` 原先在 `finally` 里调用全局 `oso install-shims` 的兜底已按 GAP008 的三条证据（连续 ≥5 次全绿、隔离审计、恢复点 no-op 日志）移除；回归由 `assert-global-bin-unchanged` 守卫兜住。
+- **垫片隔离（不再有收尾恢复）**：会调用 `installShims()` 的测试必须把临时 bin 目录前置到 `PATH`（`create-project.behavior`、`elevated/lifecycle-e2e`），或对 `execSync` 做替身（`shims-installer`），使 `where openspec` 只命中临时目录。`scripts/run-tests.mjs` 原先在 `finally` 里调用全局 `oso install-shims` 的兜底已按 GAP008 的三条证据（连续 ≥5 次全绿、隔离审计、恢复点 no-op 日志）移除；回归由 `assert-global-bin-unchanged` 守卫检测（无全局安装时跳过）。GAP008 的 CI 局限：本机证据仅覆盖 Windows，ubuntu/macos 的 CI 首跑复核仍待执行（记录于该 change 的 `verify.md` §5.1）。
 - **失败纪律**：不得删除失败测试求绿；先判断是环境问题（如 EPERM→gsudo）还是回归。
 
 ## 5. 指针区

@@ -4,7 +4,7 @@
 
 Removal of `restoreGlobalShim()` and its supporting code from `scripts/run-tests.mjs` MUST be preceded by all three of the following evidence items, and none may be skipped:
 
-1. After at least five consecutive `npm test` runs (including the Windows host and CI ubuntu/macos), the global shim `TOOL_DIR` still points at the formal installation and `openspec-shim-e2e` reliably collects all three cases.
+1. After at least five consecutive `npm test` runs (on the Windows host; the CI ubuntu/macos first-run recheck is recorded in `verify.md` as a limitation, not yet executed), the global shim `TOOL_DIR` still points at the formal installation and `openspec-shim-e2e` reliably collects all three cases.
 2. Every test that calls `installShims()` has been checked and its bin resolution is fully isolated.
 3. A temporary log at the restore point proves the state before and after restore is identical (a no-op).
 
