@@ -91,7 +91,8 @@ ELEVATED: running 2 elevated test file(s) via gsudo ...
 `git branch -D`：
 
 - `src/cli/index.ts:700` —— 仅存在于 `runRemoveWorktree()`（显式 `remove-worktree` 命令），按预审计裁决不在本变更范围，未删除。
-- `docs/WORKTREE-CREATION.md:88` —— 描述**旧版** `ensure-worktree` 防御性清理的文档段落，内容已与实现的当前行为不符（非代码路径，未在本任务改动）。
+- `docs/WORKTREE-CREATION.md:88` —— 原描述旧版 `ensure-worktree` 防御性清理的文档段落，**已在 `f06a2321a` 修复**：该节改写为「分支与目录状态处理」，伪代码同步为新判据；`git grep -n "git branch -D" -- docs/WORKTREE-CREATION.md` 为 **0 处**。
+- `docs/tasks.md:403,406` —— 描述 `remove-worktree` 的 `git worktree remove --force` + `git branch -D` 组合，属另一命令语义，按裁决保留。
 - `template/.opencode/commands/opsx-finish.md:358` —— `/opsx-finish`「丢弃」选项的显式清理步骤，属 finish 语义，非 ensure-worktree 路径。
 - 其余命中均为本变更的文档/规格/计划（`CHANGELOG.md`、`openspec/changes/settle-v1-residuals/**`），描述「不再使用该命令」。
 - **结论：`runEnsureWorktree()`（`src/cli/index.ts:616-681`）不含 `git branch -D`**，无阻断项。
@@ -103,8 +104,10 @@ verify PRECHECK 的旧主路径 `git merge-base HEAD origin/main`：
 - 其余命中为 change artifacts（提案/回顾）中对旧行为的描述。
 - **结论：0 处旧主路径残留。**
 
-### 6.3 Git 状态
+### 6.3 Git 状态（最终，含文档修复后）
 
-- `git status --short`：提交前仅 `M CHANGELOG.md`（本任务预期改动），无其它脏文件。
+- `git status --short`：**空**（`f06a2321a` 文档修复与本次证据更新提交后均无脏文件）。
+- 最终 HEAD：**本证据更新提交**（`docs(verify): refresh Task 6 evidence after doc fix`）；其父提交 `f06a2321a`（`docs: align worktree creation doc with ensure-worktree behavior`），再上一提交 `c20feaab8`（`docs(changelog): record 1.1.2 residual fixes`）。以 `git rev-parse HEAD` 为准。
 - `git rev-parse main` = `7416976a9017f0a6dabac4be331c3e6fcbff58a7`，与开工前一致（未触碰 `main`）。
-- 当前分支：`feature/settle-v1-residuals`。
+- 当前分支：`feature/settle-v1-residuals`（未 rebase/push/切换）。
+- 测试：**文档-only 变更（`docs/WORKTREE-CREATION.md`、本 `verify.md`），未重跑**；上次全量回归见 §6.1（commit `c20feaab8`）：主套件 353 / 353 pass / 0 fail，elevated 5 / 5 pass / 0 fail。
