@@ -75,24 +75,18 @@ agent 可以选择跟随或不跟随。
 
 ## 最终方案：三层代码级保证
 
-### 防御性清理：分支残留
+### 分支与目录状态处理
 
 正常 OPSX 流程下 `feature/<name>` 分支和 worktree 生命周期一致，
 不存在"有分支无 worktree"的状态——finish 会同时清理两者。
 
-但 `ensure-worktree` 仍保留了一行静默清理，作为防御性措施：
+但用户手动操作后两者可能不同步，`ensure-worktree` 按以下规则处理，**不删除任何分支**：
 
-```javascript
-// 防御性清理：正常流程无残留，但用户手动操作后可分支/worktree 不同步
-try {
-    execSync(`git branch -D "${branch}"`, { cwd, stdio: 'ignore' });
-} catch (_) {
-    // 分支不存在时静默跳过
-}
-```
+- `feature/<name>` 已存在且未被检出 → 用 `git worktree add <dir> feature/<name>` **挂回**，分支上的 commit SHA 保持不变。
+- 登记仍在但目标目录被手工删除 → 先 `git worktree prune` 再重建，不再误报「分支正被检出」。
+- 分支已被其他 worktree 检出 → 中止并点名占用路径。
 
-这样 `ensure-worktree` 在任何状态下都等价于
-"从当前 HEAD 创建干净的新分支 + 新 worktree"，无副作用。
+因此 `ensure-worktree` 既不会丢弃已有提交，也不会改动其他 worktree 的分支。
 
 ### 第 1 层：`bin/cli.js` — `ensure-worktree <name>` 子命令
 
@@ -100,9 +94,12 @@ try {
 
 ```bash
 openspec-superpowers-opencode ensure-worktree <name>
-  → 检测 .worktrees/<name>/ 是否存在
-  → 不存在 → git worktree add .worktrees/<name> -b feature/<name>
-  → 已存在 → 跳过（幂等）
+  → git worktree list --porcelain 登记 + 目标目录自身 rev-parse --show-toplevel 判定
+  → 已就位且分支正确 → 复用（零副作用）
+  → 空目录 → 清理后创建；非空目录/文件 → 中止（零删改）
+  → 陈旧登记 → prune 后重建；既有分支 → 挂回（保 SHA）
+  → 分支被别处检出 / 分支不对 → 中止并打印原因
+  → 创建/复用后做 show-toplevel、分支、git-common-dir 三项后置校验
   → 任何失败 → process.exit(1)
 ```
 
