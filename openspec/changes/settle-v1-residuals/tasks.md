@@ -49,8 +49,8 @@
 
 ## 6. 文档与回归
 
-- [ ] 6.1 `CHANGELOG.md` 的 `## [1.1.2]` → `### Fixed` 补 BUG023、BUG024、BUG025、BUG026、GAP008、GAP010、GAP011 条目
-- [ ] 6.2 运行 `npm test`，确认全绿且用例数不少于基线（342 主套件 + 5 elevated）；记录实际用例数
-- [ ] 6.3 检查 `git status` 干净；`git rev-parse main` 与开工前一致（`7416976a9017f0a6dabac4be331c3e6fcbff58a7`）
-- [ ] 6.4 全仓搜索确认无残留 `git branch -D feature/<name>`、无 `origin/main` 作为 verify 主路径
-- [ ] 6.5 若 GAP008 以保留兜底收尾，在 verify.md 与 CHANGELOG 中明确记录「部分完成」及原因
+- [x]  `CHANGELOG.md` 的 `## [1.1.2]` → `### Fixed` 补 BUG023、BUG024、BUG025、BUG026、GAP008、GAP010、GAP011 条目
+- [x]  运行 `npm test`，确认全绿且用例数不少于基线（342 主套件 + 5 elevated）；记录实际用例数
+- [x]  检查 `git status` 干净；`git rev-parse main` 与开工前一致（`7416976a9017f0a6dabac4be331c3e6fcbff58a7`）
+- [x]  全仓搜索确认无残留 `git branch -D feature/<name>`、无 `origin/main` 作为 verify 主路径
+- [x]  若 GAP008 以保留兜底收尾，在 verify.md 与 CHANGELOG 中明确记录「部分完成」及原因
