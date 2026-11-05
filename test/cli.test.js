@@ -40,24 +40,36 @@ function gitRun(dir, args) {
 }
 
 /**
+ * 解析路径为真实物理路径。优先 `fs.realpathSync.native`：Windows 下它会展开 8.3 短名
+ * （如 `RLOESS~1` → `rloessplateau`，与 git 返回的长路径一致），而普通 `fs.realpathSync` 不会。
+ * 失败时回退 `fs.realpathSync`，再失败回退 `path.resolve`，避免比较中抛错。
+ */
+function realPath(p) {
+    const resolved = path.resolve(p);
+    try {
+        return fs.realpathSync.native(resolved);
+    } catch {
+        try {
+            return fs.realpathSync(resolved);
+        } catch {
+            return resolved;
+        }
+    }
+}
+
+/**
  * 规范化路径用于跨平台比较。
- * 先解析符号链接（macOS 的 /var → /private/var，且 git 返回物理路径）；
- * 路径不存在时回退到 `path.resolve`，避免比较中抛错。
+ * 先解析符号链接与 Windows 8.3 短名（见 `realPath`）；
  * `git rev-parse --show-toplevel` 在 Windows 下还可能返回正斜杠与不同大小写，故 win32 再转小写。
  */
 function normalizePath(p) {
-    let resolved;
-    try {
-        resolved = fs.realpathSync(path.resolve(p));
-    } catch {
-        resolved = path.resolve(p);
-    }
+    const resolved = realPath(p);
     return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
-/** 建一个一次性 git 仓库（含首次提交），返回解析过符号链接的仓库根目录 */
+/** 建一个一次性 git 仓库（含首次提交），返回解析过符号链接/短名的仓库根目录 */
 function makeGitRepo(prefix) {
-    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
+    const dir = realPath(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
     gitRun(dir, ['init', '-q', '--initial-branch=main']);
     gitRun(dir, ['config', 'user.email', 'test@example.com']);
     gitRun(dir, ['config', 'user.name', 'Test User']);
