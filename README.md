@@ -1,6 +1,12 @@
 # oso (openspec-superpowers-opencode)
 
-> Bridges Superpowers + OpenSpec workflows into OpenCode with enforced worktree isolation.
+**An AI coding toolset — the orchestration layer for OpenSpec + Superpowers on OpenCode.**
+
+- **oso** decides who does the work, where, when, and how it lands.
+- **Superpowers** decides how.
+- **OpenSpec** decides what, and in what order.
+
+The last two never talk to each other. That's why oso exists.
 
 [![GitHub last commit](https://img.shields.io/github/last-commit/moyaspace/openspec-superpowers-opencode?style=flat-square&logo=github&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
 [![GitHub Stars](https://img.shields.io/github/stars/moyaspace/openspec-superpowers-opencode?style=flat-square&color=yellow&logo=github)](https://github.com/moyaspace/openspec-superpowers-opencode)
@@ -31,11 +37,21 @@ You can use both, but you'll spend more time stitching them together than actual
 
 And even if you do wire them up, you're still stuck with a **single working tree** — one change at a time. Want to add login and search simultaneously? Context collision, partial commits, reverting. You either wait, or you break things.
 
-**oso bridges the gap and adds isolation.**
+**So you have both installed — and still nobody:**
+
+- drives a change through its stages
+- gives each change its own working directory
+- decides which agent does the work
+- gets it merged without losing the tree that was tested
+
+That layer is oso.
 
 ## The oso Solution
 
-oso is a developer CLI toolset that integrates OpenSpec and Superpowers workflows into OpenCode: one-command init, enforced worktree isolation, active change registry tracking, native command interception with passthrough, and system health verification.
+oso does two kinds of work:
+
+- **Its own engineering** — deploying the workflow, giving each change an isolated worktree, tracking live changes, installing the `openspec` shim, health checks, cross-platform quirks.
+- **Coordination** — moving a change through its stages, deciding which agent does what, keeping a fix loop on the same agent while context is still hot, and landing the result atomically.
 
 ```
           ┌─ .worktrees/feature-a/  (feature/feature-a branch)
@@ -43,12 +59,12 @@ main ─────┼─ .worktrees/feature-b/  (feature/feature-b branch)
           └─ .worktrees/feature-c/  (feature/feature-c branch)
 ```
 
-<!-- TODO: 30s 终端录屏 GIF — 展示 /opsx-ff feature-a → /opsx-ff feature-b → 各自 apply，互不干扰 -->
+<!-- TODO: 30s terminal GIF — show /opsx-propose feature-a → /opsx-propose feature-b → apply each, no interference -->
 
 ```bash
 # Create two changes simultaneously
-/opsx-ff feature-a
-/opsx-ff feature-b
+/opsx-propose feature-a
+/opsx-propose feature-b
 
 # Work on feature-a
 /opsx-apply feature-a     # AI auto-cds into .worktrees/feature-a/
@@ -71,30 +87,76 @@ npm install -g @moyaspace/openspec-superpowers-opencode
 
 # 2. Init a project
 mkdir my-project && cd my-project
-oso init                                  # 或: openspec-superpowers-opencode init
+oso init                                  # or: openspec-superpowers-opencode init
 
-# 3. Open in OpenCode, then use the workflow
-/opsx-ff add-user-auth    # create change + generate artifacts
-/opsx-apply               # AI implements in isolated worktree
-/opsx-finish              # test → merge → cleanup
+# 3. Open in OpenCode, then create a change
+/opsx-propose add-user-auth   # create the change + every planning artifact, in its own worktree
+
+# 4. Implement it
+/opsx-apply                   # AI implements inside .worktrees/add-user-auth/
+
+# 5. Verify, then merge and archive
+/opsx-verify                  # implementation vs specs, tasks, design
+/opsx-finish                  # test → merge → cleanup → archive
 ```
 
+### Two ways to fill in the artifacts
+
+| Command | What it does | When to use it |
+|---|---|---|
+| `/opsx-propose` | **Create.** Makes the change, its worktree, and every planning artifact in one step. Stops if the name is already taken. | Starting something new. |
+| `/opsx-ff` | **Converge.** Takes the change to apply-ready from *any* state — creates what's missing, skips what's done. Safe to re-run. | Resuming after an interruption, or topping up a half-finished change. |
+
+`/opsx-ff` is also the faster option when you already know the full scope and don't need to review each artifact. If you'd rather approve them one at a time, use `/opsx-new` to scaffold the change, then `/opsx-continue` for each artifact.
+
 `oso init` auto-checks and installs the `openspec` shim. If it can't, init still completes and prints the exact command to run (system npm on Unix: `sudo oso install-shims`; nvm/user-level prefix: no sudo; Windows: run as Administrator). No need to re-run init afterwards.
+
+## Upgrading
+
+Upgrading an existing project is a two-command job — `oso init` is idempotent and refreshes everything OSO owns:
+
+```bash
+npm install -g @moyaspace/openspec-superpowers-opencode@latest
+cd your-project
+oso init
+```
+
+What `oso init` does on an existing project:
+
+- **Refreshes OSO-owned assets** — `.opencode/commands/` and `openspec/schemas/` are overwritten with the current versions. This is how command-layer fixes reach you.
+- **Reports every file it changed** — each refreshed file is listed as `Updated: <path>`, so upgrades are auditable.
+- **Leaves your work alone** — `openspec/changes/**` and `openspec/specs/**` are never touched. Managed blocks in `AGENTS.md`, `.gitignore`, `.gitattributes`, `.editorconfig` only have their marker section replaced; everything outside the markers is preserved.
+- **Merges `openspec/config.yaml` and `.opencode/opencode.json`** rather than replacing them.
+
+To opt out of refreshing a specific asset class, set the corresponding switch before running init:
+
+```bash
+BROWN_OVERRIDE_COMMANDS=no oso init     # keep your own .opencode/commands/
+BROWN_OVERRIDE_COMMANDS=ask oso init    # ask per file
+BROWN_OVERRIDE_OPENSPEC=no oso init     # keep your own openspec/config.yaml
+```
+
+Preview first if you want to see the plan without writing anything:
+
+```bash
+oso dry-run
+```
 
 ## Features
 
 | # | Feature | One-liner |
 |---|---------|-----------|
-| 1 | **13 OPSX commands** | `/opsx-ff` → `/opsx-apply` → `/opsx-finish` — full change lifecycle |
+| 1 | **13 OPSX commands** | `/opsx-propose` → `/opsx-apply` → `/opsx-verify` → `/opsx-finish` — full change lifecycle |
 | 2 | **Git worktree isolation** | Each change in its own `.worktrees/<name>/` dir + `feature/<name>` branch |
 | 3 | **One-command init** | `oso init` → deploy templates + config + `git init` + first commit |
-| 4 | **Bridged OpenSpec + Superpowers** | Pre-configured schema + skill mapping + lock verification, one-command deploy |
+| 4 | **Bridged OpenSpec + Superpowers** | Pre-configured schema + skill mapping + lock verification; supports Superpowers **v5 / v6 / v7** |
 | 5 | **Greenfield/brownfield** | Auto-deploy on new projects; safe merge on existing ones |
 | 6 | **Cross-platform + i18n** | Unified TypeScript installer (`src/setup/`) on Windows/Linux/macOS, `--lang zh-CN \| zh-TW \| en` |
-| 7 | **SHA-256 lock** | Skill file integrity verified on deploy |
-| 8 | **Layered architecture** | Superpowers (HOW) → OpenSpec (WHAT) → Worktree (WHERE) → Commands (WHEN) |
+| 7 | **Visible upgrades** | Re-running `oso init` lists every refreshed file instead of rewriting silently |
+| 8 | **Layered architecture** | oso (who · where · when · how it lands) ← Superpowers (how) + OpenSpec (what + order) |
 | 9 | **Full worktree + openspec change support** | Auto-register on change creation, smart `openspec list` interception, `verify` one-click health check |
 | 10 | **High-performance Worktree code search** | CodeGraph integrated in worktree, auto-indexed for high-performance code search |
+| 11 | **Delegates, doesn't copy** | On v6+, `/opsx-apply` hands execution to Superpowers' own controller; oso maintains the adapter, not a copy of the rules |
 
 > Detailed features → [docs/FEATURES.md](docs/FEATURES.md)
 
@@ -116,7 +178,7 @@ oso init                                  # 或: openspec-superpowers-opencode i
 - `openspec` CLI v1.3+
 - `opencode` CLI
 - `git`
-- Superpowers plugin
+- Superpowers plugin (v5 / v6 / v7)
 
 Run `oso verify` to check your environment.
 

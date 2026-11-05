@@ -1,8 +1,12 @@
 # openspec-superpowers-opencode（简称 oso）
 
-**🌐 Read this in other languages:** [English](README.md) | [中文](README.zh-CN.md)
+**一个 AI Coding 开发者工具集 —— OpenSpec + Superpowers 在 OpenCode 上的编排层。**
 
-> 将 Superpowers + OpenSpec 工作流桥接到 OpenCode，强制执行 worktree 隔离。
+- **oso** 管谁来做、在哪做、什么时候做、怎么落地。
+- **Superpowers** 管怎么做。
+- **OpenSpec** 管做什么、按什么顺序。
+
+后两者彼此不通气。这就是 oso 存在的理由。
 
 [![GitHub last commit](https://img.shields.io/github/last-commit/moyaspace/openspec-superpowers-opencode?style=flat-square&logo=github&color=blue)](https://github.com/moyaspace/openspec-superpowers-opencode)
 [![GitHub Stars](https://img.shields.io/github/stars/moyaspace/openspec-superpowers-opencode?style=flat-square&color=yellow&logo=github)](https://github.com/moyaspace/openspec-superpowers-opencode)
@@ -14,6 +18,8 @@
 [![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=black)](https://github.com/moyaspace/openspec-superpowers-opencode)
 
 > 如果觉得有用，请在 GitHub 上给个 ⭐！
+
+**🌐 Read this in other languages:** [English](README.md) | [中文](README.zh-CN.md)
 
 ---
 
@@ -31,11 +37,21 @@ Superpowers 提供久经考验的方法论——brainstorming、writing-plans、
 
 而且就算勉强配好了，你仍然受限于**单一工作目录**——一次只能做一个变更。想同时加登录和搜索功能？上下文冲突、半成品提交、回退。要么排队等，要么搞乱。
 
-**oso 填补了鸿沟，并增加了隔离。**
+**于是你两样都装了，却仍然没有人：**
+
+- 把一个变更从第一步推到归档
+- 给每个变更一个独立的工作目录
+- 决定这次活儿派给谁
+- 让结果合并进来，同时不弄丢刚验证过的那份代码
+
+这一层就是 oso。
 
 ## oso 的解法
 
-oso 是一个开发者 CLI 工具集，为 OpenCode 集成 OpenSpec 与 Superpowers 工作流：init 自动部署、worktree 强制隔离、注册表追踪活跃变更、原生命令拦截与透传、系统健康验证。
+oso 做两类工作：
+
+- **自己的工程** —— 部署工作流、给每个变更一个隔离的 worktree、追踪活跃变更、安装 `openspec` 垫片、健康检查、跨平台适配。
+- **协调编排** —— 把变更从一步推到下一步、决定哪个 agent 做什么、在上下文还热的时候让同一个 agent 接着修、把结果原子地落地。
 
 ```
           ┌─ .worktrees/feature-a/  (feature/feature-a 分支)
@@ -43,12 +59,12 @@ main ─────┼─ .worktrees/feature-b/  (feature/feature-b 分支)
           └─ .worktrees/feature-c/  (feature/feature-c 分支)
 ```
 
-<!-- TODO: 30s 终端录屏 GIF — 展示 /opsx-ff feature-a → /opsx-ff feature-b → 各自 apply，互不干扰 -->
+<!-- TODO: 30s 终端录屏 GIF — 展示 /opsx-propose feature-a → /opsx-propose feature-b → 各自 apply，互不干扰 -->
 
 ```bash
 # 同时创建两个变更
-/opsx-ff feature-a
-/opsx-ff feature-b
+/opsx-propose feature-a
+/opsx-propose feature-b
 
 # 开始实现 feature-a
 /opsx-apply feature-a     # AI 自动进入 .worktrees/feature-a/
@@ -73,26 +89,74 @@ npm install -g @moyaspace/openspec-superpowers-opencode
 mkdir my-project && cd my-project
 oso init                                  # 或: openspec-superpowers-opencode init
 
-# 3. 在 OpenCode 中打开，使用工作流
-/opsx-ff add-user-auth    # 创建变更 + 生成 artifacts
-/opsx-apply               # AI 在隔离 worktree 中实现
-/opsx-finish              # 测试 → 合并 → 清理
+# 3. 在 OpenCode 中打开，创建变更
+/opsx-propose add-user-auth   # 创建变更 + 全部规划 artifacts，并在独立 worktree 中
+
+# 4. 实现
+/opsx-apply                   # AI 在 .worktrees/add-user-auth/ 内实现
+
+# 5. 验收，然后合并与归档
+/opsx-verify                  # 实现 vs specs、tasks、design
+/opsx-finish                  # 测试 → 合并 → 清理 → 归档
+```
+
+### 填充 artifacts 的两条路径
+
+| 命令 | 做什么 | 什么时候用 |
+|---|---|---|
+| `/opsx-propose` | **创建。** 一步建好变更、worktree 和全部规划 artifacts。名字被占用时中止。 | 开始一件新事。 |
+| `/opsx-ff` | **补完。** 从**任意状态**把变更推进到可实施——缺什么补什么，已完成的跳过。可安全重跑。 | 中断后续跑，或补齐半成品。 |
+
+如果你已经清楚全貌、不需要逐个确认，`/opsx-ff` 也更快。若想逐个确认 artifact，用 `/opsx-new` 建骨架，再用 `/opsx-continue` 一个个生成。
+
+`oso init` 会自动检查并安装 `openspec` 垫片。装不上时 init 仍会完成，并打印可直接照抄的命令（Unix 系统 npm：`sudo oso install-shims`；nvm/用户级 prefix：无需 sudo；Windows：以管理员身份运行）。之后不需要重跑 init。
+
+## 升级
+
+升级已有项目只需两条命令——`oso init` 是幂等的，会刷新 OSO 自己拥有的一切：
+
+```bash
+npm install -g @moyaspace/openspec-superpowers-opencode@latest
+cd your-project
+oso init
+```
+
+`oso init` 在已有项目上会：
+
+- **刷新 OSO 资产** —— `.opencode/commands/` 与 `openspec/schemas/` 用当前版本覆盖。命令层的修复就是这样送到你手里的。
+- **列出每个改动的文件** —— 每个被刷新的文件都会打印 `已更新：<path>`，升级可审计。
+- **不动你的东西** —— `openspec/changes/**` 与 `openspec/specs/**` 永不触碰。`AGENTS.md`、`.gitignore`、`.gitattributes`、`.editorconfig` 只替换 marker 区块，区块外内容原样保留。
+- **合并而非替换** `openspec/config.yaml` 与 `.opencode/opencode.json`。
+
+要放弃刷新某一类资产，可在运行 init 前设置对应开关：
+
+```bash
+BROWN_OVERRIDE_COMMANDS=no oso init     # 保留你自己的 .opencode/commands/
+BROWN_OVERRIDE_COMMANDS=ask oso init    # 逐文件询问
+BROWN_OVERRIDE_OPENSPEC=no oso init     # 保留你自己的 openspec/config.yaml
+```
+
+想先看计划而不写盘：
+
+```bash
+oso dry-run
 ```
 
 ## 功能特性
 
 | # | 特性 | 一句话 |
 |---|------|--------|
-| 1 | **13 个 OPSX 命令** | `/opsx-ff` → `/opsx-apply` → `/opsx-finish` — 完整变更生命周期 |
+| 1 | **13 个 OPSX 命令** | `/opsx-propose` → `/opsx-apply` → `/opsx-verify` → `/opsx-finish` — 完整变更生命周期 |
 | 2 | **Git worktree 隔离** | 每个变更加载独立 `.worktrees/<name>/` 目录 + `feature/<name>` 分支 |
 | 3 | **一键初始化** | `oso init` → 部署模板 + 配置 + `git init` + 首次提交 |
-| 4 | **桥接 OpenSpec + Superpowers** | 预配置 schema + skill 映射 + 锁校验，一条命令部署 |
+| 4 | **桥接 OpenSpec + Superpowers** | 预配置 schema + skill 映射 + 锁校验；支持 Superpowers **v5 / v6 / v7** |
 | 5 | **绿地/棕地双模式** | 新项目自动部署；已有项目安全合并 |
 | 6 | **跨平台 + 多语言** | Unified TypeScript 安装器（`src/setup/`）支持 Windows/Linux/macOS，`--lang zh-CN \| zh-TW \| en` |
-| 7 | **SHA-256 锁** | 部署时自动校验 skill 文件完整性 |
-| 8 | **多层架构** | Superpowers（HOW）→ OpenSpec（WHAT）→ Worktree（WHERE）→ 命令（WHEN） |
+| 7 | **可见的升级** | 重跑 `oso init` 会逐条列出被刷新的文件，而不是静默重写 |
+| 8 | **分层架构** | oso（谁 · 在哪 · 何时 · 怎么落地）← Superpowers（怎么做）+ OpenSpec（做什么 + 顺序） |
 | 9 | **worktree + openspec change 全面支持** | 创建变更自动注册、`openspec list` 智能拦截、`verify` 一键健康检查 |
 | 10 | **支持 Worktree 代码高性能检索** | Worktree 内集成 CodeGraph，自动索引，支持高性能的代码检索 |
+| 11 | **委托而非复刻** | v6+ 上 `/opsx-apply` 把执行权交给 Superpowers 自己的流程引擎；oso 只维护接入层，不复刻规则 |
 
 > 详细功能说明 → [docs/FEATURES.md](docs/FEATURES.md)
 
@@ -114,7 +178,7 @@ oso init                                  # 或: openspec-superpowers-opencode i
 - `openspec` CLI v1.3+
 - `opencode` CLI
 - `git`
-- Superpowers 插件
+- Superpowers 插件（v5 / v6 / v7）
 
 运行 `oso verify` 可检查环境是否就绪。
 
