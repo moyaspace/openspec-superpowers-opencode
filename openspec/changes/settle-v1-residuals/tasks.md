@@ -1,13 +1,13 @@
 ## 1. 复现测试（RED，先于实现）
 
-- [ ] 1.1 在 `test/cli.test.js` 的 describe `ensure-worktree idempotency and branch safety` 内新增 BUG023 用例：普通空目录 → 被清理并创建真 worktree，断言 `git -C .worktrees/<name> rev-parse --show-toplevel` 等于该目录本身
-- [ ] 1.2 新增 BUG023 用例：普通非空目录 → 非 0 退出且目录内容零删改；文件占用 → 非 0 退出
-- [ ] 1.3 新增 BUG024 用例：`git worktree remove` 后重跑 → 分支被挂回，`git rev-parse feature/<name>` 与删除前一致
-- [ ] 1.4 新增 BUG025 用例：手工删除 `.worktrees/<name>` 后重跑 → prune 生效、实际创建 worktree、exit 0
-- [ ] 1.5 新增 BUG026 用例：worktree 处于错误分支 → 非 0 退出并打印当前分支；正确分支 → 复用零副作用
-- [ ] 1.6 更新既有用例 `skips deleting a branch checked out by another worktree`（状态 F）：按决策文档改为断言非 0 退出（`code === 0` → `code !== 0`），保留「分支 SHA 不变」「目标目录不存在」两条断言
-- [ ] 1.7 更新既有用例 `normal path deletes a stale branch and creates the worktree`（状态 G）：先记录 `feature/<name>` 删除前 SHA，断言改为「SHA 与删除前一致」，保留「worktree 已创建」「exit 0」断言
-- [ ] 1.8 确认 1.1–1.7 在未改实现时失败（RED），记录失败输出
+- [x]  在 `test/cli.test.js` 的 describe `ensure-worktree idempotency and branch safety` 内新增 BUG023 用例：普通空目录 → 被清理并创建真 worktree，断言 `git -C .worktrees/<name> rev-parse --show-toplevel` 等于该目录本身
+- [x]  新增 BUG023 用例：普通非空目录 → 非 0 退出且目录内容零删改；文件占用 → 非 0 退出
+- [x]  新增 BUG024 用例：`git worktree remove` 后重跑 → 分支被挂回，`git rev-parse feature/<name>` 与删除前一致
+- [x]  新增 BUG025 用例：手工删除 `.worktrees/<name>` 后重跑 → prune 生效、实际创建 worktree、exit 0
+- [x]  新增 BUG026 用例：worktree 处于错误分支 → 非 0 退出并打印当前分支；正确分支 → 复用零副作用
+- [x]  更新既有用例 `skips deleting a branch checked out by another worktree`（状态 F）：按决策文档改为断言非 0 退出（`code === 0` → `code !== 0`），保留「分支 SHA 不变」「目标目录不存在」两条断言
+- [x]  更新既有用例 `normal path deletes a stale branch and creates the worktree`（状态 G）：先记录 `feature/<name>` 删除前 SHA，断言改为「SHA 与删除前一致」，保留「worktree 已创建」「exit 0」断言
+- [x]  确认 1.1–1.7 在未改实现时失败（RED），记录失败输出
 
 ## 2. ensure-worktree 判定重写（BUG023 / BUG024 / BUG025 / BUG026）
 
