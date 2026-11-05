@@ -572,9 +572,9 @@ describe('opsx template commands validate worktree placement before copying', ()
             const content = readCommand(file);
             const body = sectionOf(file, content, startMarker, endMarker);
             for (const needle of [
-                'git rev-parse --show-toplevel',
+                'git rev-parse --show-prefix',
+                'test -z',
                 'git rev-parse --abbrev-ref HEAD',
-                'pwd -P',
                 'feature/<name>',
                 'cd .worktrees/<name> ||',
                 '最多重试 1 次',
@@ -584,6 +584,15 @@ describe('opsx template commands validate worktree placement before copying', ()
                     `${file}: ${startMarker} must contain \`${needle}\``,
                 );
             }
+            assert.equal(
+                body.includes('pwd -P'),
+                false,
+                `${file}: ${startMarker} must not use \`pwd -P\` (non-portable on Windows)`,
+            );
+            assert.ok(
+                body.indexOf('git rev-parse --show-prefix') < body.indexOf('cp -r'),
+                `${file}: ${startMarker} must validate placement before copying (\`cp -r\`)`,
+            );
             assert.ok(
                 body.includes('exit 1'),
                 `${file}: ${startMarker} must stop with \`exit 1\``,

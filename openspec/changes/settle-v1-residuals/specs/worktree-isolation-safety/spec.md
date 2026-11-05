@@ -87,7 +87,7 @@ After creating or reusing a worktree, `runEnsureWorktree` MUST verify all three 
 
 `opsx-propose.md` (Step 3a), `opsx-ff.md` (Step 3a), and `opsx-new.md` (Step 4a) MUST, after `ensure-worktree`, `cd` into the worktree with an explicit failure branch, then run two read-only checks before copying schemas and config:
 
-- `test "$(git rev-parse --show-toplevel)" = "$(pwd -P)"`
+- `test -z "$(git rev-parse --show-prefix)"`
 - `test "$(git rev-parse --abbrev-ref HEAD)" = "feature/<name>"`
 
 A failed `cd` or a failed check MUST stop and report, and MUST NOT enter the copy loop. The copy retry MUST be capped at one retry; a second failure MUST stop and report.
@@ -107,4 +107,4 @@ A failed `cd` or a failed check MUST stop and report, and MUST NOT enter the cop
 #### Scenario: all three templates carry both checks
 
 - **WHEN** `opsx-propose.md`, `opsx-ff.md`, and `opsx-new.md` are inspected
-- **THEN** each Step 3/4 section contains both `git rev-parse --show-toplevel` and `git rev-parse --abbrev-ref HEAD` checks, an explicit `cd` failure branch, and a copy retry upper bound
+- **THEN** each Step 3/4 section contains both `git rev-parse --show-prefix` and `git rev-parse --abbrev-ref HEAD` checks, an explicit `cd` failure branch, and a copy retry upper bound

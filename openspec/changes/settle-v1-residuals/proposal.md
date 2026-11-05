@@ -12,7 +12,7 @@
 
 **模板 Step 3/4 的 worktree 就位校验（GAP010）**
 - From: `cd .worktrees/<name>` 无失败分支；复制失败「重新执行复制再验证」无上限；不校验目录与分支。
-- To: `cd` 失败即停；随后两项只读校验（`--show-toplevel` 等于 `pwd -P`、`--abbrev-ref HEAD` 等于 `feature/<name>`）；复制重试上限 1 次；三份模板同步。
+- To: `cd` 失败即停；随后两项只读校验（`--show-prefix` 为空、`--abbrev-ref HEAD` 等于 `feature/<name>`）；复制重试上限 1 次；三份模板同步。
 - Reason: CLI 修好前需要第二道保险；`cd` 失败时旧写法会死循环。
 - Impact: 仅命令指令文本；不改变正常路径。
 

@@ -106,7 +106,7 @@ cd .worktrees/<name> || { echo "STOP: cd 失败"; exit 1; }
 **4a-3. 只读校验：当前目录就是独立 worktree 根：**
 
 ```bash
-test "$(git rev-parse --show-toplevel)" = "$(pwd -P)" || { echo "STOP: 不是独立 worktree"; exit 1; }
+test -z "$(git rev-parse --show-prefix)" || { echo "STOP: 不是独立 worktree"; exit 1; }
 ```
 
 **4a-4. 只读校验：当前分支为 feature/<name>：**

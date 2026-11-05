@@ -69,7 +69,7 @@
 ```text
 3a-1  ensure-worktree <name>（失败 → 停下报告）
 3a-2  cd .worktrees/<name> || { echo "STOP: cd 失败"; exit 1; }
-3a-3  test "$(git rev-parse --show-toplevel)" = "$(pwd -P)" || { echo "STOP: 不是独立 worktree"; exit 1; }
+3a-3  test -z "$(git rev-parse --show-prefix)" || { echo "STOP: 不是独立 worktree"; exit 1; }
 3a-4  test "$(git rev-parse --abbrev-ref HEAD)" = "feature/<name>" || { echo "STOP: 分支不对"; exit 1; }
 3a-5  复制 schemas/config → test -f 三项（失败重试最多 1 次，仍失败停下）
 3a-6  codegraph init（失败不阻断）
