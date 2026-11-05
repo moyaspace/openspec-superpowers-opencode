@@ -49,6 +49,13 @@
 - **无匹配 Superpowers 版本时静默回退到 v5 清单**（BUG012）：改为按 major 精确匹配，超出支持范围时明确报「不支持」，绝不跨 major 复用清单。
 - **`skills.lock.v6.json` 只匹配 v6.1.1，v6.2+ 报假 hash 警告**（BUG013）：清单刷新到 Superpowers v6.4.2。
 - **`ensure-worktree` 在 linked worktree 内不幂等，且会删除已 checkout 的分支**（BUG020）：重复执行不再报错，也不再无条件 `git branch -D`。
+- **`ensure-worktree` 把普通目录误判为「worktree 已存在」**（BUG023）：空目录 / 非空目录 / 文件不再被当作已有 worktree；空目录清理后创建真 worktree，非空目录与文件非 0 退出且零删改。
+- **worktree 移除后重跑时丢失已有提交**（BUG024）：会挂回已存在的 `feature/<name>` 分支并保留 commit SHA，不再 `git branch -D` 删除含提交的分支。
+- **登记仍在但目录被手工删除时 `ensure-worktree` 空跑**（BUG025）：先 `git worktree prune` 再重建，不再误报「分支正被检出」。
+- **worktree 处于错误分支或分支被其他 worktree 占用时静默通过**（BUG026）：错误分支非 0 退出并打印实际分支；分支被占用时中止并点名占用路径。
+- **测试收尾的全局垫片恢复兜底形同虚设**（GAP008）：按三条证据（连续 ≥5 次 `npm test`、`installShims()` 测试隔离审计、恢复点 no-op 日志）移除 `scripts/run-tests.mjs` 的恢复兜底，改由测试隔离 + 全局 bin 守卫保证不污染。
+- **OPSX 命令在 worktree 未就位时继续执行**（GAP010）：`/opsx-propose`、`/opsx-ff`、`/opsx-new` 在 worktree 就位后先做 `cd` 失败分支与两项只读校验（`--show-toplevel` == `pwd -P`、分支 == `feature/<name>`），复制重试上限 1 次。
+- **verify PRECHECK 的提交基准写死 `origin/main`**（GAP011）：改为从 `openspec list --json` 读取 `baseBranch`，缺失时回退 `origin/main` 并在 `verify.md` §5 标注。
 
 ### Internal
 

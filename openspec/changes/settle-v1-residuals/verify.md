@@ -59,3 +59,52 @@
 - 删除：`findGlobalOso()`、`restoreGlobalShim()`、`OSO_SKIP_SHIM_RESTORE` 分支、`finally` 调用、恢复失败返回 1 的退出码逻辑。
 - 同步文档：`docs/GLOBAL-BIN-TEST-POLLUTION-POSTMORTEM.md`（新增 §4 说明移除及依据）、`docs/testing.md`（删除「收尾恢复」描述）。
 - 删除后第 7 次 `npm test`：351 主套件 + 5 elevated 全绿，e2e 收集 3 条，全局 bin 守卫通过，TOOL_DIR 指向正式安装版；用例数不低于基线（342 + 5）。
+
+## 6. 全量回归（Task 6）
+
+执行时间：2026-11-06，worktree `feature/settle-v1-residuals`，Node v24.14.0。
+
+### 6.1 `npm test`
+
+```text
+ℹ tests 353
+ℹ suites 64
+ℹ pass 353
+ℹ fail 0
+ℹ skipped 0
+[guard] ✓ 全局 bin 未被修改（7 个文件）
+ELEVATED: running 2 elevated test file(s) via gsudo ...
+ℹ tests 5
+ℹ suites 2
+ℹ pass 5
+ℹ fail 0
+ℹ skipped 0
+[guard] ✓ 全局 bin 未被修改（7 个文件）
+```
+
+- 主套件：353 tests / 353 pass / 0 fail（基线 342，§5.1 记录 351，本次 353，均满足「不少于基线」）。
+- elevated：5 tests / 5 pass / 0 fail。
+- 两次全局 bin 守卫均报告「未被修改（7 个文件）」，与 §5 GAP008 的判定一致。
+
+### 6.2 残留搜索（排除 `node_modules`、`.worktrees`、`dist`、`.superpowers`、`.git`）
+
+`git branch -D`：
+
+- `src/cli/index.ts:700` —— 仅存在于 `runRemoveWorktree()`（显式 `remove-worktree` 命令），按预审计裁决不在本变更范围，未删除。
+- `docs/WORKTREE-CREATION.md:88` —— 描述**旧版** `ensure-worktree` 防御性清理的文档段落，内容已与实现的当前行为不符（非代码路径，未在本任务改动）。
+- `template/.opencode/commands/opsx-finish.md:358` —— `/opsx-finish`「丢弃」选项的显式清理步骤，属 finish 语义，非 ensure-worktree 路径。
+- 其余命中均为本变更的文档/规格/计划（`CHANGELOG.md`、`openspec/changes/settle-v1-residuals/**`），描述「不再使用该命令」。
+- **结论：`runEnsureWorktree()`（`src/cli/index.ts:616-681`）不含 `git branch -D`**，无阻断项。
+
+verify PRECHECK 的旧主路径 `git merge-base HEAD origin/main`：
+
+- `template/openspec/schemas/superpowers-bridge-opencode/schema.yaml` 与 `openspec/schemas/superpowers-bridge-opencode/schema.yaml`：无 `merge-base HEAD origin/main`；`origin/main` 仅作为 `baseBranch` 缺失时的 fallback 出现（:199-203）。
+- `test/setup-template-invariants.test.js:629-631` 为「必须不出现」的断言。
+- 其余命中为 change artifacts（提案/回顾）中对旧行为的描述。
+- **结论：0 处旧主路径残留。**
+
+### 6.3 Git 状态
+
+- `git status --short`：提交前仅 `M CHANGELOG.md`（本任务预期改动），无其它脏文件。
+- `git rev-parse main` = `7416976a9017f0a6dabac4be331c3e6fcbff58a7`，与开工前一致（未触碰 `main`）。
+- 当前分支：`feature/settle-v1-residuals`。
