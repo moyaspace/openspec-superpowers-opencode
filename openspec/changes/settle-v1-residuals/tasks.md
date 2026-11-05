@@ -33,12 +33,12 @@
 
 ## 4. GAP008 restoreGlobalShim 冗余判定（先验证后处置）
 
-- [ ] 4.1 连续运行 `npm test` ≥5 次（本机 Windows），每次记录全局垫片 `TOOL_DIR` 与 `openspec-shim-e2e` 收集数
-- [ ] 4.2 逐个核对会调用 `installShims()` 的测试（`create-project.behavior`、`elevated/lifecycle-e2e`、`shims-installer`），确认 bin 定位已隔离
-- [ ] 4.3 在 `scripts/run-tests.mjs` 恢复处临时加日志，记录恢复前后状态，证明 no-op；保留日志输出到 verify.md
-- [ ] 4.4 若三条证据齐备：删除 `restoreGlobalShim()`、`findGlobalOso()`、`OSO_SKIP_SHIM_RESTORE`、`finally` 调用与失败退出码逻辑；同步 `docs/GLOBAL-BIN-TEST-POLLUTION-POSTMORTEM.md` 的相关描述
-- [ ] 4.5 若发现仍在污染：定位并修复污染源（让测试真正隔离），保留兜底作为临时缓解，tasks/spec 状态按「部分完成」记录
-- [ ] 4.6 把三条验证证据（运行次数、隔离核对、no-op 日志）写入本 change 的 `verify.md`
+- [x]  连续运行 `npm test` ≥5 次（本机 Windows），每次记录全局垫片 `TOOL_DIR` 与 `openspec-shim-e2e` 收集数
+- [x]  逐个核对会调用 `installShims()` 的测试（`create-project.behavior`、`elevated/lifecycle-e2e`、`shims-installer`），确认 bin 定位已隔离
+- [x]  在 `scripts/run-tests.mjs` 恢复处临时加日志，记录恢复前后状态，证明 no-op；保留日志输出到 verify.md
+- [x]  若三条证据齐备：删除 `restoreGlobalShim()`、`findGlobalOso()`、`OSO_SKIP_SHIM_RESTORE`、`finally` 调用与失败退出码逻辑；同步 `docs/GLOBAL-BIN-TEST-POLLUTION-POSTMORTEM.md` 的相关描述
+- [x]  若发现仍在污染：定位并修复污染源（让测试真正隔离），保留兜底作为临时缓解，tasks/spec 状态按「部分完成」记录
+- [x]  把三条验证证据（运行次数、隔离核对、no-op 日志）写入本 change 的 `verify.md`
 
 ## 5. verify PRECHECK 基准（GAP011）
 
