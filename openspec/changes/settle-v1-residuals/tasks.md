@@ -25,11 +25,11 @@
 
 ## 3. 模板侧 worktree 就位校验（GAP010）
 
-- [ ] 3.1 `template/.opencode/commands/opsx-propose.md` Step 3a：加 `cd` 失败分支、`--show-toplevel` 与 `--abbrev-ref HEAD` 两项只读校验、复制重试上限 1 次
-- [ ] 3.2 `template/.opencode/commands/opsx-ff.md` Step 3a：同上
-- [ ] 3.3 `template/.opencode/commands/opsx-new.md` Step 4a：同上，编号用 4a-1…4a-6
-- [ ] 3.4 `test/setup-template-invariants.test.js` 新增断言：三份模板 Step 3/4 区段包含两条校验命令、`cd` 失败分支、复制重试上限
-- [ ] 3.5 确认三份模板不触碰 T009 已完成的 Step 4/5/6/Output 区段
+- [x]  `template/.opencode/commands/opsx-propose.md` Step 3a：加 `cd` 失败分支、`--show-toplevel` 与 `--abbrev-ref HEAD` 两项只读校验、复制重试上限 1 次
+- [x]  `template/.opencode/commands/opsx-ff.md` Step 3a：同上
+- [x]  `template/.opencode/commands/opsx-new.md` Step 4a：同上，编号用 4a-1…4a-6
+- [x]  `test/setup-template-invariants.test.js` 新增断言：三份模板 Step 3/4 区段包含两条校验命令、`cd` 失败分支、复制重试上限
+- [x]  确认三份模板不触碰 T009 已完成的 Step 4/5/6/Output 区段
 
 ## 4. GAP008 restoreGlobalShim 冗余判定（先验证后处置）
 
