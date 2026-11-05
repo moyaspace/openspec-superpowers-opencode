@@ -335,6 +335,72 @@ describe('ensure-worktree idempotency and branch safety', () => {
             '既有分支应被挂回而非删除重建，SHA 保持不变'
         );
     });
+
+    // ---- 名称输入边界（C1）：路径逃逸 / shell 注入 ----
+
+    test('rejects path traversal names without deleting anything', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const victim = path.join(repo, 'victim');
+        fs.mkdirSync(victim);
+
+        const result = runCliFrom(repo, 'ensure-worktree', '../victim');
+
+        assert.notStrictEqual(result.code, 0, `路径逃逸必须中止, stdout: ${result.stdout}, stderr: ${result.stderr}`);
+        assert.ok(fs.existsSync(victim), '目标目录之外的目录不得被删除');
+        assert.ok(fs.statSync(victim).isDirectory(), 'victim 应仍是目录');
+    });
+
+    test('rejects shell metacharacters without side effects', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const name = 'x" & echo PWNED>pwned.txt & rem "';
+
+        const result = runCliFrom(repo, 'ensure-worktree', name);
+
+        assert.notStrictEqual(result.code, 0, `shell 元字符名称必须中止, stdout: ${result.stdout}, stderr: ${result.stderr}`);
+        assert.strictEqual(fs.existsSync(path.join(repo, 'pwned.txt')), false, '不得经 shell 执行任意命令');
+    });
+
+    test('rejects nested path names', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+
+        const result = runCliFrom(repo, 'ensure-worktree', 'a/b');
+
+        assert.notStrictEqual(result.code, 0, `含路径分隔符的名称必须中止, stdout: ${result.stdout}, stderr: ${result.stderr}`);
+        assert.strictEqual(fs.existsSync(path.join(repo, '.worktrees', 'a')), false, '不得创建嵌套目录');
+    });
+
+    // ---- 目标路径为符号链接（M4）：不得穿过链接改动别处 ----
+
+    test('aborts when the target path is a symbolic link', (t) => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const bResult = runCliFrom(repo, 'ensure-worktree', 'b');
+        assert.strictEqual(bResult.code, 0, `前置 worktree b 应创建成功, stderr: ${bResult.stderr}`);
+
+        const bDir = path.join(repo, '.worktrees', 'b');
+        const aDir = path.join(repo, '.worktrees', 'a');
+        try {
+            fs.symlinkSync(bDir, aDir, process.platform === 'win32' ? 'junction' : 'dir');
+        } catch (e) {
+            const code = e && e.code;
+            if (code === 'EPERM' || code === 'EACCES' || code === 'ENOTSUP' || code === 'UNKNOWN') {
+                t.skip(`symlink 创建不被允许（${code}）`);
+                return;
+            }
+            throw e;
+        }
+
+        const result = runCliFrom(repo, 'ensure-worktree', 'a');
+        const output = `${result.stdout}\n${result.stderr}`;
+
+        assert.notStrictEqual(result.code, 0, `目标为符号链接时应中止, stdout: ${result.stdout}`);
+        assert.match(output, /符号链接|symbolic link|symlink/i, '应明确指出符号链接');
+        assert.strictEqual(
+            gitRun(bDir, ['rev-parse', '--abbrev-ref', 'HEAD']),
+            'feature/b',
+            '链接目标 worktree 不得被改动'
+        );
+        assert.ok(fs.readFileSync(path.join(bDir, 'README.md'), 'utf8').includes('# fixture'), '链接目标内容不得被改动');
+    });
 });
 
 describe('registry add --base usage', () => {

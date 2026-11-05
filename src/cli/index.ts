@@ -281,7 +281,7 @@ function runCli(): void {
 
 if (isEntry) runCli();
 
-export { runCli };
+export { runCli, evaluateWorktreeReady };
 
 // ====================================================================
 
@@ -323,17 +323,6 @@ async function runSetupCli(subcommand: string, targetDir: string, lang: string):
         }
     }
     process.exitCode = result.code;
-}
-
-function run(cmd: string, cwd: string): boolean {
-    try {
-        // execSync 默认经 shell 执行（等价于原 shell: true）
-        execSync(cmd, { cwd, stdio: 'inherit' });
-        return true;
-    } catch (e) {
-        console.error(t(`  ✗ 命令失败 (exit ${(e as { status?: number }).status}): ${cmd}`, `  ✗ Command failed (exit ${(e as { status?: number }).status}): ${cmd}`));
-        return false;
-    }
 }
 
 // ---- ensure-worktree — 确保变更的隔离 worktree 已创建 ----
@@ -439,7 +428,53 @@ type WorktreeAbortReason =
     | 'branch-checked-out-elsewhere'
     | 'occupied-by-file'
     | 'occupied-by-non-empty-dir'
+    | 'target-is-symlink'
     | 'stale-registration';
+
+type WorktreeNameError =
+    | 'empty'
+    | 'dot'
+    | 'dotdot'
+    | 'traversal'
+    | 'separator'
+    | 'control'
+    | 'whitespace'
+    | 'reserved-char'
+    | 'shell-metachar'
+    | 'leading-dash'
+    | 'trailing-dot'
+    | 'lock-suffix';
+
+const WORKTREE_NAME_REASONS: Record<WorktreeNameError, [string, string]> = {
+    empty: ['名称为空', 'name is empty'],
+    dot: ['不得为 "."', 'must not be "."'],
+    dotdot: ['不得为 ".."', 'must not be ".."'],
+    traversal: ['不得包含 ".."', 'must not contain ".."'],
+    separator: ['不得包含路径分隔符 / 或 \\', 'must not contain a path separator (/ or \\)'],
+    control: ['不得包含 NUL 或控制字符', 'must not contain NUL or control characters'],
+    whitespace: ['不得包含空白字符', 'must not contain whitespace'],
+    'reserved-char': ['不得包含 <>:"|?*~^[] 保留字符', 'must not contain reserved characters <>:"|?*~^[]'],
+    'shell-metachar': ['不得包含 shell 元字符（& ; ` $ ( ) { } !）', 'must not contain shell metacharacters (& ; ` $ ( ) { } !)'],
+    'leading-dash': ['不得以 - 开头', 'must not start with "-"'],
+    'trailing-dot': ['不得以 . 结尾', 'must not end with "."'],
+    'lock-suffix': ['不得以 .lock 结尾', 'must not end with ".lock"'],
+};
+
+function validateWorktreeName(name: string): WorktreeNameError | null {
+    if (name.length === 0) return 'empty';
+    if (name === '.') return 'dot';
+    if (name === '..') return 'dotdot';
+    if (name.includes('..')) return 'traversal';
+    if (name.includes('/') || name.includes('\\')) return 'separator';
+    if (/[\u0000-\u001f\u007f]/.test(name)) return 'control';
+    if (/\s/.test(name)) return 'whitespace';
+    if (/[<>:"|?*~^\[\]]/.test(name)) return 'reserved-char';
+    if (/[&;`$(){}!]/.test(name)) return 'shell-metachar';
+    if (name.startsWith('-')) return 'leading-dash';
+    if (name.endsWith('.')) return 'trailing-dot';
+    if (name.endsWith('.lock')) return 'lock-suffix';
+    return null;
+}
 
 interface WorktreeDecision {
     action: 'reuse' | 'create' | 'abort' | 'prune';
@@ -539,8 +574,20 @@ function pruneWorktrees(repoRoot: string): void {
     try {
         execFileSync('git', ['worktree', 'prune'], { cwd: repoRoot, stdio: 'ignore' });
     } catch {
-        // 清理失败不阻断；调用方会按刷新后的登记簿重新判定
+        console.error(t(
+            '  ⚠ git worktree prune 失败，继续按当前登记判定',
+            '  ⚠ git worktree prune failed; continuing with the current registry'
+        ));
     }
+}
+
+function abortInvalidWorktreeName(name: string, reason: WorktreeNameError): never {
+    const [zhReason, enReason] = WORKTREE_NAME_REASONS[reason];
+    console.error(t(
+        `  ✗ 非法的 worktree 名称: ${JSON.stringify(name)}（${zhReason}），已中止（未做任何修改）`,
+        `  ✗ Invalid worktree name: ${JSON.stringify(name)} (${enReason}); aborted without changes`
+    ));
+    process.exit(1);
 }
 
 function abortEnsureWorktree(reason: WorktreeAbortReason, detail: string, branch: string): never {
@@ -569,6 +616,12 @@ function abortEnsureWorktree(reason: WorktreeAbortReason, detail: string, branch
                 `  ✗ Target path is a non-empty directory: ${detail}; aborted without changes`
             ));
             break;
+        case 'target-is-symlink':
+            console.error(t(
+                `  ✗ 目标路径是符号链接: ${detail}，已中止（未做任何修改）`,
+                `  ✗ Target path is a symbolic link: ${detail}; aborted without changes`
+            ));
+            break;
         case 'stale-registration':
             console.error(t(
                 `  ✗ worktree 登记已失效且无法自动修复: ${detail}，已中止`,
@@ -579,43 +632,87 @@ function abortEnsureWorktree(reason: WorktreeAbortReason, detail: string, branch
     process.exit(1);
 }
 
-function verifyWorktreeReady(targetDir: string, branch: string, repoRoot: string, name: string): void {
-    const failures: string[] = [];
+interface WorktreeReadyFailure {
+    check: 'show-toplevel' | 'branch' | 'git-common-dir';
+    detail?: string;
+}
 
-    const toplevel = readGitOutput(targetDir, ['rev-parse', '--show-toplevel']);
+function evaluateWorktreeReady(
+    targetDir: string,
+    branch: string,
+    repoRoot: string,
+    readGit: (cwd: string, args: string[]) => string | null = readGitOutput,
+): WorktreeReadyFailure[] {
+    const failures: WorktreeReadyFailure[] = [];
+
+    const toplevel = readGit(targetDir, ['rev-parse', '--show-toplevel']);
     if (toplevel === null || !samePath(realPath(toplevel), realPath(targetDir))) {
-        failures.push(t(
-            `  ✗ 后置校验失败: worktree 根目录不匹配（--show-toplevel）: .worktrees/${name}/`,
-            `  ✗ Post-validation failed: worktree root mismatch (--show-toplevel): .worktrees/${name}/`
-        ));
+        failures.push({ check: 'show-toplevel', detail: toplevel ?? '' });
     }
 
-    const headBranch = readGitOutput(targetDir, ['rev-parse', '--abbrev-ref', 'HEAD']);
+    const headBranch = readGit(targetDir, ['rev-parse', '--abbrev-ref', 'HEAD']);
     if (headBranch !== branch) {
-        failures.push(t(
-            `  ✗ 后置校验失败: 当前分支为 ${headBranch ?? '(unknown)'}，期望 ${branch}`,
-            `  ✗ Post-validation failed: current branch is ${headBranch ?? '(unknown)'}, expected ${branch}`
-        ));
+        failures.push({ check: 'branch', detail: headBranch ?? '(unknown)' });
     }
 
-    const commonDir = readGitOutput(targetDir, ['rev-parse', '--git-common-dir']);
+    const commonDir = readGit(targetDir, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
+        ?? readGit(targetDir, ['rev-parse', '--git-common-dir']);
     const commonResolved = commonDir === null ? null : realPath(path.resolve(targetDir, commonDir));
     if (commonResolved === null || !samePath(commonResolved, realPath(path.join(repoRoot, '.git')))) {
-        failures.push(t(
-            `  ✗ 后置校验失败: git-common-dir 不匹配仓库 .git: .worktrees/${name}/`,
-            `  ✗ Post-validation failed: git-common-dir does not match repository .git: .worktrees/${name}/`
-        ));
+        failures.push({ check: 'git-common-dir', detail: commonDir ?? '' });
     }
 
-    if (failures.length > 0) {
-        for (const failure of failures) console.error(failure);
-        process.exit(1);
+    return failures;
+}
+
+function verifyWorktreeReady(targetDir: string, branch: string, repoRoot: string, name: string): void {
+    const failures = evaluateWorktreeReady(targetDir, branch, repoRoot);
+    if (failures.length === 0) return;
+
+    for (const failure of failures) {
+        switch (failure.check) {
+            case 'show-toplevel':
+                console.error(t(
+                    `  ✗ 后置校验失败: worktree 根目录不匹配（--show-toplevel）: .worktrees/${name}/`,
+                    `  ✗ Post-validation failed: worktree root mismatch (--show-toplevel): .worktrees/${name}/`
+                ));
+                break;
+            case 'branch':
+                console.error(t(
+                    `  ✗ 后置校验失败: 当前分支为 ${failure.detail ?? '(unknown)'}，期望 ${branch}`,
+                    `  ✗ Post-validation failed: current branch is ${failure.detail ?? '(unknown)'}, expected ${branch}`
+                ));
+                break;
+            case 'git-common-dir':
+                console.error(t(
+                    `  ✗ 后置校验失败: git-common-dir 不匹配仓库 .git: .worktrees/${name}/`,
+                    `  ✗ Post-validation failed: git-common-dir does not match repository .git: .worktrees/${name}/`
+                ));
+                break;
+        }
     }
+    process.exit(1);
 }
 
 function runEnsureWorktree(name: string, cwd: string): void {
+    const nameError = validateWorktreeName(name);
+    if (nameError !== null) abortInvalidWorktreeName(name, nameError);
+
     const repoRoot = resolveRepoRoot(cwd);
-    const targetDir = path.join(repoRoot, '.worktrees', name);
+    const worktreesRoot = path.join(repoRoot, '.worktrees');
+    const targetDir = path.join(worktreesRoot, name);
+    if (!samePath(path.dirname(targetDir), worktreesRoot)) {
+        console.error(t(
+            `  ✗ 目标路径越出 .worktrees 目录: ${targetDir}，已中止`,
+            `  ✗ Target path escapes the .worktrees directory: ${targetDir}; aborted`
+        ));
+        process.exit(1);
+    }
+
+    if (fs.existsSync(targetDir) && fs.lstatSync(targetDir).isSymbolicLink()) {
+        abortEnsureWorktree('target-is-symlink', targetDir, `feature/${name}`);
+    }
+
     const targetReal = realPath(targetDir);
     const branch = `feature/${name}`;
     const branchRef = `refs/heads/${branch}`;
@@ -642,16 +739,17 @@ function runEnsureWorktree(name: string, cwd: string): void {
     }
 
     if (decision.action === 'reuse') {
+        verifyWorktreeReady(targetDir, branch, repoRoot, name);
         console.log(decision.reason === 'inside'
             ? t(`  ✓ 已在该 worktree 内: .worktrees/${name}/`, `  ✓ Already inside this worktree: .worktrees/${name}/`)
             : t(`  ✓ worktree 已存在: .worktrees/${name}/`, `  ✓ Worktree already exists: .worktrees/${name}/`));
-        verifyWorktreeReady(targetDir, branch, repoRoot, name);
         process.exit(0);
     }
 
     if (decision.removeEmptyDir) {
         try {
             const stat = fs.statSync(targetDir);
+            if (stat.isFile()) abortEnsureWorktree('occupied-by-file', targetDir, branch);
             if (!stat.isDirectory() || fs.readdirSync(targetDir).length > 0) {
                 abortEnsureWorktree('occupied-by-non-empty-dir', targetDir, branch);
             }
@@ -666,10 +764,18 @@ function runEnsureWorktree(name: string, cwd: string): void {
 
     console.log(t(`  → 创建 worktree: .worktrees/${name}/ (${branch})`, `  → Creating worktree: .worktrees/${name}/ (${branch})`));
 
-    const dirArg = isWin ? `".worktrees\\${name}"` : `".worktrees/${name}"`;
-    const branchArg = decision.reason === 'attach' ? `"${branch}"` : `-b "${branch}"`;
-    const ok = run(`git worktree add ${dirArg} ${branchArg}`, repoRoot);
-    if (!ok) {
+    const worktreePath = path.join('.worktrees', name);
+    try {
+        if (decision.reason === 'attach') {
+            execFileSync('git', ['worktree', 'add', worktreePath, branch], { cwd: repoRoot, stdio: 'inherit' });
+        } else {
+            execFileSync('git', ['worktree', 'add', '-b', branch, worktreePath], { cwd: repoRoot, stdio: 'inherit' });
+        }
+    } catch (e) {
+        console.error(t(
+            `  ✗ 命令失败 (exit ${(e as { status?: number }).status}): git worktree add`,
+            `  ✗ Command failed (exit ${(e as { status?: number }).status}): git worktree add`
+        ));
         console.error(t('  ✗ worktree 创建失败', '  ✗ Worktree creation failed'));
         process.exit(1);
     }
