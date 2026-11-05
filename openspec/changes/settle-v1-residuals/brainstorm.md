@@ -45,7 +45,11 @@
 6. **D6 GAP008 先验证后删除**：连续 ≥5 次运行 + 隔离核对 + no-op 日志三条证据齐备才删 `restoreGlobalShim()` 及其配套；若发现仍污染，修污染源、兜底保留、状态记「部分完成」。
 7. **D7 GAP011 基准**：verify PRECHECK 先取本 change 的 `baseBranch`，缺失才退回 `origin/main` 并在 verify.md §5 标注基准；两份 `schema.yaml` 同步改。
 
-## Open Questions / 已知冲突
+## 已裁决（用户确认）
 
-- **既有测试断言与 BUG024 冲突**：`test/cli.test.js:146` 的 `normal path deletes a stale branch and creates the worktree` 断言「`feature/fresh` 被删除并在当前 HEAD 重建（SHA == base）」，这正是 BUG024 要求消除的破坏性行为；而 BUG024 关闭条件要求「分支 SHA 与删除前一致」，块又写「不得修改既有用例的断言」。二者不可同时满足。**处理建议**：重写该条用例（保留其创建 worktree 的断言，改分支 SHA 断言为「保持删除前的 SHA」），并在 apply 前向用户确认这是对「不得修改既有断言」的必要例外。其余既有用例（幂等、被别处检出时跳过）断言不动。
-- **GAP008 的删除条件是验证结论，不是预设结论**：本变更可能以「保留兜底 + 记部分完成」收尾；tasks 与 spec 都按条件分支写，不预设一定删除。
+用户已裁决：**参照 `local/docs/2026-11-05_opsx-ensure-worktree-decision.md` 处理**。据此：
+
+- **状态 F（分支被其他 worktree 检出）→ ABORT（非 0 退出）**。`test/cli.test.js:129` 的既有断言 `code === 0` 改为 `code !== 0`；「分支 SHA 不变」「目标目录不存在」两条断言保留。
+- **状态 G（分支存在但未被检出）→ 挂回分支，保留 SHA**。`test/cli.test.js:146` 的既有断言 `SHA === base` 改为 `SHA === 删除前 SHA`；「worktree 已创建」「exit 0」两条断言保留。
+- **其余既有用例**（`inside the target worktree exits 0 without recreating or deleting`）完全兼容，不动。
+- **GAP008 的删除条件仍是验证结论**，不是预设结论：本变更可能以「保留兜底 + 记部分完成」收尾；tasks 与 spec 按条件分支写。

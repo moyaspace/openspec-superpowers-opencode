@@ -102,7 +102,7 @@ git log --oneline "$base"..HEAD | wc -l
 
 ## Risks / Trade-offs
 
-- **[既有测试断言与 BUG024 冲突]** → `test/cli.test.js:146` 的 `normal path deletes a stale branch and creates the worktree` 断言残留分支被删除并在当前 HEAD 重建（SHA == base），与 BUG024「分支 SHA 与删除前一致」互斥。缓解：重写该条用例的分支断言，保留其创建 worktree 的断言；apply 前向用户确认这是「不得修改既有用例断言」的必要例外。**不修改前两条既有用例（幂等、被别处检出时跳过）的断言。**
+- **[既有测试断言与决策文档冲突，已裁决按决策文档处理]** → `test/cli.test.js:129` 断言状态 F 时 exit 0，而决策文档 §3/§4 要求 ABORT（非 0）；`test/cli.test.js:146` 断言状态 G 时分支 SHA == base（即删除重建），而决策文档 §3/§4 与 BUG024 要求挂回并保留 SHA。用户已裁决参照决策文档处理，因此这两条既有断言随实现更新：第一条 `code 0 → 非 0`，第二条 `SHA == base → SHA == 删除前 SHA`；其余断言不动，`inside the target worktree exits 0 without recreating or deleting` 用例完全兼容。
 - **[`worktree prune` 可能清理用户预期外的失效登记]** → 只清理「目录已不存在」的登记，不碰磁盘文件；prune 后重读登记再判定，避免误删。
 - **[空目录删除的边界]** → 只删「存在、是目录、且为空」的目标路径；非空目录与文件一律中止，零删改。
 - **[GAP008 结论不确定]** → 可能以保留兜底收尾；tasks/spec 按条件分支写，不把「删除」当必然结果。
@@ -118,7 +118,7 @@ git log --oneline "$base"..HEAD | wc -l
 5. 跑 `npm test`（≥5 次用于 GAP008 证据）与全量回归，更新 `CHANGELOG.md`。
 6. 回滚策略：改动集中在 CLI 判定、模板文本与 schema 文本，无数据迁移；如回归失败按文件级 `git checkout` 回退。
 
-## Open Questions
+## 已裁决 / 剩余不确定项
 
-- 既有测试 `test/cli.test.js:146` 的断言必须重写才能满足 BUG024；这是执行块「不得修改既有用例的断言」与 backlog 关闭条件的直接冲突。**需在 apply 前向用户确认**，不在本变更内自行弱化其他断言。
-- GAP008 的最终状态取决于验证结果：删除（完成）或保留 + 记「部分完成」。verify.md 必须写入三条证据。
+- **既有测试断言（已裁决）**：用户确认参照决策文档处理。`test/cli.test.js:129`（状态 F）改为断言非 0 退出；`test/cli.test.js:146`（状态 G）改为断言分支 SHA 保持删除前值；`inside the target worktree exits 0 without recreating or deleting` 不动。
+- **GAP008（仍待验证）**：最终状态取决于三条验证证据，删除（完成）或保留 + 记「部分完成」；verify.md 必须写入证据。

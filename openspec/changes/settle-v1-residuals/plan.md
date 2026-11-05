@@ -44,8 +44,9 @@
 - [ ] **Step 3:** 新增 BUG024 用例：`worktree add` + 提交 → `worktree remove` → 记录 `feature/demo` SHA → 重跑 → 断言 SHA 不变且 worktree 重新登记
 - [ ] **Step 4:** 新增 BUG025 用例：`worktree add` → 直接 `rm -rf .worktrees/demo` → 重跑 → 断言目录存在、`worktree list` 含之、exit 0
 - [ ] **Step 5:** 新增 BUG026 用例：worktree 内 `checkout -b other` → 重跑 → 断言非 0 且 stdout/stderr 含 `other`；再切回 `feature/demo` → 断言复用零副作用
-- [ ] **Step 6:** 改写既有用例 `normal path deletes a stale branch and creates the worktree` 的分支断言：从「SHA == base」改为「SHA == 删除前的 stale 提交」（保留创建 worktree 的断言；前两条既有用例不动）。开工前确认该例外
-- [ ] **Step 7:** 运行 `npm run build && node --test test/cli.test.js`，确认新用例失败、失败信息与预期一致（RED）
+- [ ] **Step 6:** 更新既有用例 `skips deleting a branch checked out by another worktree`（状态 F）：`assert.strictEqual(result.code, 0)` 改为 `assert.notStrictEqual(result.code, 0)`；保留「分支 SHA 不变」「目标目录不存在」两条断言；消息断言匹配 ABORT 文案
+- [ ] **Step 7:** 更新既有用例 `normal path deletes a stale branch and creates the worktree`（状态 G）：在 ensure 前记录 `feature/fresh` 的 SHA，断言改为与该 SHA 相等；保留「worktree 已创建」「exit 0」两条断言
+- [ ] **Step 8:** 运行 `npm run build && node --test test/cli.test.js`，确认新用例失败、失败信息与预期一致（RED）
 
 ### Task 2: 判定函数与 `runEnsureWorktree` 重写（GREEN）
 
