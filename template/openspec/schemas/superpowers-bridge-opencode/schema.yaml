@@ -287,6 +287,28 @@ artifacts:
          Blocks only if §7 is empty AND plan.md has `[~]` rows (means
          the gap analysis was skipped, not that gaps don't exist).
 
+      8. **Test evidence freshness** (blocking when stale):
+
+         Test evidence in verify.md must describe the tree that will
+         be archived, not an earlier one. Record it as:
+
+           tests: <N> (main suite) + <M> (elevated)
+           run at: <commit-sha>
+           command: <exact command>
+
+         If verify.md already carries test evidence, check whether
+         HEAD has moved into behaviour-bearing paths since the
+         recorded commit:
+
+           git diff --name-only <recorded-sha>..HEAD -- src test template scripts assets package.json
+
+         Empty output → nothing to do. Non-empty output → either
+         re-run the suite and update the numbers, or keep the old run
+         and add the literal line:
+           no behaviour change since <sha>: <paths>
+         Docs-only drift never requires a re-run, but `run at:` must
+         still be stated so readers can see the distance.
+
       Verify MAY be re-run multiple times as the implementation is
       refined — each run overwrites verify.md with current state.
 
@@ -308,11 +330,15 @@ artifacts:
       1. verify.md exists:
          test -f openspec/changes/<change-name>/verify.md
 
-      2. verify.md's Overall Decision is NOT marked as FAIL.
-         The verify.md template has 3 mutually-exclusive checkboxes
-         in its "Overall Decision" section: "✅ PASS", "⚠️ PASS WITH
-         WARNINGS", "❌ FAIL". Only "❌ FAIL" being checked is blocking:
-         ! grep -q '^- \[x\] ❌ FAIL' openspec/changes/<change-name>/verify.md
+      2. verify.md MUST carry an explicit Overall Decision that
+         authorises archive. The verify.md template has 3 mutually-
+         exclusive checkboxes in its "Overall Decision" section:
+         "✅ PASS", "⚠️ PASS WITH WARNINGS", "❌ FAIL". Absence of the
+         section is NOT a pass — it means verify was never run:
+         grep -qE '^- \[x\] (✅ PASS|⚠️ PASS WITH WARNINGS)' openspec/changes/<change-name>/verify.md
+         If this returns non-zero, STOP and tell the user to run
+         /opsx-verify first: a verify.md without an explicit PASS is
+         an implementation-notes file, not a verification report.
 
       Only after both succeed, proceed.
 

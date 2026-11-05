@@ -29,6 +29,7 @@
 - **包内实现迁移为 TypeScript + ESM**（`lib/` → `dist/`，入口仍为 `oso` / `openspec-superpowers-opencode`），构建产物不再入库，改由 `prepare` 在打包前现编。
 - **模板 `AGENTS.md` 的「项目文档参考」改为「文档命名与位置约定」**：明确该节只回答「这类文档该叫什么、放在哪里」，**不代表当前存在也不代表缺失**，并显式禁止因路径不存在而创建目录或报告缺口。另在托管区块（marker）之外新增「文档参考」一节，供项目登记**实际存在**的文档及其作用——新建项目时只写入空标题与表头，`oso init` 不填写任何条目，升级时也不覆盖该节。
 - **`/opsx-ff` 可从任意状态补完 artifacts**：再次执行时若 change 已存在则跳过创建、只补齐未完成的 artifacts，全部完成时不产生空提交；`/opsx-propose` 与 `/opsx-new` 在名字已被占用时主动中止并给出继续方式（`/opsx-continue` 逐个 / `/opsx-ff` 一次补齐）。
+- **`verify` 流程的两处记录收紧**：`retrospective` 的 PRECHECK 改为必须命中 `✅ PASS` 或 `⚠️ PASS WITH WARNINGS`——`verify.md` 缺 `## Overall Decision` 时不再视为通过，需先跑 `/opsx-verify`。`verify.md` 新增「Test Evidence」一节，要求记录测试计数、`run at: <commit-sha>` 与命令；`run at` 之后若触及 `src/`、`test/`、`template/`、`scripts/`、`assets/`、`package.json`，必须重跑或显式声明无行为改动。
 
 ### Removed
 

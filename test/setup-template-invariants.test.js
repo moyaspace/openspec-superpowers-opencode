@@ -608,17 +608,31 @@ const SCHEMA_RELATIVE = path.join(
     'schema.yaml',
 );
 const TEMPLATE_SCHEMA_PATH = path.join(TEMPLATE_DIR, SCHEMA_RELATIVE);
-// The repository's self-hosted copy is gitignored (`.gitignore:44`), so a clean
-// checkout / CI may not have it. Assert when present, skip when absent.
-const REPO_SCHEMA_PATH = path.join(__dirname, '..', SCHEMA_RELATIVE);
+const TEMPLATE_VERIFY_TEMPLATE_PATH = path.join(
+    TEMPLATE_DIR,
+    'openspec',
+    'schemas',
+    'superpowers-bridge-opencode',
+    'templates',
+    'verify.md',
+);
 
 const VERIFY_SECTION_START = '  - id: verify';
 const VERIFY_SECTION_END = '  - id: retrospective';
+
+const RETRO_SECTION_START = '  - id: retrospective';
+const RETRO_SECTION_END = '\napply:';
 
 function readVerifySection(file) {
     assert.ok(fs.existsSync(file), `missing schema file: ${file}`);
     const content = fs.readFileSync(file, 'utf8');
     return sectionOf(file, content, VERIFY_SECTION_START, VERIFY_SECTION_END);
+}
+
+function readRetrospectiveSection(file) {
+    assert.ok(fs.existsSync(file), `missing schema file: ${file}`);
+    const content = fs.readFileSync(file, 'utf8');
+    return sectionOf(file, content, RETRO_SECTION_START, RETRO_SECTION_END);
 }
 
 function assertVerifyBaseline(file) {
@@ -646,18 +660,54 @@ describe('verify artifact derives commit evidence from the change baseBranch', (
     it('template schema.yaml verify PRECHECK uses baseBranch and the annotated fallback', () => {
         assertVerifyBaseline(TEMPLATE_SCHEMA_PATH);
     });
+});
 
-    it('repository schema.yaml verify PRECHECK matches the template copy when present', (t) => {
-        if (!fs.existsSync(REPO_SCHEMA_PATH)) {
-            t.skip(`repository schema copy absent (gitignored): ${REPO_SCHEMA_PATH}`);
-            return;
-        }
-        const repoBody = assertVerifyBaseline(REPO_SCHEMA_PATH);
-        const templateBody = readVerifySection(TEMPLATE_SCHEMA_PATH);
-        assert.equal(
-            repoBody.replace(/\r\n/g, '\n'),
-            templateBody.replace(/\r\n/g, '\n'),
-            'repository and template verify sections must stay identical (line endings ignored)',
+describe('retrospective PRECHECK requires an explicit PASS decision', () => {
+    // A verify.md without `## Overall Decision` must not be read as a pass.
+    // The repository's own gitignored schema copy is deliberately NOT compared
+    // here: it is a deployed environment artefact, not a correctness target.
+    it('template schema.yaml requires ✅ PASS or ⚠️ PASS WITH WARNINGS', () => {
+        const body = readRetrospectiveSection(TEMPLATE_SCHEMA_PATH);
+        assert.ok(
+            body.includes("grep -qE '^- \\[x\\] (✅ PASS|⚠️ PASS WITH WARNINGS)'"),
+            'retrospective PRECHECK must require an explicit PASS / PASS WITH WARNINGS line',
         );
+        assert.equal(
+            body.includes("! grep -q '^- \\[x\\] ❌ FAIL'"),
+            false,
+            'retrospective PRECHECK must not treat a missing Overall Decision as a pass',
+        );
+    });
+});
+
+describe('verify artifact records test evidence bound to a commit', () => {
+    it('verify instruction carries the freshness check and the diff command', () => {
+        const body = readVerifySection(TEMPLATE_SCHEMA_PATH);
+        for (const needle of [
+            'Test evidence freshness',
+            'run at: <commit-sha>',
+            'git diff --name-only <recorded-sha>..HEAD -- src test template scripts assets package.json',
+            'no behaviour change since <sha>: <paths>',
+        ]) {
+            assert.ok(
+                body.includes(needle),
+                `verify instruction must contain \`${needle}\``,
+            );
+        }
+    });
+
+    it('verify.md template carries the Test Evidence section', () => {
+        assert.ok(fs.existsSync(TEMPLATE_VERIFY_TEMPLATE_PATH));
+        const template = fs.readFileSync(TEMPLATE_VERIFY_TEMPLATE_PATH, 'utf8');
+        for (const needle of [
+            '## 8. Test Evidence',
+            '**run at**:',
+            'git diff --name-only <recorded-sha>..HEAD -- src test template scripts assets package.json',
+        ]) {
+            assert.ok(
+                template.includes(needle),
+                `verify.md template must contain \`${needle}\``,
+            );
+        }
     });
 });

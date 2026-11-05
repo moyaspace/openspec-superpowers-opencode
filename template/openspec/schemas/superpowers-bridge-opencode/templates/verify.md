@@ -120,6 +120,23 @@ ls docs/superpowers/specs/*.md 2>/dev/null
 
 ---
 
+## 8. Test Evidence
+
+- [ ] 測試跑在將要歸檔的樹上（`run at:` 之後無行為改動，或已重跑）
+
+**主套件**：`<N>` tests / `<pass>` pass / `<fail>` fail / `<skipped>` skipped
+**Elevated**：`<M>` tests / `<pass>` pass
+**run at**: `<commit-sha>`
+**command**: `<exact command>`
+
+**`run at:` 之後的行為改動核對**：
+
+    git diff --name-only <recorded-sha>..HEAD -- src test template scripts assets package.json
+
+若有輸出且未重跑，必須在此列出 `no behaviour change since <sha>: <paths>` 或重跑後更新數字。
+
+---
+
 ## Overall Decision
 
 - [ ] ✅ PASS — 可進入 finishing-a-development-branch 與 archive
