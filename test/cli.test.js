@@ -39,6 +39,16 @@ function gitRun(dir, args) {
     }).trim();
 }
 
+/**
+ * 规范化路径用于跨平台比较。
+ * `git rev-parse --show-toplevel` 在 Windows 下可能返回正斜杠与不同大小写，
+ * 因此统一用 `path.resolve` 归一化分隔符，win32 下再转小写。
+ */
+function normalizePath(p) {
+    const resolved = path.resolve(p);
+    return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
 /** 建一个一次性 git 仓库（含首次提交），返回仓库根目录 */
 function makeGitRepo(prefix) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -126,6 +136,147 @@ describe('ensure-worktree idempotency and branch safety', () => {
         );
     });
 
+    test('replaces a plain empty target directory with a real worktree', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const name = 'demo';
+        const worktree = path.join(repo, '.worktrees', name);
+        fs.mkdirSync(worktree, { recursive: true });
+        assert.strictEqual(fs.readdirSync(worktree).length, 0, '前置：目标应为空目录');
+
+        const result = runCliFrom(repo, 'ensure-worktree', name);
+
+        assert.strictEqual(result.code, 0, `空目录应被替换为真 worktree, stderr: ${result.stderr}`);
+        assert.match(
+            gitRun(repo, ['worktree', 'list', '--porcelain']),
+            /\.worktrees[\\/]demo/,
+            '空目录应被清理并创建真实 worktree'
+        );
+        assert.strictEqual(
+            normalizePath(gitRun(worktree, ['rev-parse', '--show-toplevel'])),
+            normalizePath(worktree),
+            'worktree 的 show-toplevel 必须等于其自身'
+        );
+        assert.strictEqual(gitRun(worktree, ['rev-parse', '--abbrev-ref', 'HEAD']), 'feature/demo');
+    });
+
+    test('aborts on a plain non-empty target directory without deleting or modifying it', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const name = 'demo';
+        const worktree = path.join(repo, '.worktrees', name);
+        const marker = path.join(worktree, 'keep.txt');
+        fs.mkdirSync(worktree, { recursive: true });
+        fs.writeFileSync(marker, 'precious\n');
+
+        const result = runCliFrom(repo, 'ensure-worktree', name);
+
+        assert.notStrictEqual(result.code, 0, `非空目录应中止, stdout: ${result.stdout}, stderr: ${result.stderr}`);
+        assert.ok(fs.existsSync(marker), '非空目录内容不得被删除');
+        assert.strictEqual(fs.readFileSync(marker, 'utf8'), 'precious\n', '非空目录内容不得被修改');
+    });
+
+    test('aborts when the target path is occupied by a plain file without touching it', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const name = 'demo';
+        const target = path.join(repo, '.worktrees', name);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, 'occupied\n');
+
+        const result = runCliFrom(repo, 'ensure-worktree', name);
+
+        assert.notStrictEqual(result.code, 0, `目标为文件时应中止, stdout: ${result.stdout}, stderr: ${result.stderr}`);
+        assert.ok(fs.statSync(target).isFile(), '目标文件不得被删除或替换');
+        assert.strictEqual(fs.readFileSync(target, 'utf8'), 'occupied\n', '目标文件内容不得被修改');
+    });
+
+    test('reattaches an existing branch after its worktree was removed', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const name = 'demo';
+        const worktree = path.join(repo, '.worktrees', name);
+        gitRun(repo, ['worktree', 'add', '-q', '.worktrees/demo', '-b', 'feature/demo']);
+        fs.writeFileSync(path.join(worktree, 'work.txt'), 'work\n');
+        gitRun(worktree, ['add', '.']);
+        gitRun(worktree, ['commit', '-q', '-m', 'work']);
+        gitRun(repo, ['worktree', 'remove', worktree]);
+        assert.strictEqual(fs.existsSync(worktree), false, '前置：worktree 应已被移除');
+        const branchHead = gitRun(repo, ['rev-parse', 'refs/heads/feature/demo']);
+
+        const result = runCliFrom(repo, 'ensure-worktree', name);
+
+        assert.strictEqual(result.code, 0, `应挂回既有分支, stderr: ${result.stderr}`);
+        assert.strictEqual(
+            gitRun(repo, ['rev-parse', 'refs/heads/feature/demo']),
+            branchHead,
+            '既有分支必须被挂回而非删除重建，SHA 保持不变'
+        );
+        assert.ok(fs.existsSync(worktree), 'worktree 应被重新创建');
+        assert.match(gitRun(repo, ['worktree', 'list', '--porcelain']), /\.worktrees[\\/]demo/);
+        assert.strictEqual(gitRun(worktree, ['rev-parse', '--abbrev-ref', 'HEAD']), 'feature/demo');
+    });
+
+    test('recreates a manually deleted worktree directory after pruning stale registration', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const name = 'demo';
+        const worktree = path.join(repo, '.worktrees', name);
+        gitRun(repo, ['worktree', 'add', '-q', '.worktrees/demo', '-b', 'feature/demo']);
+        assert.strictEqual(fs.existsSync(worktree), true, '前置：worktree 应存在');
+        fs.rmSync(worktree, { recursive: true, force: true });
+        assert.strictEqual(fs.existsSync(worktree), false, '前置：目录应被手工删除');
+
+        const result = runCliFrom(repo, 'ensure-worktree', name);
+
+        assert.strictEqual(result.code, 0, `陈旧登记应 prune 后重建, stderr: ${result.stderr}`);
+        assert.ok(fs.existsSync(worktree), '目录应被重新创建为真实 worktree');
+        assert.match(gitRun(repo, ['worktree', 'list', '--porcelain']), /\.worktrees[\\/]demo/);
+        assert.strictEqual(
+            normalizePath(gitRun(worktree, ['rev-parse', '--show-toplevel'])),
+            normalizePath(worktree),
+            'worktree 的 show-toplevel 必须等于其自身'
+        );
+    });
+
+    test('aborts on a wrong branch and reuses a correct-branch worktree without side effects', () => {
+        const repo = makeGitRepo('oso-ensure-wt-');
+        const name = 'demo';
+        const worktree = path.join(repo, '.worktrees', name);
+        gitRun(repo, ['worktree', 'add', '-q', '.worktrees/demo', '-b', 'feature/demo']);
+        gitRun(worktree, ['checkout', '-q', '-b', 'other']);
+        const featureHead = gitRun(repo, ['rev-parse', 'refs/heads/feature/demo']);
+
+        const wrong = runCliFrom(repo, 'ensure-worktree', name);
+        const wrongOutput = `${wrong.stdout}\n${wrong.stderr}`;
+        assert.notStrictEqual(wrong.code, 0, `错误分支应中止, stdout: ${wrong.stdout}`);
+        assert.match(wrongOutput, /other/, '应打印实际检出的分支名');
+        assert.strictEqual(
+            gitRun(repo, ['rev-parse', 'refs/heads/feature/demo']),
+            featureHead,
+            '错误分支中止时不得改动 feature 分支'
+        );
+
+        gitRun(worktree, ['checkout', '-q', 'feature/demo']);
+        fs.writeFileSync(path.join(worktree, 'dirty.txt'), 'dirty\n');
+        const branchHead = gitRun(repo, ['rev-parse', 'refs/heads/feature/demo']);
+        const entriesBefore = gitRun(repo, ['worktree', 'list', '--porcelain']);
+
+        const reuse = runCliFrom(repo, 'ensure-worktree', name);
+        assert.strictEqual(reuse.code, 0, `正确分支应复用, stderr: ${reuse.stderr}`);
+        assert.match(`${reuse.stdout}\n${reuse.stderr}`, /复用|已存在|reuse|already exists/i, '应报告复用');
+        assert.strictEqual(
+            gitRun(repo, ['rev-parse', 'refs/heads/feature/demo']),
+            branchHead,
+            '复用不得改动分支'
+        );
+        assert.strictEqual(
+            gitRun(repo, ['worktree', 'list', '--porcelain']),
+            entriesBefore,
+            '复用不得改动 worktree 登记'
+        );
+        assert.strictEqual(
+            fs.readFileSync(path.join(worktree, 'dirty.txt'), 'utf8'),
+            'dirty\n',
+            '复用不得重置工作区'
+        );
+    });
+
     test('skips deleting a branch checked out by another worktree', () => {
         const repo = makeGitRepo('oso-ensure-wt-');
         const name = 'shared';
@@ -133,8 +284,9 @@ describe('ensure-worktree idempotency and branch safety', () => {
         const branchHead = gitRun(repo, ['rev-parse', 'refs/heads/feature/shared']);
 
         const result = runCliFrom(repo, 'ensure-worktree', name);
-        assert.strictEqual(result.code, 0, `应跳过而非报错, stderr: ${result.stderr}`);
-        assert.match(result.stdout, /跳过删除|skipping deletion|checked out/i);
+        const output = `${result.stdout}\n${result.stderr}`;
+        assert.notStrictEqual(result.code, 0, `分支被别处检出时应 ABORT, stdout: ${result.stdout}`);
+        assert.match(output, /\.worktrees[\\/]elsewhere/, 'ABORT 消息应点名占用分支的 worktree 路径');
         assert.strictEqual(
             gitRun(repo, ['rev-parse', 'refs/heads/feature/shared']),
             branchHead,
@@ -143,16 +295,16 @@ describe('ensure-worktree idempotency and branch safety', () => {
         assert.strictEqual(fs.existsSync(path.join(repo, '.worktrees', name)), false);
     });
 
-    test('normal path deletes a stale branch and creates the worktree', () => {
+    test('attaches an existing stale branch and creates the worktree', () => {
         const repo = makeGitRepo('oso-ensure-wt-');
         const name = 'fresh';
-        const base = gitRun(repo, ['rev-parse', 'HEAD']);
 
         gitRun(repo, ['checkout', '-q', '-b', 'stale-tmp']);
         fs.writeFileSync(path.join(repo, 'stale.txt'), 'stale\n');
         gitRun(repo, ['add', '.']);
         gitRun(repo, ['commit', '-q', '-m', 'stale']);
         gitRun(repo, ['branch', 'feature/fresh', 'stale-tmp']);
+        const branchHead = gitRun(repo, ['rev-parse', 'refs/heads/feature/fresh']);
         gitRun(repo, ['checkout', '-q', 'main']);
 
         const result = runCliFrom(repo, 'ensure-worktree', name);
@@ -161,8 +313,8 @@ describe('ensure-worktree idempotency and branch safety', () => {
         assert.match(gitRun(repo, ['worktree', 'list', '--porcelain']), /\.worktrees[\\/]fresh/);
         assert.strictEqual(
             gitRun(repo, ['rev-parse', 'refs/heads/feature/fresh']),
-            base,
-            '残留分支应被删除并在当前 HEAD 上重建'
+            branchHead,
+            '既有分支应被挂回而非删除重建，SHA 保持不变'
         );
     });
 });
