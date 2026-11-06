@@ -548,3 +548,20 @@ describe('oso command guidance', () => {
         assert.doesNotMatch(output, /(?<!create-)openspec-superpowers-opencode/, '报错不得使用长名');
     });
 });
+
+describe('CLI entry detection', () => {
+    // npm link / pnpm / macOS tmpdir (/var -> /private/var) all reach the CLI
+    // through a symlinked path. The entry check must still fire there.
+    test('runs when invoked through a symlinked path', (t) => {
+        const linkRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'oso-link-'));
+        const link = path.join(linkRoot, 'repo');
+        t.after(() => fs.rmSync(linkRoot, { recursive: true, force: true }));
+        fs.symlinkSync(path.resolve(__dirname, '..'), link, process.platform === 'win32' ? 'junction' : 'dir');
+        const output = child_process.execFileSync(
+            process.execPath,
+            [path.join(link, 'dist', 'cli', 'index.js'), '--version'],
+            { encoding: 'utf8' },
+        );
+        assert.match(output.trim(), /^\d+\.\d+\.\d+$/);
+    });
+});

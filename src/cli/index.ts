@@ -25,7 +25,18 @@ const toolDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..',
 const args = process.argv.slice(2);
 const isWin = process.platform === 'win32';
 // 仅在作为入口直接运行时才分发子命令：本模块被 import（如 init 的部署后验证）时必须无副作用。
-const isEntry = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+// 路径可能是 symlink（macOS /var -> /private/var、npm link、pnpm）。import.meta.url 已是
+// 解析后的真实路径，直接用 argv[1] 拼 URL 会不相等，导致入口静默不执行。
+const isEntry = (() => {
+    const entry = process.argv[1];
+    if (entry === undefined) return false;
+    if (import.meta.url === pathToFileURL(entry).href) return true;
+    try {
+        return fs.realpathSync(fileURLToPath(import.meta.url)) === fs.realpathSync(entry);
+    } catch {
+        return false;
+    }
+})();
 
 // 解析 --lang 参数（必须在 isHelp 之前）
 const langIndex = args.indexOf('--lang');
