@@ -57,9 +57,13 @@
 - **测试收尾的全局垫片恢复兜底形同虚设**（GAP008）：按三条证据（连续 ≥5 次 `npm test`、`installShims()` 测试隔离审计、恢复点 no-op 日志）移除 `scripts/run-tests.mjs` 的恢复兜底，改由测试隔离 + 全局 bin 守卫保证不污染。
 - **OPSX 命令在 worktree 未就位时继续执行**（GAP010）：`/opsx-propose`、`/opsx-ff`、`/opsx-new` 在 worktree 就位后先做 `cd` 失败分支与两项只读校验（`git rev-parse --show-prefix` 为空、分支 == `feature/<name>`），复制重试上限 1 次。
 - **verify PRECHECK 的提交基准写死 `origin/main`**（GAP011）：改为从 `openspec list --json` 读取 `baseBranch`，缺失时回退 `origin/main` 并在 `verify.md` §5 标注。
+- **CLI 经符号链接路径调用时静默不执行**（BUG028）：`oso` / `openspec-superpowers-opencode` 的入口判断原先直接比较 `import.meta.url` 与 `process.argv[1]` 拼出的 URL，路径中存在符号链接时不等，进程以 0 退出且零输出。现已用解析后的真实路径兜底，覆盖 macOS tmpdir（`/var` → `/private/var`）、`npm link`、pnpm 与容器挂载等场景。
+- **前置命令缺失时 `oso init` 抛出崩栈**（BUG029）：`spawnSync` 的 `ENOENT` 不再逃逸为未捕获异常，改为按退出码 127 走正常前置检查，输出可读的「缺少哪个命令」。
 
 ### Internal
 
 - elevated 套件（含 `lifecycle-e2e`：`npm pack` → 本地安装 → `oso init` → registry → reset）在 Unix 与 CI 上真实执行，不再恒为 `SKIPPED`（GAP005）；这是发布 tarball 可装可跑的唯一自动证据。
 - 删除 V2 迁移遗留的一次性验收测试 `test/imp16-tarball-equivalence.test.js`，其独有断言迁入 CI 的 tarball 内容检查。
 - CI 增加两条发布守卫：`dist/` 不得被 git 跟踪、构建后工作区必须干净。
+- CI 固定 `@fission-ai/openspec@1.16.0`：该 CLI 的人类可读输出在 minor 版本间会变（1.4.0 把 `(schema: X)` 改成独立的 `Schema: X` 行），不钉版本会让 CI 随上游发版变红。
+- `lifecycle-e2e` 不再依赖宿主预装 `opencode`、Superpowers 或 git identity：缺失时自备 stub / fixture，且在失败信息中一并输出 `status`、`signal`、`spawnError` 与输出尾部（GAP014）。
