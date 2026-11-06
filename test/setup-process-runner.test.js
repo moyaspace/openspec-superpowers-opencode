@@ -16,6 +16,15 @@ describe('process runner', () => {
         assert.equal(result.stderr, '');
     });
 
+    it('reports a missing program as exit 127 instead of throwing', () => {
+        const runner = createProcessRunner();
+
+        const result = runner.run('oso-command-that-does-not-exist', ['--version']);
+
+        assert.equal(result.code, 127);
+        assert.match(result.stderr, /ENOENT|not found/i);
+    });
+
     it('invokes Windows command shims through ComSpec without shell mode', () => {
         const calls = [];
         const runner = createProcessRunner({

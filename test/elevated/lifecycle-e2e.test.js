@@ -65,6 +65,21 @@ function makeIsolatedBin() {
     writeFileSync(join(bin, 'openspec.ps1'), 'exit 0\r\n');
     writeFileSync(join(bin, 'openspec'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   }
+  const opencodeProbe = process.platform === 'win32'
+    ? spawnSync('where.exe', ['opencode'], { encoding: 'utf8' })
+    : spawnSync('which', ['opencode'], { encoding: 'utf8' });
+  const hasOpencode = (opencodeProbe.stdout ?? '').trim().length > 0;
+  if (!hasOpencode) {
+    // `opencode` is a documented prerequisite that CI images do not ship, and
+    // `oso init` only probes `opencode --version`. A version-printing stub keeps
+    // the lifecycle test runnable without pulling the native binary.
+    if (process.platform === 'win32') {
+      writeFileSync(join(bin, 'opencode.cmd'), '@echo off\r\necho 0.0.0-stub\r\n');
+      writeFileSync(join(bin, 'opencode.ps1'), "Write-Output '0.0.0-stub'\r\n");
+    } else {
+      writeFileSync(join(bin, 'opencode'), '#!/bin/sh\necho 0.0.0-stub\n', { mode: 0o755 });
+    }
+  }
   return bin;
 }
 

@@ -61,7 +61,14 @@ function createProcessRunner(options: ProcessRunnerOptions = {}): ProcessRunner 
             if (runOptions.env !== undefined) spawnOptions.env = runOptions.env;
             if (runOptions.input !== undefined) spawnOptions.input = runOptions.input;
             const result = spawnSync(executable, executableArgs, spawnOptions);
-            if (result.error) throw result.error;
+            if (result.error) {
+                return {
+                    code: 127,
+                    signal: null,
+                    stdout: '',
+                    stderr: result.error.message,
+                };
+            }
             return {
                 code: result.status === null ? 1 : result.status,
                 signal: result.signal,
