@@ -32,7 +32,9 @@ describe('openspec CLI consumes OSO schema [real CLI]', { skip: !openspecAvailab
   test('openspec new change applies OSO schema to the change', () => {
     const r = runOpen(['new', 'change', 'oso-cli-integration-check'], work);
     assert.equal(r.status, 0, `new change failed: ${r.out.slice(0, 300)}`);
-    assert.match(r.out, /schema: superpowers-bridge-opencode/, 'CLI output must show OSO schema applied');
+    // 1.3.x prints "(schema: X)" on the success line; 1.4.0+ prints a standalone
+    // "Schema: X" line. Only "the schema was applied" is under contract here.
+    assert.match(r.out, /schema:\s*superpowers-bridge-opencode/i, 'CLI output must show OSO schema applied');
     const changeDir = join(work, 'openspec', 'changes', 'oso-cli-integration-check');
     assert.equal(existsSync(join(changeDir, '.openspec.yaml')), true, '.openspec.yaml missing');
     const yaml = readFileSync(join(changeDir, '.openspec.yaml'), 'utf8');
