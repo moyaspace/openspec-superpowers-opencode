@@ -118,6 +118,11 @@ describe('OSO lifecycle end-to-end [elevated]', () => {
 
     const init = run('node', [cliEntry, 'init', '.'], project, 600000, {
       PATH: isolatedBin + delimiter + (process.env.PATH ?? ''),
+      // `oso init` runs `git commit`; ubuntu/macos runners ship no git identity.
+      GIT_AUTHOR_NAME: 'oso e2e',
+      GIT_AUTHOR_EMAIL: 'oso-e2e@example.com',
+      GIT_COMMITTER_NAME: 'oso e2e',
+      GIT_COMMITTER_EMAIL: 'oso-e2e@example.com',
       BROWN_OVERRIDE_INIT: 'yes',
       BROWN_OVERRIDE_OPENSPEC: 'yes',
       BROWN_OVERRIDE_OCODEJSON: 'yes',
@@ -126,7 +131,7 @@ describe('OSO lifecycle end-to-end [elevated]', () => {
       BROWN_OVERRIDE_AGENTS: 'yes',
       BROWN_OVERRIDE_REGISTRY: 'yes',
     });
-    assert.equal(init.status, 0, `oso init failed: ${init.out}`);
+    assert.equal(init.status, 0, `oso init failed: ${init.out.slice(-4000)}`);
     assert.equal(existsSync(join(project, 'openspec', 'oso-change-registry.json')), true, 'registry missing');
     assert.equal(existsSync(join(project, 'openspec', 'schemas', 'superpowers-bridge-opencode')), true, 'schemas missing');
     assert.equal(existsSync(join(project, 'AGENTS.md')), true, 'AGENTS.md not deployed');
