@@ -132,7 +132,7 @@ describe('OSO lifecycle end-to-end [elevated]', () => {
       BROWN_OVERRIDE_REGISTRY: 'yes',
     });
     assert.equal(init.status, 0, `oso init failed: ${init.out.slice(-4000)}`);
-    assert.equal(existsSync(join(project, 'openspec', 'oso-change-registry.json')), true, 'registry missing');
+    assert.equal(existsSync(join(project, 'openspec', 'oso-change-registry.json')), true, `registry missing; init output tail:\n${init.out.slice(-2000)}`);
     assert.equal(existsSync(join(project, 'openspec', 'schemas', 'superpowers-bridge-opencode')), true, 'schemas missing');
     assert.equal(existsSync(join(project, 'AGENTS.md')), true, 'AGENTS.md not deployed');
   });
