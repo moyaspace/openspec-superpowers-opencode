@@ -53,7 +53,7 @@ openspec/oso-change-registry.json
 /test-runs/*
 !/test-runs/.gitkeep
 
-# Personal local workspace (do not track)
+# Private local workspace (tracked separately when needed)
 /local/
 
 # <!-- openspec-superpowers-opencode_gitignore -->

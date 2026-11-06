@@ -130,7 +130,7 @@ openspec/
 ### Superpowers 路径
 
 ```
-C:\Users\rloessplateau\.cache\opencode\packages\superpowers@git+https_\github.com\obra\superpowers.git\node_modules\superpowers\skills\
+C:\Users\RLOESS~1\AppData\Local\Temp\oso-ci-sim\.cache\opencode\packages\superpowers@oso-e2e\node_modules\superpowers\skills\
 ```
 
 ### skill() 不可用时
@@ -144,7 +144,7 @@ C:\Users\rloessplateau\.cache\opencode\packages\superpowers@git+https_\github.co
 
 | 任务类型    | 调用方式                                                                                                                                |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 实现任务    | `task(category="deep", load_skills=[], ...)` — prompt 中嵌入 TDD 指令（Read C:\Users\rloessplateau\.cache\opencode\packages\superpowers@git+https_\github.com\obra\superpowers.git\node_modules\superpowers\skills\test-driven-development/SKILL.md） |
+| 实现任务    | `task(category="deep", load_skills=[], ...)` — prompt 中嵌入 TDD 指令（Read C:\Users\RLOESS~1\AppData\Local\Temp\oso-ci-sim\.cache\opencode\packages\superpowers@oso-e2e\node_modules\superpowers\skills\test-driven-development/SKILL.md） |
 | 代码搜索    | `task(subagent_type="explore", ...)`                                                                                                    |
 | 查文档      | `task(subagent_type="librarian", ...)`                                                                                                  |
 | 架构决策    | `task(subagent_type="oracle", ...)`                                                                                                     |
@@ -158,13 +158,18 @@ Superpowers 技能（TDD、brainstorming 等）是文件系统上的 `.md` 文�
 
 **唯一正确的传递方式**：Read 文件后，内容直接嵌入 `prompt` 字段。见上方"子 Agent 调度"表。
 
-## 项目文档参考
+## 文档命名与位置约定
 
-以下文档是 AI 理解项目上下文的主要入口。标注 `*` 的为推荐必配。
-
-## 项目文档参考
-
-以下文档是 AI 理解项目上下文的主要入口。标注 `*` 的为推荐必配。
+> **本节是命名与位置约定（convention），不是任务清单，也不是缺口清单。**
+>
+> 下列路径只回答一个问题：「**如果要写这类文档，应该叫什么名字、放在哪里**」。它们**不代表当前存在，也不代表缺失**。
+>
+> - **MUST NOT** 因为某个路径不存在，就创建对应的目录或文件。
+> - **MUST NOT** 把本节当作「项目文档不完整」的证据，据此向用户报告缺口或提议补齐。
+> - **MUST NOT** 主动询问用户是否需要创建这些文档。
+> - 确需新建文档时，按本节命名与定位；本节未覆盖的类型，**SHOULD** 先问用户。
+>
+> 标注 `*` 的是多数项目会用到的高价值入口——**存在时**优先阅读。
 
 ### 项目概览
 
@@ -198,7 +203,7 @@ Superpowers 技能（TDD、brainstorming 等）是文件系统上的 `.md` 文�
 
 ### 工作草稿
 
-- `local/` — 私有设计与实施资料（被主仓库 `.gitignore` 排除；由 `local/` 内的独立私有 Git 仓库跟踪）
+- `local/` — 私有设计与实施资料（被主仓库 `.gitignore` 排除；如需版本历史，由该目录内的独立私有 Git 仓库跟踪）
   - `inbox/` — 待分析的原始材料、未分类草稿
   - `notes/` — 个人笔记、非正式记录
 
