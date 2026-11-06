@@ -17,7 +17,7 @@ function run(cmd, args, cwd, timeout = 180000, env) {
   const r = process.platform === 'win32'
     ? spawnSync('cmd.exe', ['/d', '/s', '/c', cmd, ...args], { cwd, encoding: 'utf8', timeout, env: env ? { ...process.env, ...env } : undefined })
     : spawnSync(cmd, args, { cwd, encoding: 'utf8', timeout, env: env ? { ...process.env, ...env } : undefined });
-  return { out: (r.stdout ?? '') + (r.stderr ?? ''), status: r.status ?? -1 };
+  return { out: (r.stdout ?? '') + (r.stderr ?? ''), status: r.status ?? -1, signal: r.signal, spawnError: r.error ? String(r.error.message) : null };
 }
 
 const openspecAvailable = run('openspec', ['--version']).status === 0;
@@ -131,8 +131,8 @@ describe('OSO lifecycle end-to-end [elevated]', () => {
       BROWN_OVERRIDE_AGENTS: 'yes',
       BROWN_OVERRIDE_REGISTRY: 'yes',
     });
-    assert.equal(init.status, 0, `oso init failed: ${init.out.slice(-4000)}`);
-    assert.equal(existsSync(join(project, 'openspec', 'oso-change-registry.json')), true, `registry missing; init output tail:\n${init.out.slice(-2000)}`);
+    assert.equal(init.status, 0, `oso init failed: status=${init.status} signal=${init.signal} spawnError=${init.spawnError} out=${init.out.slice(-3000)}`);
+    assert.equal(existsSync(join(project, 'openspec', 'oso-change-registry.json')), true, `registry missing; status=${init.status} signal=${init.signal} spawnError=${init.spawnError} out=${init.out.slice(-3000)}`);
     assert.equal(existsSync(join(project, 'openspec', 'schemas', 'superpowers-bridge-opencode')), true, 'schemas missing');
     assert.equal(existsSync(join(project, 'AGENTS.md')), true, 'AGENTS.md not deployed');
   });
