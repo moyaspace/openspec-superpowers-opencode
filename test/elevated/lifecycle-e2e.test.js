@@ -6,7 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, readdirSync, readFileSync, mkdirSync, writeFileSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, readdirSync, readFileSync, mkdirSync, writeFileSync, copyFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, basename, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,7 +45,19 @@ function makeIsolatedBin() {
     const name = basename(p);
     if (!name.startsWith('openspec')) continue;
     if (existsSync(join(bin, name))) continue;
-    copyFileSync(p, join(bin, name));
+    if (process.platform === 'win32') {
+      copyFileSync(p, join(bin, name));
+    } else {
+      // npm's global bin entry is a symlink into the package, e.g. bin/openspec.js
+      // whose body is `import '../dist/cli/index.js'`. copyFileSync follows the
+      // symlink, so the relocated copy resolves that relative import against the
+      // temp dir and fails. Wrap the resolved absolute path instead.
+      writeFileSync(
+        join(bin, name),
+        `#!/bin/sh\nexec node "${realpathSync(p)}" "$@"\n`,
+        { mode: 0o755 },
+      );
+    }
     copied += 1;
   }
   if (copied === 0) {
