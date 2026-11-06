@@ -7,7 +7,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, readdirSync, readFileSync, mkdirSync, writeFileSync, copyFileSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { join, dirname, basename, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -83,6 +83,21 @@ function makeIsolatedBin() {
   return bin;
 }
 
+function ensureSuperpowersFixture() {
+  const packagesDir = join(homedir(), '.cache', 'opencode', 'packages');
+  const present = existsSync(packagesDir)
+    && readdirSync(packagesDir).some((name) => name.startsWith('superpowers@'));
+  if (present) return null;
+  // CI images do not ship Superpowers, but `oso init` requires a skills
+  // directory to resolve. Lock verification only warns, so an empty skills dir
+  // plus a package.json version is enough to exercise the lifecycle.
+  const pkgDir = join(packagesDir, 'superpowers@oso-e2e', 'node_modules', 'superpowers');
+  mkdirSync(join(pkgDir, 'skills'), { recursive: true });
+  writeFileSync(join(pkgDir, 'package.json'), JSON.stringify({ version: '7.0.0' }));
+  return join(packagesDir, 'superpowers@oso-e2e');
+}
+
+const superpowersFixture = ensureSuperpowersFixture();
 const isolatedBin = makeIsolatedBin();
 const project = join(workRoot, 'proj-e2e');
 const cliEntry = join(project, 'node_modules', '@moyaspace', 'openspec-superpowers-opencode', 'dist', 'cli', 'index.js');
@@ -135,7 +150,9 @@ describe('OSO lifecycle end-to-end [elevated]', () => {
   test('cleanup removes work root', () => {
     rmSync(workRoot, { recursive: true, force: true });
     rmSync(isolatedBin, { recursive: true, force: true });
+    if (superpowersFixture) rmSync(superpowersFixture, { recursive: true, force: true });
     assert.equal(existsSync(workRoot), false);
     assert.equal(existsSync(isolatedBin), false);
+    assert.equal(superpowersFixture === null || existsSync(superpowersFixture) === false, true);
   });
 });
