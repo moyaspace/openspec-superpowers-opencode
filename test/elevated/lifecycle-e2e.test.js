@@ -6,7 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, readdirSync, readFileSync, mkdirSync, writeFileSync, copyFileSync, realpathSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, readdirSync, readFileSync, mkdirSync, writeFileSync, copyFileSync, realpathSync, statSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import { join, dirname, basename, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,8 +131,21 @@ describe('OSO lifecycle end-to-end [elevated]', () => {
       BROWN_OVERRIDE_AGENTS: 'yes',
       BROWN_OVERRIDE_REGISTRY: 'yes',
     });
-    assert.equal(init.status, 0, `oso init failed: status=${init.status} signal=${init.signal} spawnError=${init.spawnError} out=${init.out.slice(-3000)}`);
-    assert.equal(existsSync(join(project, 'openspec', 'oso-change-registry.json')), true, `registry missing; status=${init.status} signal=${init.signal} spawnError=${init.spawnError} out=${init.out.slice(-3000)}`);
+    const probe = run('node', ['-e', 'process.stdout.write("probe-ok")'], project, 60000, {
+      PATH: isolatedBin + delimiter + (process.env.PATH ?? ''),
+    });
+    const cliProbe = run('node', [cliEntry, '--version'], project, 60000, {
+      PATH: isolatedBin + delimiter + (process.env.PATH ?? ''),
+    });
+    const diag = [
+      `probe=${probe.status}:${JSON.stringify(probe.out)}`,
+      `cli=${cliProbe.status}:${JSON.stringify(cliProbe.out)}`,
+      `entryBytes=${existsSync(cliEntry) ? statSync(cliEntry).size : 'missing'}`,
+      `init=${init.status}:${init.signal}:${JSON.stringify(init.out.slice(-1200))}`,
+      `project=${readdirSync(project).join(',')}`,
+    ].join(' | ');
+    assert.equal(init.status, 0, `oso init failed: ${diag}`);
+    assert.equal(existsSync(join(project, 'openspec', 'oso-change-registry.json')), true, `registry missing: ${diag}`);
     assert.equal(existsSync(join(project, 'openspec', 'schemas', 'superpowers-bridge-opencode')), true, 'schemas missing');
     assert.equal(existsSync(join(project, 'AGENTS.md')), true, 'AGENTS.md not deployed');
   });
