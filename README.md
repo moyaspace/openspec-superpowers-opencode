@@ -55,7 +55,7 @@ oso does two kinds of work:
 
 ```
           ┌─ .worktrees/feature-a/  (feature/feature-a branch)
-main ─────┼─ .worktrees/feature-b/  (feature/feature-b branch)
+base ─────┼─ .worktrees/feature-b/  (feature/feature-b branch)
           └─ .worktrees/feature-c/  (feature/feature-c branch)
 ```
 

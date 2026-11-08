@@ -55,7 +55,7 @@ oso 做两类工作：
 
 ```
           ┌─ .worktrees/feature-a/  (feature/feature-a 分支)
-main ─────┼─ .worktrees/feature-b/  (feature/feature-b 分支)
+base ─────┼─ .worktrees/feature-b/  (feature/feature-b 分支)
           └─ .worktrees/feature-c/  (feature/feature-c 分支)
 ```
 
