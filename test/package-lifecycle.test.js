@@ -15,8 +15,12 @@ describe('package lifecycle', () => {
     }
   });
 
-  test('prepare carries the build', () => {
-    assert.equal(pkg.scripts?.prepare, 'npm run build');
+  test('prepack carries the build', () => {
+    assert.equal(pkg.scripts?.prepack, 'npm run build');
+  });
+
+  test('no prepare script (allowScripts would flag it on install)', () => {
+    assert.equal('prepare' in (pkg.scripts ?? {}), false, 'scripts.prepare must not exist');
   });
 
   test('legacy install hook script is deleted', () => {

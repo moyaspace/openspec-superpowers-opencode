@@ -22,20 +22,27 @@ TBD - created by archiving change retire-install-hook. Update Purpose after arch
 - **WHEN** 检查 `src/shims-installer.ts` 与 `src/setup/shim-check.ts`
 - **THEN** 两者仍存在且可被 `install-shims` / `ensureShim` 调用
 
-### Requirement: 构建 MUST 由 prepare 在源目录承载
+### Requirement: 构建 MUST 由 prepack 在打包前承载
 
-根 `package.json` MUST 提供 `"prepare": "npm run build"`。构建 MUST NOT 放入 `install` 或 `postinstall`。干净 clone 执行 `npm ci` 后 MUST 生成 `dist/`，且 `dist/cli/index.js` 存在。从 tarball 安装到其他项目时 MUST NOT 执行构建。
+根 `package.json` MUST 提供 `"prepack": "npm run build"`。构建 MUST NOT 放入 `install`、`postinstall`、`preinstall` 或 `prepare`。`scripts` MUST NOT 含 `prepare`：npm >= 11.16 的 `allowScripts` 门禁按「声明即告警」枚举生命周期脚本，不判断该脚本在当前安装场景是否真的执行，因此 `prepare` 会让用户安装 tarball 时看到 `install scripts blocked` / `not yet covered by allowScripts` 警告，而它在 tarball 安装场景本就不执行。干净 clone 的 `npm ci` MUST NOT 依赖任何生命周期脚本生成 `dist/`；`npm test`（首步 typecheck、次步 build）与 `npm run build` MUST 生成 `dist/cli/index.js`。从 tarball 安装到其他项目时 MUST NOT 执行构建。
 
-#### Scenario: 干净 clone 的 npm ci 生成 dist
+#### Scenario: 没有任何安装期生命周期脚本
+
+- **WHEN** 读取根 `package.json` 的 `scripts`
+- **THEN** 键集合不包含 `preinstall`、`install`、`postinstall`、`prepare`
+
+#### Scenario: 干净 clone 由 build 生成 dist
 
 - **WHEN** 在干净 clone 中执行 `npm ci`
 - **THEN** 命令以 exit 0 结束
-- **AND** `dist/cli/index.js` 存在
+- **AND** `dist/` 的存在与否不构成 `npm ci` 的成败条件
+- **AND** 随后执行 `npm test` 或 `npm run build` 后 `dist/cli/index.js` 存在
 
 #### Scenario: tarball 安装不执行构建
 
 - **WHEN** 把打好的 tarball 安装到另一个项目
 - **THEN** 安装过程不执行本包的构建脚本
+- **AND** 安装过程 MUST NOT 产生 `allowScripts` 相关警告
 - **AND** 安装目录仍包含 tarball 自带的 `dist/`
 
 ### Requirement: dist MUST NOT 被 git 跟踪但仍进入 tarball

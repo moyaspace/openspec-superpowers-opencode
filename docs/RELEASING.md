@@ -109,7 +109,7 @@ npm test
 npm pack
 ```
 
-- 本包有 `"prepare": "npm run build"`，所以 `npm pack` 会**自动现编一次** `dist/`；打完必须复核 `git status --porcelain` 仍为空（产物由源码生成，不应产生 diff）。
+- 本包有 `"prepack": "npm run build"`，所以 `npm pack` 会**自动现编一次** `dist/`；打完必须复核 `git status --porcelain` 仍为空（产物由源码生成，不应产生 diff）。用 `prepack` 而非 `prepare` 是为了让包在 npm >= 11.16 上安装时零 `allowScripts` 告警（见 `openspec/specs/package-lifecycle/spec.md`）。
 - 打出 `moyaspace-openspec-superpowers-opencode-<ver>.tgz`，**这是后续所有平台验证的唯一安装源**：本地 Windows、Ubuntu、macOS、以及 CI 之外的验收，全部装同一个文件，不得各平台自行构建。
 - 按 `.github/workflows/ci.yml` 的 `Verify tarball contents` 清单本地核对一遍（关键文件齐全、已删文件不在包内、`package/src/` 与 `package/tsconfig.json` 不得出现）。
 - `.tgz` 已被 `.gitignore` 的 `*.tgz` 排除，**不要**提交它。

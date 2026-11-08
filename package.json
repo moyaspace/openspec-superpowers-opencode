@@ -50,7 +50,7 @@
     "test": "node scripts/run-tests.mjs node --test \"test/*.test.js\"",
     "typecheck": "tsc -p tsconfig.json",
     "build": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
-    "prepare": "npm run build"
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "@types/node": "26.4.1",

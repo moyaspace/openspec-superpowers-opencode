@@ -9,7 +9,7 @@
 
 - **Node.js 要求提高到 `>= 22.9.0`**（1.1.1 为 `>= 16`）。
 - **老项目重跑 `oso init` 的默认行为已改变**：OSO 自有资产（`.opencode/commands/`、`.opencode/skills/`、`openspec/schemas/`）默认**覆盖**，并逐条打印「已更新：<path>」。依赖旧默认（保留）的项目请显式设置 `BROWN_OVERRIDE_COMMANDS=no` / `BROWN_OVERRIDE_SKILLS=no`。
-- **包不再有 `install` 生命周期脚本**：安装完成后不会自动写 `openspec` 垫片，改由 `oso init` 自检并安装。npm 12 用户因此不再需要 `--allow-scripts`。
+- **包不再有任何安装期生命周期脚本**（`install` / `postinstall` / `preinstall` / `prepare` 均无）：安装完成后不会自动写 `openspec` 垫片，改由 `oso init` 自检并安装。npm >= 11.16 / 12 用户安装时不会看到 `allowScripts` 告警，也不需要 `--allow-scripts`。
 
 ### Added
 
@@ -26,7 +26,7 @@
 - **垫片安装失败不再中止 `oso init`**：跳过该步、走完 8/8、仍以 exit 0 结束，结尾输出独立提示块，含失败原因、实际 binDir 与按平台/权限区分的可照抄命令（Unix 系统 npm 需 `sudo oso install-shims`，nvm/用户级 prefix 无需 sudo，Windows 需管理员权限或 `gsudo`）。
 - **垫片写入改为原子替换**：先写同目录临时文件再 `rename` 覆盖，避免「unlink 成功、write 失败」导致用户的 `openspec` 命令消失；权限不足时不再静默跳过。
 - **`/opsx-finish` 的测试命令按项目自带入口分派**：优先 `makefile test:` → CI 显式命令 → 项目文档，候选冲突或疑似子集时询问用户；失败先甄别环境类问题，语言默认命令仅作兜底。
-- **包内实现迁移为 TypeScript + ESM**（`lib/` → `dist/`，入口仍为 `oso` / `openspec-superpowers-opencode`），构建产物不再入库，改由 `prepare` 在打包前现编。
+- **包内实现迁移为 TypeScript + ESM**（`lib/` → `dist/`，入口仍为 `oso` / `openspec-superpowers-opencode`），构建产物不再入库，改由 `prepack` 在打包前现编。
 - **模板 `AGENTS.md` 的「项目文档参考」改为「文档命名与位置约定」**：明确该节只回答「这类文档该叫什么、放在哪里」，**不代表当前存在也不代表缺失**，并显式禁止因路径不存在而创建目录或报告缺口。另在托管区块（marker）之外新增「文档参考」一节，供项目登记**实际存在**的文档及其作用——新建项目时只写入空标题与表头，`oso init` 不填写任何条目，升级时也不覆盖该节。
 - **`/opsx-ff` 可从任意状态补完 artifacts**：再次执行时若 change 已存在则跳过创建、只补齐未完成的 artifacts，全部完成时不产生空提交；`/opsx-propose` 与 `/opsx-new` 在名字已被占用时主动中止并给出继续方式（`/opsx-continue` 逐个 / `/opsx-ff` 一次补齐）。
 - **`verify` 流程的两处记录收紧**：`retrospective` 的 PRECHECK 改为必须命中 `✅ PASS` 或 `⚠️ PASS WITH WARNINGS`——`verify.md` 缺 `## Overall Decision` 时不再视为通过，需先跑 `/opsx-verify`。`verify.md` 新增「Test Evidence」一节，要求记录测试计数、`run at: <commit-sha>` 与命令；`run at` 之后若触及 `src/`、`test/`、`template/`、`scripts/`、`assets/`、`package.json`，必须重跑或显式声明无行为改动。
@@ -34,7 +34,7 @@
 ### Removed
 
 - `install` 生命周期脚本（`scripts/shims-installer.mjs`）——它是 npm 12 下静默失效、且迫使 `dist/` 入库的根源。
-- `dist/` 的 git 跟踪（产物由 `npm run build` / `prepare` 现编，tarball 仍包含 `dist/`）。
+- `dist/` 的 git 跟踪（产物由 `npm run build` / `prepack` 现编，tarball 仍包含 `dist/`）。
 - 文档中「需要 `--allow-scripts`」的表述。
 
 ### Fixed
