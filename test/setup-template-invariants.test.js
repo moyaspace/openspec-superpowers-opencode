@@ -711,3 +711,64 @@ describe('verify artifact records test evidence bound to a commit', () => {
         }
     });
 });
+// apply 指令的描述必须与上游版本解耦：脚本参数、references 清单、章节名都随版本变化。
+// 两份副本（命令文件 + schema.yaml）各断言一次，避免只守一边。
+describe('apply instructions stay version-agnostic (command file + schema)', () => {
+    const applySources = () => [
+        ['opsx-apply.md', readCommand('opsx-apply.md')],
+        ['schema.yaml', fs.readFileSync(TEMPLATE_SCHEMA_PATH, 'utf8')],
+    ];
+
+    it('defers script arguments to each script usage instead of hardcoding them', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('usage'),
+                `${file}: apply instructions must defer script arguments to each script usage`,
+            );
+        }
+        assert.ok(
+            !readCommand('opsx-apply.md').includes('<plan.md 路径>'),
+            'opsx-apply.md: hardcoded <plan.md 路径> argument must be gone',
+        );
+        assert.ok(
+            !fs.readFileSync(TEMPLATE_SCHEMA_PATH, 'utf8').includes('<plan.md 路徑>'),
+            'schema.yaml: hardcoded <plan.md 路徑> argument must be gone',
+        );
+    });
+
+    it('degrades when references/ is absent and stops hard-referencing its files', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(content.includes('references/'), `${file}: must mention references/`);
+            assert.ok(
+                content.includes('不存在'),
+                `${file}: must describe the no-references fallback`,
+            );
+            assert.ok(
+                !content.includes('references/preflight.md'),
+                `${file}: must not hard-reference references/preflight.md`,
+            );
+            assert.ok(
+                !content.includes('references/resuming.md'),
+                `${file}: must not hard-reference references/resuming.md`,
+            );
+        }
+    });
+
+    it('anchors the section-name boundary at 6.2.0', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('6.2.0'),
+                `${file}: must state that Setup / The Task Loop / Final Review start at 6.2.0`,
+            );
+        }
+    });
+
+    it('stops with a diagnosis when a required script is missing', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('STOP') && content.includes('缺失'),
+                `${file}: must STOP on a missing script and report which one`,
+            );
+        }
+    });
+});

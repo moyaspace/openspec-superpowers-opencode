@@ -505,12 +505,12 @@ apply:
          Read：
            {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
 
-         並確認 SDD 的三個腳本存在（此處只確認可訪問，不運行）：
-           {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/task-brief
-           {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package
-           {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/sdd-workspace
+         並確認 SKILL.md 引用的腳本都存在（此處只確認可訪問，不運行）。MUST NOT 寫死腳本名單——
+         不同版本的腳本集合不同（6.0.x 無 `sdd-workspace`，7.0.2 多出 `sdd-repo`），
+         一律以 SKILL.md 實際引用為準。
 
-       如果有任一 Read 失敗、或 v6+ 下任一腳本缺失，STOP 並告知用戶，不要靜默降級。
+       如果有任一 Read 失敗、或有腳本缺失，STOP 並明確輸出：缺哪個腳本、當前 Superpowers 主版本號、
+       以及「請升級 Superpowers 或改用 v5 分支」；不要靜默降級。
 
        同時確認專案所需的 CLI 工具可用。讀取 plan.md 找出所有提到的工具
        （如 `mvn`/`mvnw`、`docker`、`python3`、`node`/`npm` 等）。
@@ -547,13 +547,16 @@ apply:
          MUST NOT 用 `sh` 或 `./` 替代。
        - `scripts/...` 是相對 SDD 技能目錄的路徑，MUST NOT 當作倉庫相對路徑。
 
-       SKILL.md 中的寫法 → apply 階段 MUST 使用的寫法：
+       參數個數與順序 MUST 以腳本自身的 usage 為準，不由本階段規定——不同 Superpowers 版本不同
+       （6.1.x 的 `sdd-workspace` 無參數，6.2.0 起必須 1 個 `PLAN_FILE`）。
+       不確定時先執行 `bash "<腳本絕對路徑>"`（不傳參數），腳本會印出 usage 並以非零碼退出，
+       按提示補齊後重試。MUST NOT 憑記憶猜測參數。
 
-       | SKILL.md 中的寫法 | apply 階段 MUST 使用的寫法 |
+       | 腳本 | apply 階段 MUST 使用的寫法 |
        |---|---|
-       | `bash scripts/sdd-workspace PLAN_FILE` | `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/sdd-workspace" <plan.md 路徑>` |
-       | `bash scripts/task-brief PLAN_FILE N` | `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/task-brief" <plan.md 路徑> <任務序號>` |
-       | `bash scripts/review-package PLAN_FILE BASE HEAD` | `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package" <plan.md 路徑> <BASE> <HEAD>` |
+       | `sdd-workspace` | `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/sdd-workspace" <參數按 usage>` |
+       | `task-brief` | `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/task-brief" <參數按 usage>` |
+       | `review-package` | `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package" <參數按 usage>` |
 
        `bash --version` 失敗 → STOP 並告知用戶安裝 Git for Windows（或等價 bash）後重試；
        MUST NOT 靜默降級成手工拼 prompt。
@@ -630,17 +633,24 @@ apply:
        嚴格按 `{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md` 執行。
        實現與審查是 SDD 同一個循環的兩半，一起交給它，不得拆成兩套自作流程：
 
-       - **Setup**：SKILL.md 的 Setup 段（workspace 用
-         `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/sdd-workspace" <plan.md 路徑>` 取得；
-         ledger 是 workspace 下的 `progress.md`，已存在則先讀 `references/resuming.md`）。
-       - **Pre-flight**：SKILL.md 要求讀的 `references/preflight.md`（含其中的衝突掃描）。
-       - **逐任務**：SKILL.md 的 The Task Loop（§1 dispatch implementer → §2 handle report →
-         §3 review task → §4 fix loop → §5 complete task）。
-       - **收尾**：SKILL.md 的 Final Review（`references/final-review.md`）。
+       下列章節名自 Superpowers 6.2.0 起存在；6.0–6.1 無同名章節，按你實際讀到的 SKILL.md 中
+       對應職責的章節執行。開始執行前 MUST 用一行輸出你映射到的章節。
 
-       MUST 讀取 SKILL.md 指引的每一個 `references/` 文件（v7 共 7 份：`batching.md`、
-       `cannot-verify.md`、`final-review.md`、`fix-loop.md`、`handling-reports.md`、
-       `preflight.md`、`resuming.md`），按其中的規則執行，不得憑記憶替代。
+       - **Setup**：SKILL.md 的 Setup 段（workspace 用
+         `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/sdd-workspace" <參數按 usage>` 取得；
+         ledger 是 workspace 下的 `progress.md`，已存在則先讀它續跑）。
+       - **Pre-flight**：SKILL.md 中負責 pre-flight 的章節（6.2+ 在 `Setup` 前後；
+         6.0–6.1 為 `Pre-Flight Plan Review`），含其中的衝突掃描。
+       - **逐任務**：SKILL.md 的 The Task Loop（6.0–6.1 為 `The Process` +
+         `Handling Implementer Status` + `Handling Reviewer ⚠️ Items`）。
+       - **收尾**：SKILL.md 的 Final Review（6.0–6.1 無該章節，收尾按 `The Process` 末段 +
+         `../requesting-code-review/code-reviewer.md`）。
+
+       MUST 讀完 SKILL.md 指引的每一個文件：
+       - 若 SKILL.md 指向 `references/` 下的文件（Superpowers 7.0.1 起為 7 份），逐個讀完；
+       - 若無 `references/` 目錄（6.x），讀 SKILL.md 全篇 + 它點名的 prompt 模板文件。
+       MUST NOT 因目錄不存在而跳過，也 MUST NOT 憑記憶替代實讀。
+       開始時 MUST 用一行輸出你實際讀取的文件清單。
 
        MUST NOT 用舊的自編排流程替代 SKILL.md。細節一律以 SKILL.md /
        `implementer-prompt.md` / `task-reviewer-prompt.md` / `references/` 為準；
@@ -657,13 +667,13 @@ apply:
 
        審查同樣交給 SDD：本階段不另起一套審查流程，審查者按 SKILL.md §3 派發：
 
-       - 單任務審查 → SKILL.md §3 Review the task：用
-         `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package" <plan.md 路徑> <BASE> <HEAD>`
+       - 單任務審查 → SKILL.md 的 Review the task 環節：用
+         `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package" <參數按 usage>`
          生成 package，再用 `task-reviewer-prompt.md` 填 prompt、按
          `task(subagent_type="oracle", ...)` 派審查者（`BASE` 是實現者派發前記錄的 commit，
          不是 `HEAD~1`）。
-       - 修復 → SKILL.md §4 The fix loop（讀 `references/fix-loop.md`）。
-       - 全分支審查 → SKILL.md 的 Final Review（讀 `references/final-review.md`）。
+       - 修復 → SKILL.md 的 fix loop 環節（7.x 另有 `references/fix-loop.md`，存在則一併讀）。
+       - 全分支審查 → SKILL.md 的 Final Review（7.x 另有 `references/final-review.md`）。
 
        除 SDD 流程之外，OSO 只追加兩條額外約束（MUST）：
 
