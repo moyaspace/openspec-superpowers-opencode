@@ -818,7 +818,7 @@ async function initProject(options: SetupOptions = {}): Promise<ProjectResult> {
         const regResult = await resolveDecision({
             override: (options.env || process.env).BROWN_OVERRIDE_REGISTRY,
             prompt: options.prompt,
-            question: t('oso-change-registry.json 已存在，是否覆写？(y/N):', 'oso-change-registry.json exists. Overwrite? (y/N):'),
+            question: t('oso-change-registry.json 已存在，是否覆写？', 'oso-change-registry.json exists. Overwrite?'),
         });
         overwriteRegistry = regResult === 'yes';
     }

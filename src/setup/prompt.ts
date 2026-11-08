@@ -26,13 +26,19 @@ function normalizeResponse(value: unknown, options: DecisionOptions = {}): Decis
     return normalizeOverride(normalized, options);
 }
 
+function hintFor(allowAsk: boolean | undefined): string {
+    return allowAsk === true ? '(y/n/a)' : '(y/N)';
+}
+
 async function resolveDecision(options: DecisionOptions = {}): Promise<Decision> {
     const normalizedOverride = normalizeOverride(options.override, options);
     if (normalizedOverride) return normalizedOverride;
     if (typeof options.prompt !== 'function') return 'no';
 
+    const question = `${options.question || 'Continue?'} ${hintFor(options.allowAsk)}`;
+
     while (true) {
-        const response = await options.prompt(options.question || 'Continue?');
+        const response = await options.prompt(question);
         const decision = normalizeResponse(response, options);
         if (decision) return decision;
     }

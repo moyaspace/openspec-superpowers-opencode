@@ -28,6 +28,28 @@ describe('setup prompt decisions', () => {
         });
 
         assert.equal(decision, 'yes');
-        assert.deepEqual(prompts, ['Continue?']);
+        assert.deepEqual(prompts, ['Continue? (y/N)']);
+    });
+
+    it('appends the accepted answers to the question', async () => {
+        const prompts = [];
+
+        await resolveDecision({
+            prompt: async question => {
+                prompts.push(question);
+                return 'n';
+            },
+            question: 'Overwrite config.yaml?',
+        });
+        await resolveDecision({
+            prompt: async question => {
+                prompts.push(question);
+                return 'n';
+            },
+            question: 'Overwrite commands?',
+            allowAsk: true,
+        });
+
+        assert.deepEqual(prompts, ['Overwrite config.yaml? (y/N)', 'Overwrite commands? (y/n/a)']);
     });
 });
