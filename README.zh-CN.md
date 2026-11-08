@@ -264,9 +264,9 @@ npm publish                                                 # 发布到 npm
   <img src="https://api.oasig.space/home/logo.webp" alt="OASIG API" width="120">
 </div>
 
-> **OASIG API**（[api.oasig.space](https://api.oasig.space)）是 oso 的合作伙伴，提供兼容 [OI] 协议的 AI API 网关。
+> **OASIG API**（[api.oasig.space](https://api.oasig.space)）是 oso 的合作伙伴，提供兼容 OpenAI 协议的 AI API 网关。
 
-- **兼容 [OI] 协议** —— 换模型只需改一个字符串。
+- **兼容 OpenAI 协议** —— 换模型只需改一个字符串。
 - **按量计费** —— 没有月费，注册即用。
 - **私有 GPU** 助力模型推理。
 - **一个模型，多条通路** —— 请求由多个上游卖家共同承载。
@@ -277,8 +277,8 @@ npm publish                                                 # 发布到 npm
 **三步开始使用：**
 
 1. **创建令牌** —— 在 [api.oasig.space](https://api.oasig.space) 注册并生成 API Key。
-2. **获取 Base URL** —— [OI] 兼容端点：`https://api.oasig.space/v1`
-3. **配置你的工具** —— 把 Base URL 和 Key 填进 [CC]、Cursor、Codex、NextChat 等即可使用。
+2. **获取 Base URL** —— OpenAI 兼容端点：`https://api.oasig.space/v1`
+3. **配置你的工具** —— 把 Base URL 和 Key 填进 Claude、Cursor、Codex、NextChat 等即可使用。
 
 > **妥善保管你的密钥。** 不要把真实 API Key 提交到本仓库或任何仓库 —— 请使用占位符或环境变量。
 
