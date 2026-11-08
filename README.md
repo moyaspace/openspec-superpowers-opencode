@@ -261,6 +261,30 @@ Scan the QR code below to add the maintainer on WeChat with the note **"oso"**, 
 ## Partners
 
 <div align="center">
+  <img src="https://api.oasig.space/home/logo.webp" alt="OASIG API" width="120">
+</div>
+
+> **OASIG API** ([api.oasig.space](https://api.oasig.space)) is a partner of oso, providing an [OI]-compatible AI API gateway.
+
+- **[OI] protocol compatible** — switching models is a one-string change.
+- **Pay as you go** — no monthly fee, usable right after signup.
+- **Private GPUs** power model inference.
+- **One model, multiple routes** — requests are served by many upstream sellers.
+- **Multi-seller LLM support.**
+- **Making models enjoyable for everyone.**
+- **WeChat Pay and Alipay** are supported on both sites.
+
+**Get started in 3 steps:**
+
+1. **Create a token** — Sign up at [api.oasig.space](https://api.oasig.space) and generate an API key.
+2. **Get the Base URL** — [OI]-compatible endpoint: `https://api.oasig.space/v1`
+3. **Configure your tool** — Paste the Base URL and key into [CC], Cursor, Codex, NextChat, etc.
+
+> **Keep your key safe.** Never commit real API keys to this or any repository — use placeholders or environment variables.
+
+---
+
+<div align="center">
   <img src="https://moyaspace.com/home/favicon.png" alt="MoyaAI" width="120">
 </div>
 
