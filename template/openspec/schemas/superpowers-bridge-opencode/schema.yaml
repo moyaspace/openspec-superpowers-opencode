@@ -512,6 +512,18 @@ apply:
        如果有任一 Read 失敗、或有腳本缺失，STOP 並明確輸出：缺哪個腳本、當前 Superpowers 主版本號、
        以及「請升級 Superpowers 或改用 v5 分支」；不要靜默降級。
 
+       **4a-2. MUST 輸出兩行匯報**（供人工驗證與續跑判斷，未輸出即視為 pre-flight 未完成，
+       MUST NOT 進入 Executor）：
+
+       ```text
+       讀取清單：<實際讀取的每一個文件路徑，含或不含 references/ 下的文件>
+       章節映射：<階段> → <SKILL.md 中的實際章節名>
+       ```
+
+       `章節映射` 按你**實際讀到的** SKILL.md 填寫；`Setup` / `The Task Loop` / `Final Review`
+       只在 6.2.0 起存在，6.0–6.1 需映射到 `Pre-Flight Plan Review` / `The Process` /
+       `Handling Implementer Status` 等實際章節。
+
        同時確認專案所需的 CLI 工具可用。讀取 plan.md 找出所有提到的工具
        （如 `mvn`/`mvnw`、`docker`、`python3`、`node`/`npm` 等）。
        若缺少工具，報告 WARNING（不停止）——用戶可能有替代方案。
@@ -634,7 +646,7 @@ apply:
        實現與審查是 SDD 同一個循環的兩半，一起交給它，不得拆成兩套自作流程：
 
        下列章節名自 Superpowers 6.2.0 起存在；6.0–6.1 無同名章節，按你實際讀到的 SKILL.md 中
-       對應職責的章節執行。開始執行前 MUST 用一行輸出你映射到的章節。
+       對應職責的章節執行（用 4a-2 報出的映射）。
 
        - **Setup**：SKILL.md 的 Setup 段（workspace 用
          `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/sdd-workspace" <參數按 usage>` 取得；
@@ -650,7 +662,6 @@ apply:
        - 若 SKILL.md 指向 `references/` 下的文件（Superpowers 7.0.1 起為 7 份），逐個讀完；
        - 若無 `references/` 目錄（6.x），讀 SKILL.md 全篇 + 它點名的 prompt 模板文件。
        MUST NOT 因目錄不存在而跳過，也 MUST NOT 憑記憶替代實讀。
-       開始時 MUST 用一行輸出你實際讀取的文件清單。
 
        MUST NOT 用舊的自編排流程替代 SKILL.md。細節一律以 SKILL.md /
        `implementer-prompt.md` / `task-reviewer-prompt.md` / `references/` 為準；
