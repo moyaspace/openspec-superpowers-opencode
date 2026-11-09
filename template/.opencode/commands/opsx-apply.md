@@ -84,26 +84,6 @@ Read：
 如果有任一 Read 失败、或有脚本缺失，STOP 并明确输出：缺哪个脚本、当前 Superpowers 主版本号、
 以及「请升级 Superpowers 或改用 v5 分支」；不要静默降级。
 
-**4a-2. MUST 把 pre-flight 结果写入文件**（供人工验证与续跑判断；文件不存在或缺少任一节，即视为 pre-flight 未完成，MUST NOT 进入 Step 5）：
-
-写入路径：`.superpowers/sdd/preflight-<change 名>.md`（相对 worktree 根）
-
-```markdown
-# Pre-flight
-
-- Superpowers 版本：<检测到的完整版本号>
-- 读取清单：
-  - <实际读取的每一个文件路径，逐行列出；含 references/ 下的文件则逐个列出>
-- 章节映射：
-  - <阶段名> → <SKILL.md 中的实际章节名>
-  - <阶段名> → <SKILL.md 中的实际章节名>
-```
-
-`章节映射` 按你**实际读到的** SKILL.md 填写；`Setup` / `The Task Loop` / `Final Review` 只在 6.2.0 起存在，
-6.0–6.1 需映射到 `Pre-Flight Plan Review` / `The Process` / `Handling Implementer Status` 等实际章节。
-
-若 `.superpowers/sdd/` 尚不存在：先创建该目录，并在其中写入内容为 `*` 的 `.gitignore`（使该目录不进 git），再写上述文件。
-
 **4b. 确认 plan.md 中提到的工具链（mvn、docker、node 等）可用。**
 
 **4c. 确认 .gitignore 已就绪：**
@@ -199,7 +179,7 @@ task(
 
 严格按 `{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md` 执行。Step 5 与 Step 6 是同一个 SDD 循环的两半，一起交给它，不得拆成两套自作流程：
 
-下列章节名自 Superpowers 6.2.0 起存在；6.0–6.1 无同名章节，按你在 4a-2 报出的实际映射执行。
+下列章节名自 Superpowers 6.2.0 起存在；6.0–6.1 无同名章节，按你实际读到的 SKILL.md 中对应职责的章节执行。
 
 - **Setup**：SKILL.md 的 Setup 段（workspace 用 `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/sdd-workspace" <参数按 usage>` 取得；ledger 是 workspace 下的 `progress.md`，已存在则先读它续跑）。
 - **Pre-flight**：SKILL.md 中负责 pre-flight 的章节（6.2+ 在 `Setup` 前后；6.0–6.1 为 `Pre-Flight Plan Review`），含其中的冲突扫描。
