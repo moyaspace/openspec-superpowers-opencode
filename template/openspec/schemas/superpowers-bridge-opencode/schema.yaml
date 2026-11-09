@@ -512,17 +512,28 @@ apply:
        如果有任一 Read 失敗、或有腳本缺失，STOP 並明確輸出：缺哪個腳本、當前 Superpowers 主版本號、
        以及「請升級 Superpowers 或改用 v5 分支」；不要靜默降級。
 
-       **4a-2. MUST 輸出兩行匯報**（供人工驗證與續跑判斷，未輸出即視為 pre-flight 未完成，
-       MUST NOT 進入 Executor）：
+       **4a-2. MUST 把 pre-flight 結果寫入文件**（供人工驗證與續跑判斷；文件不存在或缺少任一節，
+       即視為 pre-flight 未完成，MUST NOT 進入 Executor）：
 
-       ```text
-       讀取清單：<實際讀取的每一個文件路徑，含或不含 references/ 下的文件>
-       章節映射：<階段> → <SKILL.md 中的實際章節名>
+       寫入路徑：`.superpowers/sdd/preflight-<change 名>.md`（相對 worktree 根）
+
+       ```markdown
+       # Pre-flight
+
+       - Superpowers 版本：<檢測到的完整版本號>
+       - 讀取清單：
+         - <實際讀取的每一個文件路徑，逐行列；含 references/ 下的文件則逐個列出>
+       - 章節映射：
+         - <階段名> → <SKILL.md 中的實際章節名>
+         - <階段名> → <SKILL.md 中的實際章節名>
        ```
 
        `章節映射` 按你**實際讀到的** SKILL.md 填寫；`Setup` / `The Task Loop` / `Final Review`
        只在 6.2.0 起存在，6.0–6.1 需映射到 `Pre-Flight Plan Review` / `The Process` /
        `Handling Implementer Status` 等實際章節。
+
+       若 `.superpowers/sdd/` 尚不存在：先創建該目錄，並在其中寫入內容為 `*` 的 `.gitignore`
+       （使該目錄不進 git），再寫上述文件。
 
        同時確認專案所需的 CLI 工具可用。讀取 plan.md 找出所有提到的工具
        （如 `mvn`/`mvnw`、`docker`、`python3`、`node`/`npm` 等）。
