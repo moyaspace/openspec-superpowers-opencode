@@ -683,7 +683,12 @@ apply:
 
     4. **Verification**：所有任務完成後，在 worktree 中執行驗證：
 
-       執行 `openspec status --change <name> --json`，確認所有 artifacts 已完成。
+       執行 `openspec status --change <name> --json`，只看 apply 階段該交付的部分：
+       `tasks` 與 `plan` MUST 為 `done`（也可直接讀 `applyRequires` 欄位）。
+
+       `verify` 與 `retrospective` 屬後續階段，此時**必然未完成**，`isComplete` 因此必然為
+       `false` —— 這是正常的。MUST NOT 因為 `isComplete: false` 就在本階段補寫這兩個
+       artifact，也不要嘗試「補完」。
 
     5. **Commit**：在 worktree 中提交所有變更：
 

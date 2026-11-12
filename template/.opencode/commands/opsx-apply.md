@@ -241,7 +241,10 @@ Read：
 openspec status --change "<name>" --json
 ```
 
-确认所有 artifacts 已完成。如果有未完成的，按提示补充。
+只看 apply 阶段该交付的部分：`tasks` 与 `plan` 必须为 `done`（也可直接读 `applyRequires` 字段）。
+
+`verify` 与 `retrospective` 属于后续阶段，此时**必然未完成**，`isComplete` 因此必然为 `false` —— 这是正常的。
+MUST NOT 因为 `isComplete: false` 就在本阶段补写这两个 artifact，也不要尝试「补完」。
 
 ### Step 8: 在 worktree 中提交变更
 
