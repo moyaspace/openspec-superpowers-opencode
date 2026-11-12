@@ -198,6 +198,14 @@ pre-flight 扫描发现的冲突或缺口，若某条 MUST 可测、且补测试
 
 先检测 Superpowers 版本，然后按对应版本流程执行。
 
+**派发前分诊（MUST）**：逐个检查 plan task 的 `**Covers:**`。
+
+- **全部命中纯验证项** → **不派发**。该 task 的验收项由本命令在 Step 7 / Step 8 亲自执行并勾选；plan 里不该存在这种 task，若遇到说明 plan 生成有缺陷，照此处理并在 `## Decisions` 记录。
+- **部分命中** → 代码部分派发，验证部分留给 Step 7。
+- **不含纯验证项** → 正常派发。
+
+判断错误时不要绕过：`review-package` 报 `empty commit range` 这类「范围为空」的错误，说明派出去的对象没有产生任何变更。MUST 回头核对这条 task 的 `**Covers:**` 是否全部属于纯验证项，重新判断该不该派发；MUST NOT 自行编造审查内容把审查走完。
+
 **Superpowers v5 流程：**
 
 Read：

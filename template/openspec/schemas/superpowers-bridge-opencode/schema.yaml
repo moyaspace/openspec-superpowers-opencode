@@ -208,6 +208,9 @@ artifacts:
          它们不属于任何 task 的交付物，由 apply 执行到该验证时自行勾选。
        - 写完 plan 后 MUST 核对一遍：tasks.md 中每个非纯验证条目都至少被一个 task 的
          `Covers:` 覆盖；有条目无人认领时，先修正 task 边界或补 task，再输出 plan。
+       - **task 类型自检**：每个 task 的 `Covers:` 中 MUST 至少有一项不是纯验证项。
+         若某 task 的 `Covers:` 全部是纯验证项，MUST 删除该 task —— 那些验收项留在 tasks.md 中，
+         由 apply 在验证阶段执行并勾选，不需要、也不允许为它们单独建一个 task。
        - `Covers:` 是覆盖索引与定位依据，不改变 task 的划分；MUST NOT 为了凑编号而拆 task。
 
        **RED 步骤的自证（MUST）**
@@ -679,6 +682,18 @@ apply:
        > 「优先级语义补多候选用例」两条为本桥接补充，上游无对应原文。
 
     3. **Executor — 实现与审查**：
+
+       **派发前分诊（MUST）**：逐个检查 plan task 的 `**Covers:**`。
+
+       - **全部命中纯验证项** → **不派发**。该 task 的验收项由本命令在 Verification /
+         Commit 阶段亲自执行并勾选；plan 里不该存在这种 task，若遇到说明 plan 生成有缺陷，
+         照此处理并在 `## Decisions` 记录。
+       - **部分命中** → 代码部分派发，验证部分留给 Verification 阶段。
+       - **不含纯验证项** → 正常派发。
+
+       判断错误时不要绕过：`review-package` 报 `empty commit range` 这类「范围为空」的错误，
+       说明派出去的对象没有产生任何变更。MUST 回头核对这条 task 的 `**Covers:**` 是否全部属于
+       纯验证项，重新判断该不该派发；MUST NOT 自行编造审查内容把审查走完。
 
        **Superpowers v5：**
 
