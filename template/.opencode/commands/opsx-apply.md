@@ -160,7 +160,11 @@ Read：
   {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
   {{SUPERPOWERS_BASE_PATH}}test-driven-development/SKILL.md
 
-对 plan.md 中的每个微任务：
+对 plan.md 中的每个 **task** 执行（task 是派发与审查的单位；step 是实现者内部的执行方法，不单独派发）：
+
+> 若 plan 中存在「同一类小改动重复多次」的任务（同一行修复、常量变更、字段新增等），MUST NOT 逐个派发：
+> 合并为一次派发、一次 diff 评审（Superpowers 7.0.1 起 `subagent-driven-development/references/batching.md` 有此规定；
+> 更早版本按同一原则处理）。只有需要独立判断、独立测试或独立评审面的工作，才单独派发。
 1. 使用 implementer-prompt.md 模板构造基础 prompt
 2. 从 TDD SKILL.md 中提取 RED-GREEN-REFACTOR 流程、铁律作为 prompt 的前置指令
 3. 通过 `task()` 派 Agent 实现（load_skills=[]，TDD 通过 prompt 嵌入传递）：

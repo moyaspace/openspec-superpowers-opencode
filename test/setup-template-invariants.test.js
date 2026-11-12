@@ -772,3 +772,49 @@ describe('apply instructions stay version-agnostic (command file + schema)', () 
         }
     });
 });
+
+// 任务粒度与派发单位:plan 的 task 必须自带测试周期、以 commit 收尾,且不得用时间/行数界定;
+// 同一类小改动必须合并派发(上游 batching.md)。见 backlog BUG030。
+describe('plan task unit stays commit-aligned (command file + schema)', () => {
+    const schemaText = () => fs.readFileSync(TEMPLATE_SCHEMA_PATH, 'utf8');
+
+    it('keeps the upstream Task Right-Sizing criterion in the plan instruction', () => {
+        const content = schemaText();
+        assert.ok(
+            content.includes('Task Right-Sizing'),
+            'schema.yaml: plan instruction must carry the upstream Task Right-Sizing criterion',
+        );
+        assert.ok(
+            content.includes('worth a fresh reviewer') || content.includes('worth\n       a fresh reviewer'),
+            'schema.yaml: Task Right-Sizing text must be quoted, not paraphrased',
+        );
+    });
+
+    it('drops the invented time and micro-step granularity rule', () => {
+        const content = schemaText();
+        assert.ok(
+            !content.includes('2-5 minute'),
+            'schema.yaml: the 2-5 minute rule must be gone (upstream removed it in v6.4.2)',
+        );
+        assert.ok(
+            !content.includes('micro-steps'),
+            'schema.yaml: tasks must not be described as micro-steps',
+        );
+    });
+
+    it('dispatches and reviews per task, not per micro-task', () => {
+        const command = readCommand('opsx-apply.md');
+        assert.ok(
+            command.includes('batching.md'),
+            'opsx-apply.md: must reference the upstream batching rule for same-shape small work',
+        );
+        assert.ok(
+            !command.includes('每个微任务'),
+            'opsx-apply.md: must dispatch per task, not per micro-task',
+        );
+        assert.ok(
+            !schemaText().includes('每個微任務'),
+            'schema.yaml: must dispatch per task, not per micro-task',
+        );
+    });
+});

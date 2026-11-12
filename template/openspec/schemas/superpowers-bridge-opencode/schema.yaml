@@ -166,13 +166,34 @@ artifacts:
 
       The writing-plans skill will:
       1. Read the tasks.md and design.md for context
-      2. Break each task into 2-5 minute micro-steps (TDD style)
+       2. Break each task into steps that each have a checkable result
       3. Include exact file paths, code snippets, test commands
       4. Add commit points after each task
 
       Pass the tasks.md content to the skill as the input for
       decomposition. The plan should reference the specs and
       design artifacts in this change directory.
+
+       **任務 vs 步驟（必要區分，MUST）**
+
+       - **task** 是派發與審查的單位：一個 task = 一次 subagent 派發 + 至少一個 commit + 一次 diff 審查。
+       - **step** 是 task 內部的執行方法（寫失敗的測試 → 跑它 → 實現 → 跑測試 → 提交），不佔 plan 的頂層編號。
+       - MUST NOT 把 step 當成 task，也 MUST NOT 用時間長度界定 task 粒度（上游自 v6.4.2 起已移除時間單位）。
+
+       **task 邊界判據（照抄上游 writing-plans 的 Task Right-Sizing，MUST）**
+
+       A task is the smallest unit that carries its own test cycle and is worth
+       a fresh reviewer's gate. When drawing task boundaries: fold setup,
+       configuration, scaffolding, and documentation steps into the task whose
+       deliverable needs them; split only where a reviewer could meaningfully
+       reject one task while approving its neighbor. Each task ends with an
+       independently testable deliverable.
+
+       因此：
+
+       - 每個 task MUST 以至少一個 commit 結束（沒有 commit 就沒有可審的 diff）；
+       - MUST NOT 出現「純驗證」「純補測試」這類不產生變更的 task —— 驗收寫進所屬 task 的完成條件；
+       - task MUST NOT 包含對其範圍外既有檔案的刪除 / 覆蓋 / 移動；確需變更環境時 MUST 停下來報告，由用戶決定。
     requires:
       - tasks
 
@@ -592,7 +613,11 @@ apply:
 
        **Superpowers v5：**
 
-      從 plan.md 中提取每個微任務，對每個任務調用子 Agent：
+       對 plan.md 中的每個 **task** 執行（task 是派發與審查的單位；step 是實現者內部的執行方法，不單獨派發）：
+
+       > 若 plan 中存在「同類小改動重複多次」的任務（同一行修復、常量變更、欄位新增等），MUST NOT 逐個派發：
+       > 合併為一次派發、一次 diff 評審（Superpowers 7.0.1 起 `subagent-driven-development/references/batching.md`
+       > 有此規定；更早版本按同一原則處理）。只有需要獨立判斷、獨立測試或獨立評審面的工作，才單獨派發。
 
       a) 讀取 implementer-prompt.md 模板，按模板構造 prompt：
          模板路徑：
