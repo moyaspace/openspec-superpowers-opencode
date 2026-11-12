@@ -276,12 +276,19 @@ describe('opsx-apply.md detects an existing worktree before creating one', () =>
 });
 
 describe('opsx-apply.md delegates the v6+ branch to upstream SDD', () => {
-    it('dispatches implementers with the OMO task() syntax', () => {
+    it('dispatches implementers with the OmO task() syntax', () => {
         const content = readCommand('opsx-apply.md');
         assert.ok(
-            content.includes('task(category="deep"'),
-            'opsx-apply.md: delegation must dispatch via task(category="deep"',
+            content.includes('task(category='),
+            'opsx-apply.md: delegation must dispatch via task(category=...',
         );
+        assert.ok(
+            !content.includes('category="deep"'),
+            'opsx-apply.md: category must come from the tier table, not be hardcoded',
+        );
+        for (const tier of ['`quick`', '`deep`', '`ultrabrain`', '实现者档位']) {
+            assert.ok(content.includes(tier), `opsx-apply.md: tier table must mention ${tier}`);
+        }
     });
 
     it('forbids copying the [CC] Subagent syntax', () => {
@@ -320,7 +327,7 @@ describe('opsx-apply.md delegates the v6+ branch to upstream SDD', () => {
             step45 < step5,
             'opsx-apply.md: Step 4.5 must precede Step 5 so the mapping is read before dispatch',
         );
-        for (const section of ['bash 调用写法', 'SDD → OMO 语法映射', 'tasks.md 勾选契约']) {
+        for (const section of ['bash 调用写法', 'SDD → OmO 语法映射', 'tasks.md 勾选契约']) {
             assert.ok(
                 content.includes(section),
                 `opsx-apply.md: Step 4.5 must keep the "${section}" section`,
@@ -343,7 +350,7 @@ describe('opsx-apply.md delegates the v6+ branch to upstream SDD', () => {
         );
     });
 
-    it('defines the CC / OMO abbreviations where they are first used', () => {
+    it('defines the CC / OmO abbreviations where they are first used', () => {
         const content = readCommand('opsx-apply.md');
         assert.ok(
             !content.includes('[CC]'),
@@ -351,8 +358,8 @@ describe('opsx-apply.md delegates the v6+ branch to upstream SDD', () => {
                 + 'write Claude Code（下称 CC） instead',
         );
         assert.ok(
-            content.includes('Claude Code（下称 CC）') && content.includes('Oh My OpenCode（下称 OMO）'),
-            'opsx-apply.md must define Claude Code（下称 CC） and Oh My OpenCode（下称 OMO） '
+            content.includes('Claude Code（下称 CC）') && content.includes('oh-my-openagent（下称 OmO）'),
+            'opsx-apply.md must define Claude Code（下称 CC） and oh-my-openagent（下称 OmO） '
                 + 'before the mapping table uses them',
         );
     });

@@ -194,6 +194,9 @@ artifacts:
        - 每個 task MUST 以至少一個 commit 結束（沒有 commit 就沒有可審的 diff）；
        - MUST NOT 出現「純驗證」「純補測試」這類不產生變更的 task —— 驗收寫進所屬 task 的完成條件；
        - task MUST NOT 包含對其範圍外既有檔案的刪除 / 覆蓋 / 移動；確需變更環境時 MUST 停下來報告，由用戶決定。
+       - **粒度下限**：task MUST 大到值得一個獨立審查者把關。若其實現小到審查者的結論只能是「沒問題」，
+         MUST 並進相鄰 task，不單獨成 task。與 batching 分工：batching 管「已拆開的同形態小改動
+         合併派發」，本條管「一開始就別拆這麼小」。
 
        **task → tasks.md 覆蓋聲明（`Covers:`，MUST）**
 
@@ -206,6 +209,12 @@ artifacts:
        - 寫完 plan 後 MUST 核對一遍：tasks.md 中每個非純驗證條目都至少被一個 task 的
          `Covers:` 覆蓋；有條目無人認領時，先修正 task 邊界或補 task，再輸出 plan。
        - `Covers:` 是覆蓋索引與定位依據，不改變 task 的劃分；MUST NOT 為了湊編號而拆 task。
+
+       **RED 步驟的自證（MUST）**
+
+       計劃中任何標註 RED（預期失敗）的步驟，MUST 同時寫明如何確認測試已被 runner 發現
+       （例如輸出含 `tests >= 1`）。若得到 `tests 0` 且退出碼 0，RED 無效，
+       先修發現機制（路徑 / 命名 / 配置）再重走。
     requires:
       - tasks
 
@@ -564,7 +573,7 @@ apply:
     2. **v6+ 委託契約（四節，MUST / MUST NOT）**：
 
       下面四節只對 **v6+ 分支**生效，是硬約束，不是參考資料。SKILL.md 裡的命令與派發語法
-      都按 **Claude Code（下稱 CC）** 側寫，落到 **Oh My OpenCode（下稱 OMO）** 必須按本節改寫；v5 分支不受本節影響。
+      都按 **Claude Code（下稱 CC）** 側寫，落到 **oh-my-openagent（下稱 OmO）** 必須按本節改寫；v5 分支不受本節影響。
       本節必須在 Executor 之前讀完，否則會先照抄 **CC** 語法。
 
        **① bash 調用寫法（MUST）**
@@ -593,19 +602,42 @@ apply:
        `bash --version` 失敗 → STOP 並告知用戶安裝 Git for Windows（或等價 bash）後重試；
        MUST NOT 靜默降級成手工拼 prompt。
 
-       **② SDD → OMO 語法映射（MUST）**
+       **② SDD → OmO 語法映射（MUST）**
 
-      SKILL.md 用 **Claude Code（CC）** 的 Subagent 語義描述派發。在 **Oh My OpenCode（OMO）** 中 MUST 按下表改寫，
+      SKILL.md 用 **Claude Code（CC）** 的 Subagent 語義描述派發。在 **oh-my-openagent（OmO）** 中 MUST 按下表改寫，
       MUST NOT 照抄 `Subagent (general-purpose)` 一類語法：
 
-       | SDD 寫法 | OMO MUST 寫法 | 說明 |
+       | SDD 寫法 | OmO MUST 寫法 | 說明 |
        |---|---|---|
-       | `Subagent (general-purpose)` | 實現者：`task(category="deep", load_skills=[], description="<任務名>", prompt="<prompt>")` | `description` 必填；`category="deep"` 只用於**實現者** |
-       | Subagent 承擔審查角色（task reviewer） | 審查者：`task(subagent_type="oracle", description="<審查名>", prompt="<prompt>")` | 與本倉庫既有約定一致（v5 分支同樣用 `oracle`）；MUST NOT 用 `category="deep"` 派審查者 |
-       | 按任務複雜度選 `model`（SKILL.md 的 Model Selection） | **不寫** `model` 參數 | 檔位固定 `deep`，本橋接不按複雜度分檔 |
-       | 後台派發 | `run_in_background=true` | 結果用 `background_output(task_id="bg_...")` 收取，不要短超時輪詢 |
+       | `Subagent (general-purpose)` | 實現者：`task(category=<按下表選>, load_skills=[], description="<任務名>", prompt="<prompt>")` | `description` 必填；`category` MUST 顯式指定，不得省略（省略會繼承會話預設模型）；只用於**實現者** |
+       | Subagent 承擔審查角色（task reviewer） | 審查者：`task(subagent_type="oracle", description="<審查名>", prompt="<prompt>")` | 與本倉庫既有約定一致（v5 分支同樣用 `oracle`）；MUST NOT 用 `category` 派審查者 |
+       | 按任務複雜度選 `model`（SKILL.md 的 Model Selection） | **不寫** `model` 參數 | 檔位由下方「實現者檔位」表決定；MUST NOT 寫 `model` 參數 |
+       | 異步派發（一律） | `run_in_background=true` | 結果用 `background_output(task_id="bg_...")` 收取，不要短超時輪詢。不要為了少一步往返改成同步：同步會阻塞主會話，用戶在等待期間無法插話 |
        | 續跑同一個子 Agent（fix loop 前 3 輪、補充上下文） | `task(..., task_id="ses_...")` | 首次派發返回的 `ses_...` 會話 ID 要記下；續跑 MUST 帶上它，不得另起新 Agent 重來 |
        | `load_skills=["test-driven-development"]` 之類 | **MUST NOT 依賴**，一律 `load_skills=[]` | `load_skills` 只接受已註冊的 skill ID；Superpowers 的 skill 是檔案系統上的 `.md`，不是註冊技能，傳進去會被**靜默忽略**（不報錯、不生效） |
+
+       **實現者檔位（MUST，只按 plan 裡讀得到的客觀信號，不估計時長）**
+
+       | plan 的形態 | category |
+       |---|---|
+       | 計劃裡已含完整代碼，實現等於照著抄 + 跑測試；或只碰 1–2 個文件且規格完整 | `quick` |
+       | 要改多個文件，且它們彼此牽連（改簽名、加欄位、接新模組），但做法計劃裡已寫明 | `deep` |
+       | 計劃沒定方案，實現者必須自行決定方案、模組邊界或資料結構；或實現者必須先理解大片代碼庫才能動手 | `ultrabrain` |
+
+       > 判據出自 Superpowers `subagent-driven-development/SKILL.md` 的 Model Selection：
+       > `Touches 1-2 files with a complete spec` / `Touches multiple files with integration concerns` /
+       > `Requires design judgment or broad codebase understanding`。
+       > 上游按模型能力分三檔，本橋接按 OmO 的 category 映射，語義一一對應。
+
+       **等待已派發的子代理**：不要用短超時輪詢，也不要無聲地無限等。等待期間有本地工作
+       （更新 ledger、打包下一個審查、讀報告）就繼續做，子代理的結果會自己到；
+       確實無事可做時分段等待（5–10 分鐘一段），段間報一行狀態並清點活躍子代理。
+       MUST NOT 並行派發多個實現者（會衝突）。
+
+       > 出自 Superpowers `subagent-driven-development/SKILL.md` §Waiting on dispatched subagents：
+       > `never poll a wait interface with short timeouts, and never sit in one silent, open-ended wait either`
+       > `When you are genuinely idle, wait in bounded stretches (five to ten minutes, where your platform allows), and between stretches post one line of status`
+       > `Never dispatch multiple implementation subagents in parallel (conflicts).`
 
        Superpowers skill 的唯一正確傳遞方式：`Read` 該 `.md` 文件，把內容（或其要求）
        直接嵌進 `prompt`，或讓子 Agent 自己去 `Read` 指定路徑。
@@ -642,6 +674,10 @@ apply:
 
        每條裁決 MUST 寫明：決定、理由、判斷錯誤時的代價。
 
+       > 裁決格式出自 Superpowers `subagent-driven-development/SKILL.md` §Rulings, not stalls：
+       > `Ruling: <what you decided> — <why> — <what it costs if wrong>`。「可測 MUST 當場補」與
+       > 「優先級語義補多候選用例」兩條為本橋接補充，上游無對應原文。
+
     3. **Executor — 實現與審查**：
 
        **Superpowers v5：**
@@ -666,7 +702,7 @@ apply:
 
          然後使用 task() 調用子 Agent 執行任務（load_skills=[]，純 prompt 驅動）：
             task(
-              category="deep",
+              category="<按 2.② 的檔位表選>",
               load_skills=[],
               description="實現 <任務名>",
               prompt="<TDD 前置指令 + 模板填充的內容>",
@@ -711,7 +747,7 @@ apply:
 
        MUST NOT 用舊的自編排流程替代 SKILL.md。細節一律以 SKILL.md /
        `implementer-prompt.md` / `task-reviewer-prompt.md` / `references/` 為準；
-       本階段只補兩處 SKILL.md 沒寫明的 OMO 落地口徑 —— 腳本的 bash 調用形態（見 2.①）
+       本階段只補兩處 SKILL.md 沒寫明的 OmO 落地口徑 —— 腳本的 bash 調用形態（見 2.①）
        與 `BASE` 的記錄口徑（見下）。以下內容不在本節重述：
 
        - implementer / task reviewer 的 prompt 怎麼填（含 TDD 指令怎麼進入 prompt ——
@@ -719,8 +755,8 @@ apply:
        - fix loop 的輪次上限、BLOCKED / NEEDS_CONTEXT / DONE_WITH_CONCERNS 的處置、
          斷點續跑規則。
 
-       派發語法 MUST 按 2.② 的「SDD → OMO 語法映射」改寫：`task(category="deep", load_skills=[])`，
-       不寫 `model` 參數，後台派發加 `run_in_background=true`，續跑帶 `task_id="ses_..."`。
+       派發語法 MUST 按 2.② 的「SDD → OmO 語法映射」改寫：`task(category=<按檔位表選>, load_skills=[])`，
+       不寫 `model` 參數，一律異步派發加 `run_in_background=true`，續跑帶 `task_id="ses_..."`。
 
        審查同樣交給 SDD：本階段不另起一套審查流程，審查者按 SKILL.md §3 派發：
 
@@ -732,12 +768,16 @@ apply:
        - 修復 → SKILL.md 的 fix loop 環節（7.x 另有 `references/fix-loop.md`，存在則一併讀）。
        - 全分支審查 → SKILL.md 的 Final Review（7.x 另有 `references/final-review.md`）。
 
-       除 SDD 流程之外，OSO 只追加兩條額外約束（MUST）：
+       除 SDD 流程之外，OSO 只追加三條額外約束（MUST）：
 
-      1. 實現者 report 中 `status = DONE` 的任務，控制方 MUST 在
-         `openspec/changes/<name>/tasks.md` 勾選對應 checkbox（見 2.③）；其它狀態不勾。
-       2. MUST NOT 修改 `openspec/schemas/` 下任何文件與 `openspec/config.yaml`；
-          確實需要改 → STOP 並上報，交由用戶處理，不得自行改動。
+       1. 實現者 report 中 `status = DONE` 的任務，控制方 MUST 在
+          `openspec/changes/<name>/tasks.md` 勾選對應 checkbox（見 2.③）；其它狀態不勾。
+       2. MUST NOT 修改 `openspec/schemas/` 下任何文件與 `openspec/config.yaml`。
+          發現確需修改時，STOP 並向 OSO 維護者（oso 倉庫 / npm 包作者）報告：
+          說明哪個文件、哪一段、為什麼模板本身需要改。執行階段不得改動這些文件。
+       3. 審查者報告只採信結構化區塊（Spec Compliance / Issues / Assessment 等）；
+          正文前的過程敘述一律忽略，不據此下結論。缺必需 section 時才用同一 `task_id`
+          要求重發；僅有過程敘述不觸發重發。
 
     4. **Verification**：所有任務完成後，在 worktree 中執行驗證：
 
@@ -749,13 +789,28 @@ apply:
        artifact，也不要嘗試「補完」。
 
        此外，控制方 MUST 在 worktree 內**獨立執行** plan 中約定的測試命令，記錄命令、
-       退出碼與彙總行。實現者報告裡的「測試通過」只作線索，不作證據。
+       退出碼與彙總行中的**測試數量**。數量與 plan 聲明不一致時，MUST 先自查原因
+       （用例被跳過、plan 計數口徑不同等）：能解釋則繼續並記入 `## Unverified`，
+       查不出原因才停下報告。`tests 0` 且退出碼 0 屬假 RED，MUST 停下。
+       實現者報告裡的「測試通過」只作線索，不作證據。
+
+       > 「測試通過即證明在測已有行為」出自 Superpowers `test-driven-development/SKILL.md` §Verify RED - Watch It Fail：
+       > `Test passes? You're testing existing behavior. Fix test.` / `Test errors? Fix error, re-run until it fails correctly.`
+       > 「`tests 0` 且退出碼 0 屬假 RED」與「獨立複跑、數量核對」為本橋接補充，上游無對應原文。
 
     5. **Commit**：提交前，若本次 apply 在 SDD ledger 中產生了 `Ruling:`、deferred Minor
        或 ⚠️ 消解記錄，MUST 把要點抄進 `openspec/changes/<name>/tasks.md` 末尾三節
        （`## Decisions` / `## Deferred` / `## Unverified`），一節一條、寫明理由；
        無記錄時留 `—`。這些內容隨 change 歸檔，SDD workspace 刪除後仍可追溯。
-       然後在 worktree 中提交所有變更：
+       若本次 apply 修改了 `plan.md` 或 `specs/**`：
+       - 只允許兩類改動：**事實錯誤**（版本號、命令寫法等）與**範圍措辭**（驗收場景的表述邊界）。
+         MUST NOT 改驗收斷言、需求範圍或行為約定；確需改這類內容 → STOP 並上報用戶。
+       - MUST **獨立提交**：先提交這些文件，再提交其餘（含 tasks.md 的勾選與三節），兩筆分開。
+       - 該提交的 message MUST 寫明：改了哪個 artifact、舊值 → 新值、為什麼。
+       - 預設不需要複審。若改動觸及驗收斷言或需求範圍（正常情況下應已被上一條攔下），
+         MUST 先做一次 scoped re-review：`review-package` → `task-reviewer-prompt.md` →
+         `task(subagent_type="oracle", ...)`，結論記入 `## Decisions` 後再提交。
+       然後在 worktree 中提交其餘變更：
 
        ```bash
        git add -A && git commit -m "<name>: <描述>"
