@@ -818,3 +818,59 @@ describe('plan task unit stays commit-aligned (command file + schema)', () => {
         );
     });
 });
+
+// 勾选契约(GAP020): plan 的 task 用 Covers 声明覆盖的 tasks.md checkbox, apply 据此定位;
+// 勾选依据是实际执行证据,声明只用于加速。只锁结构,不锁处置措辞,避免把规则写死。
+describe('tasks.md tick contract is evidence-driven and Covers-indexed (command file + schema)', () => {
+    const tickSources = () => [
+        ['opsx-apply.md', readCommand('opsx-apply.md')],
+        ['schema.yaml', fs.readFileSync(TEMPLATE_SCHEMA_PATH, 'utf8')],
+    ];
+
+    it('declares a Covers field in the plan template', () => {
+        const planTemplate = fs.readFileSync(
+            path.join(path.dirname(TEMPLATE_SCHEMA_PATH), 'templates', 'plan.md'),
+            'utf8',
+        );
+        assert.ok(
+            planTemplate.includes('**Covers:**'),
+            'plan.md template: each task must declare **Covers:**',
+        );
+    });
+
+    it('asks the plan phase to emit Covers and keep pure-verification items out', () => {
+        const content = fs.readFileSync(TEMPLATE_SCHEMA_PATH, 'utf8');
+        assert.ok(content.includes('Covers:'), 'schema.yaml: plan instruction must require Covers');
+        assert.ok(
+            /純驗證型條目|纯验证型条目/.test(content),
+            'schema.yaml: pure-verification items must be excluded from Covers',
+        );
+    });
+
+    it('makes actual execution evidence the tick criterion', () => {
+        for (const [file, content] of tickSources()) {
+            assert.ok(content.includes('Covers:'), `${file}: tick contract must mention Covers`);
+            assert.ok(
+                /以實際執行證據為準|以实际执行证据为准/.test(content),
+                `${file}: tick contract must make execution evidence authoritative`,
+            );
+            assert.ok(
+                content.includes('不是 1:1'),
+                `${file}: tick contract must state plan tasks and checkboxes are not 1:1`,
+            );
+        }
+    });
+
+    it('keeps unresolved items visible instead of blocking the run', () => {
+        for (const [file, content] of tickSources()) {
+            assert.ok(
+                /寧可少勾|宁可少勾/.test(content),
+                `${file}: unresolved checkboxes must stay unticked and be reported`,
+            );
+            assert.ok(
+                /憑現有資訊無法判斷|凭现有信息无法判断/.test(content),
+                `${file}: must only ask the user when facts are unavailable`,
+            );
+        }
+    });
+});

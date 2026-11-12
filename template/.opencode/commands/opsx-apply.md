@@ -46,10 +46,16 @@ description: Implement tasks from an OpenSpec change in existing worktree (Exper
 git worktree list
 ```
 
-- **输出含 `.worktrees/<name>`** → `cd .worktrees/<name>`
-- **输出不含** → 从**项目根**执行 `openspec-superpowers-opencode ensure-worktree <name>`，再 `cd .worktrees/<name>`
+- **输出含 `.worktrees/<name>`** → 跳过创建
+- **输出不含** → 从**项目根**执行 `openspec-superpowers-opencode ensure-worktree <name>`
 
 **MUST NOT** 在 `git worktree list` 已列出目标时再调用 `ensure-worktree`。
+
+进入 worktree：
+
+```bash
+cd .worktrees/<name> || { echo "STOP: cd 失败"; exit 1; }
+```
 
 ### Step 3: 读取 schema apply 指令
 
@@ -100,9 +106,9 @@ Read：
 
 **原则：先写 .gitignore，再跑 install/build。避免产物被误提交。**
 
-### Step 4.5: v6+ 委托契约（三节，MUST / MUST NOT）
+### Step 4.5: v6+ 委托契约（四节，MUST / MUST NOT）
 
-下面三节只对 **v6+ 分支**生效，是硬约束，不是参考资料。SKILL.md 里的命令与派发语法都按 **Claude Code（下称 CC）** 侧写，落到 **Oh My OpenCode（下称 OMO）** 必须按本节改写；v5 分支不受本节影响。
+下面四节只对 **v6+ 分支**生效，是硬约束，不是参考资料。SKILL.md 里的命令与派发语法都按 **Claude Code（下称 CC）** 侧写，落到 **Oh My OpenCode（下称 OMO）** 必须按本节改写；v5 分支不受本节影响。
 
 **① bash 调用写法（MUST）**
 
@@ -136,7 +142,7 @@ SKILL.md 用 **Claude Code（CC）** 的 Subagent 语义描述派发。在 **Oh 
 |---|---|---|
 | `Subagent (general-purpose)` | 实现者：`task(category="deep", load_skills=[], description="<任务名>", prompt="<prompt>")` | `description` 必填；`category="deep"` 只用于**实现者** |
 | Subagent 承担审查角色（task reviewer） | 审查者：`task(subagent_type="oracle", description="<审查名>", prompt="<prompt>")` | 与本仓库既有约定一致（v5 分支同样用 `oracle`）；MUST NOT 用 `category="deep"` 派审查者 |
-| 按任务复杂度选 `model`（SKILL.md 的 Model Selection） | **不写** `model` 参数 | 模型由 `category` 隐含；SKILL.md 的「机械任务用便宜模型 / 架构任务用最强模型」→ 选对应 `category`，不写模型名 |
+| 按任务复杂度选 `model`（SKILL.md 的 Model Selection） | **不写** `model` 参数 | 档位固定 `deep`，本桥接不按复杂度分档 |
 | 后台派发 | `run_in_background=true` | 结果用 `background_output(task_id="bg_...")` 收取，不要短超时轮询 |
 | 续跑同一个子 Agent（fix loop 前 3 轮、补充上下文） | `task(..., task_id="ses_...")` | 首次派发返回的 `ses_...` 会话 ID 要记下；续跑 MUST 带上它，不得另起新 Agent 重来 |
 | `load_skills=["test-driven-development"]` 之类 | **MUST NOT 依赖**，一律 `load_skills=[]` | `load_skills` 只接受已注册的 skill ID；Superpowers 的 skill 是文件系统上的 `.md`，不是注册技能，传进去会被**静默忽略**（不报错、不生效） |
@@ -145,10 +151,24 @@ Superpowers skill 的唯一正确传递方式：`Read` 该 `.md` 文件，把内
 
 **③ tasks.md 勾选契约（MUST）**
 
+**勾选依据是实际执行证据，不是 plan 的声明。**
+
 - 实现者 report 中 `status = DONE` 的任务，控制方 MUST 在 `openspec/changes/<name>/tasks.md` 勾选对应 checkbox（`- [ ]` → `- [x]`）。SDD 只维护自己的 ledger 与 todo，不会写 OpenSpec 的 tasks.md，这一条只能由本命令补上。
+- plan task 与 checkbox **不是 1:1**：task 是派发与审查单位，checkbox 是验收点，数量与顺序都不保证对应。用 task 的 `**Covers:**` 声明快速定位；声明与实际不符时 MUST 以实际执行证据为准，并如实记录偏离，不得因声明对不上而中断流程。
+- **纯验证项**（`openspec validate`、工作区干净、全量测试）不由任何 plan task 代勾；由本命令在实际执行到该验证时勾选（如 Step 7 / Step 8）。未执行不得勾选。
+- 无法确定某 checkbox 是否已完成时 MUST NOT 勾选，并在完成结果中列出待确认项 —— 宁可少勾（可见），不可错勾（不可见）。
 - 其它状态（`DONE_WITH_CONCERNS` / `NEEDS_CONTEXT` / `BLOCKED`）MUST NOT 勾选。
 - MUST 逐条勾选，不得批量把所有 checkbox 一次勾完；审查回退的任务 MUST 改回未勾选。
 - 未真正执行的验收项（测试、构建、手工验证）MUST 记为「未验」，MUST NOT 写成通过。
+- 只有当**凭现有信息无法判断**某个 checkbox 的完成状态时才询问用户；有事实依据的分歧 MUST 自行按证据处理，不把判断推回给用户。
+
+**④ 冲突与缺口的裁决（MUST）**
+
+pre-flight 扫描发现的冲突或缺口，若某条 MUST 可测、且补测试的成本低（不新增依赖、改动不超一个测试文件），MUST 本轮当场补掉，不得以「交给后续审查」结案。只有成本高或无法自动验证时，才留给最终审查分诊。
+
+约束含「第一个 / 优先级 / 顺序」这类语义时，MUST 补一个能让优先级真正起作用的用例：让多个候选同时满足触发条件，验证选中的是被声明为优先的那个。候选数量由签名决定，不写死。
+
+每条裁决 MUST 写明：决定、理由、判断错误时的代价。
 
 ### Step 5: 逐任务实现
 
@@ -250,7 +270,11 @@ openspec status --change "<name>" --json
 `verify` 与 `retrospective` 属于后续阶段，此时**必然未完成**，`isComplete` 因此必然为 `false` —— 这是正常的。
 MUST NOT 因为 `isComplete: false` 就在本阶段补写这两个 artifact，也不要尝试「补完」。
 
-### Step 8: 在 worktree 中提交变更
+此外，控制方 MUST 在 worktree 内**独立执行** plan 中约定的测试命令，记录命令、退出码与汇总行。实现者报告里的「测试通过」只作线索，不作证据。
+
+### Step 8: 落盘裁决并提交
+
+提交前，若本次 apply 在 SDD ledger 中产生了 `Ruling:`、deferred Minor 或 ⚠️ 消解记录，MUST 把要点抄进 `openspec/changes/<name>/tasks.md` 末尾三节（`## Decisions` / `## Deferred` / `## Unverified`），一节一条、写明理由；无记录时留 `—`。这些内容随 change 归档，SDD workspace 删除后仍可追溯。
 
 ```bash
 git add -A && git commit -m "<name>: <描述>"

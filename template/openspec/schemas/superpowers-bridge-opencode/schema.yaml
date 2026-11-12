@@ -194,6 +194,18 @@ artifacts:
        - 每個 task MUST 以至少一個 commit 結束（沒有 commit 就沒有可審的 diff）；
        - MUST NOT 出現「純驗證」「純補測試」這類不產生變更的 task —— 驗收寫進所屬 task 的完成條件；
        - task MUST NOT 包含對其範圍外既有檔案的刪除 / 覆蓋 / 移動；確需變更環境時 MUST 停下來報告，由用戶決定。
+
+       **task → tasks.md 覆蓋聲明（`Covers:`，MUST）**
+
+       每個 task MUST 在標題下用一行宣告它交付物覆蓋的 tasks.md checkbox 編號，
+       例如：`**Covers:** 1.1, 1.2, 2.1`。
+
+       - 編號取自 tasks.md 的 `- [ ] X.Y` 條目，逐個列出，不寫區間。
+       - 純驗證型條目（`openspec validate`、工作區乾淨、全量測試）MUST NOT 列入 ——
+         它們不屬於任何 task 的交付物，由 apply 執行到該驗證時自行勾選。
+       - 寫完 plan 後 MUST 核對一遍：tasks.md 中每個非純驗證條目都至少被一個 task 的
+         `Covers:` 覆蓋；有條目無人認領時，先修正 task 邊界或補 task，再輸出 plan。
+       - `Covers:` 是覆蓋索引與定位依據，不改變 task 的劃分；MUST NOT 為了湊編號而拆 task。
     requires:
       - tasks
 
@@ -516,7 +528,6 @@ apply:
        然後按版本確認對應 skill 能力可 Read / 可訪問：
 
        **Superpowers v5（Read，任一失敗 STOP）：**
-         {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/implementer-prompt.md
          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/spec-reviewer-prompt.md
          {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/code-quality-reviewer-prompt.md
@@ -550,9 +561,9 @@ apply:
        - 存在 → `cd .worktrees/<name>`
        - 不存在 → STOP，提示用戶先運行 `/opsx-ff <name>` 或 `/opsx-new <name>` 創建 worktree
 
-    2. **v6+ 委託契約（三節，MUST / MUST NOT）**：
+    2. **v6+ 委託契約（四節，MUST / MUST NOT）**：
 
-      下面三節只對 **v6+ 分支**生效，是硬約束，不是參考資料。SKILL.md 裡的命令與派發語法
+      下面四節只對 **v6+ 分支**生效，是硬約束，不是參考資料。SKILL.md 裡的命令與派發語法
       都按 **Claude Code（下稱 CC）** 側寫，落到 **Oh My OpenCode（下稱 OMO）** 必須按本節改寫；v5 分支不受本節影響。
       本節必須在 Executor 之前讀完，否則會先照抄 **CC** 語法。
 
@@ -591,7 +602,7 @@ apply:
        |---|---|---|
        | `Subagent (general-purpose)` | 實現者：`task(category="deep", load_skills=[], description="<任務名>", prompt="<prompt>")` | `description` 必填；`category="deep"` 只用於**實現者** |
        | Subagent 承擔審查角色（task reviewer） | 審查者：`task(subagent_type="oracle", description="<審查名>", prompt="<prompt>")` | 與本倉庫既有約定一致（v5 分支同樣用 `oracle`）；MUST NOT 用 `category="deep"` 派審查者 |
-       | 按任務複雜度選 `model`（SKILL.md 的 Model Selection） | **不寫** `model` 參數 | 模型由 `category` 隱含；SKILL.md 的「機械任務用便宜模型 / 架構任務用最強模型」→ 選對應 `category`，不寫模型名 |
+       | 按任務複雜度選 `model`（SKILL.md 的 Model Selection） | **不寫** `model` 參數 | 檔位固定 `deep`，本橋接不按複雜度分檔 |
        | 後台派發 | `run_in_background=true` | 結果用 `background_output(task_id="bg_...")` 收取，不要短超時輪詢 |
        | 續跑同一個子 Agent（fix loop 前 3 輪、補充上下文） | `task(..., task_id="ses_...")` | 首次派發返回的 `ses_...` 會話 ID 要記下；續跑 MUST 帶上它，不得另起新 Agent 重來 |
        | `load_skills=["test-driven-development"]` 之類 | **MUST NOT 依賴**，一律 `load_skills=[]` | `load_skills` 只接受已註冊的 skill ID；Superpowers 的 skill 是檔案系統上的 `.md`，不是註冊技能，傳進去會被**靜默忽略**（不報錯、不生效） |
@@ -601,13 +612,35 @@ apply:
 
        **③ tasks.md 勾選契約（MUST）**
 
-      - 實現者 report 中 `status = DONE` 的任務，控制方 MUST 在
-        `openspec/changes/<name>/tasks.md` 勾選對應 checkbox（`- [ ]` → `- [x]`）。
-        SDD 只維護自己的 ledger 與 todo，不會寫 OpenSpec 的 tasks.md，這一條只能由
-        apply 階段補上。
-      - 其它狀態（`DONE_WITH_CONCERNS` / `NEEDS_CONTEXT` / `BLOCKED`）MUST NOT 勾選。
+       **勾選依據是實際執行證據，不是 plan 的聲明。**
+
+       - 實現者 report 中 `status = DONE` 的任務，控制方 MUST 在
+         `openspec/changes/<name>/tasks.md` 勾選對應 checkbox（`- [ ]` → `- [x]`）。
+         SDD 只維護自己的 ledger 與 todo，不會寫 OpenSpec 的 tasks.md，這一條只能由
+         apply 階段補上。
+       - plan task 與 checkbox **不是 1:1**：task 是派發與審查單位，checkbox 是驗收點，
+         數量與順序都不保證對應。用 task 的 `**Covers:**` 聲明快速定位；聲明與實際不符時
+         MUST 以實際執行證據為準，並如實記錄偏離，不得因聲明對不上而中斷流程。
+       - **純驗證項**（`openspec validate`、工作區乾淨、全量測試）不由任何 plan task 代勾；
+         由本命令在實際執行到該驗證時勾選（如 Step 7 / Step 8）。未執行不得勾選。
+       - 無法確定某 checkbox 是否已完成時 MUST NOT 勾選，並在完成結果中列出待確認項 ——
+         寧可少勾（可見），不可錯勾（不可見）。
+       - 其它狀態（`DONE_WITH_CONCERNS` / `NEEDS_CONTEXT` / `BLOCKED`）MUST NOT 勾選。
        - MUST 逐條勾選，不得批量把所有 checkbox 一次勾完；審查回退的任務 MUST 改回未勾選。
        - 未真正執行的驗收項（測試、構建、手工驗證）MUST 記為「未驗」，MUST NOT 寫成通過。
+       - 只有當**憑現有資訊無法判斷**某個 checkbox 的完成狀態時才詢問用戶；
+         有事實依據的分歧 MUST 自行按證據處理，不把判斷推回給用戶。
+
+       **④ 衝突與缺口的裁決（MUST）**
+
+       pre-flight 掃描發現的衝突或缺口，若某條 MUST 可測、且補測試的成本低
+       （不新增依賴、改動不超一個測試文件），MUST 本輪當場補掉，不得以
+       「交給後續審查」結案。只有成本高或無法自動驗證時，才留給最終審查分診。
+
+       約束含「第一個 / 優先級 / 順序」這類語義時，MUST 補一個能讓優先級真正起作用的用例：
+       讓多個候選同時滿足觸發條件，驗證選中的是被聲明為優先的那個。候選數量由簽名決定，不寫死。
+
+       每條裁決 MUST 寫明：決定、理由、判斷錯誤時的代價。
 
     3. **Executor — 實現與審查**：
 
@@ -715,7 +748,14 @@ apply:
        `false` —— 這是正常的。MUST NOT 因為 `isComplete: false` 就在本階段補寫這兩個
        artifact，也不要嘗試「補完」。
 
-    5. **Commit**：在 worktree 中提交所有變更：
+       此外，控制方 MUST 在 worktree 內**獨立執行** plan 中約定的測試命令，記錄命令、
+       退出碼與彙總行。實現者報告裡的「測試通過」只作線索，不作證據。
+
+    5. **Commit**：提交前，若本次 apply 在 SDD ledger 中產生了 `Ruling:`、deferred Minor
+       或 ⚠️ 消解記錄，MUST 把要點抄進 `openspec/changes/<name>/tasks.md` 末尾三節
+       （`## Decisions` / `## Deferred` / `## Unverified`），一節一條、寫明理由；
+       無記錄時留 `—`。這些內容隨 change 歸檔，SDD workspace 刪除後仍可追溯。
+       然後在 worktree 中提交所有變更：
 
        ```bash
        git add -A && git commit -m "<name>: <描述>"

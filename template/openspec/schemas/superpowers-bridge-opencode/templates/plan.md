@@ -13,5 +13,7 @@
 
 ## Task 1: <!-- Component Name -->
 
-- [ ] **Step 1:** <!-- micro-step -->
-- [ ] **Step 2:** <!-- micro-step -->
+**Covers:** <!-- tasks.md checkbox ids this task delivers, e.g. 1.1, 1.2; use — when none -->
+
+- [ ] **Step 1:** <!-- step -->
+- [ ] **Step 2:** <!-- step -->
