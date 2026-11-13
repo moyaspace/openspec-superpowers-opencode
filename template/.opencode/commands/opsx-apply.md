@@ -160,12 +160,20 @@ SKILL.md 用 **Claude Code（CC）** 的 Subagent 语义描述派发。在 **oh-
 > `Requires design judgment or broad codebase understanding`。
 > 上游按模型能力分三档，本桥接按 OmO 的 category 映射，语义一一对应。
 
-**等待已派发的子代理**：不要用短超时轮询，也不要无声地无限等。等待期间有本地工作（更新 ledger、打包下一个审查、读报告）就继续做，子代理的结果会自己到；确实无事可做时分段等待（5–10 分钟一段），段间报一行状态并清点活跃子代理。MUST NOT 并行派发多个实现者（会冲突）。
+**派发后取结果（MUST）**：派发时 MUST 记下 `task()` 返回的 `bg_...` 任务 ID 与 `ses_...` 会话 ID。完成后 MUST 主动调用 `background_output(task_id="bg_...")` 取结果。
 
-> 出自 Superpowers `subagent-driven-development/SKILL.md` §Waiting on dispatched subagents：
+本桥接已知问题：子任务完成时虽会唤醒控制方回合，但**唤醒信号不含任务 ID 与结果正文**（只剩一行内部标记）。因此 MUST NOT 假设结果会自动送达，也 MUST NOT 依赖唤醒信号判断哪个任务完成——用自己记下的 `bg_...` 去取。
+
+这条与插件版本无关：即使某些版本的唤醒信号带正文、或只在全部任务完成时汇总通知，按「自己记 ID、主动取」执行都能成立，因此 MUST NOT 因通知变好而改回被动等待。
+
+等待期间若有本地工作（更新 ledger、打包下一个审查）就继续做，然后回来取结果；不要用短超时反复轮询，也不要无声地无限等。MUST NOT 并行派发多个实现者（会冲突）。
+
+若有多个已派发且尚未取结果的任务，MUST 逐个取完，不能只取一个就继续。
+
+> 「不要短超时轮询、不要无声无限等、不得并行派发多个实现者」出自 Superpowers `subagent-driven-development/SKILL.md` §Waiting on dispatched subagents：
 > `never poll a wait interface with short timeouts, and never sit in one silent, open-ended wait either`
-> `When you are genuinely idle, wait in bounded stretches (five to ten minutes, where your platform allows), and between stretches post one line of status`
 > `Never dispatch multiple implementation subagents in parallel (conflicts).`
+> 该节另有「child results arrive on their own」一句，在 OmO 当前环境**不成立**（唤醒信号无正文），故不采纳。
 
 Superpowers skill 的唯一正确传递方式：`Read` 该 `.md` 文件，把内容（或其要求）直接嵌进 `prompt`，或让子 Agent 自己去 `Read` 指定路径。
 
