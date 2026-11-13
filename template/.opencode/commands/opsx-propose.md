@@ -171,7 +171,11 @@ openspec-superpowers-opencode registry add <name> .worktrees/<name> --base "<BAS
 
 使用 **TodoWrite** 追踪 artifact 进度。
 
-按依赖顺序循环（artifacts with `status: "ready"` first）：
+按依赖顺序处理 artifacts，每轮处理后重新读取 `openspec status --change "<name>" --json`：
+
+- **处理范围**：只处理 `status` 为 `"ready"` 的 artifacts；已 `done` 的 **不得重建**，其数量在进入 Step 5 时统计为 `<M>`。
+- **排除 post-apply**：`requires` 链包含 `applyRequires` 中任一 artifact 的（`verify`、`retrospective`）由后续阶段生成，`propose` **不得生成**。`requires` 链取 `openspec instructions <artifact-id> --change "<name>" --json` 的 `dependencies` 递归展开（不含 artifact 自身）。
+- **停止**：没有可处理的 artifact 时立即停止。
 
 对各 artifact：
 
@@ -187,7 +191,7 @@ c. 使用 `template` 结构 + `instruction` 指引创建文件
 
 d. 显示 "✓ Created <artifact-id>"
 
-e. 循环直到 `openspec status --change "<name>" --json` 中所有 `applyRequires` 为 `"done"`
+e. 循环直到没有可处理的 artifact——即所有非 post-apply artifact 均为 `"done"`
 
 ### Step 6: 提交 artifacts 并退出 worktree（cd 回项目根，不切换分支）
 
