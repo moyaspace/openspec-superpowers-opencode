@@ -780,6 +780,64 @@ describe('apply instructions stay version-agnostic (command file + schema)', () 
     });
 });
 
+// apply 收尾必须留下可复核的证据:未勾要有原因、退出码必须是数值、证据落盘到 tasks.md 第四节、
+// 改 plan 后 brief 必须重生成。见 backlog GAP043 / E1' / E4 / E6 / E7。
+describe('apply leaves auditable evidence (command file + schema + tasks template)', () => {
+    const applySources = () => [
+        ['opsx-apply.md', readCommand('opsx-apply.md')],
+        ['schema.yaml', fs.readFileSync(TEMPLATE_SCHEMA_PATH, 'utf8')],
+    ];
+    const readTasksTemplate = () =>
+        fs.readFileSync(
+            path.join(
+                TEMPLATE_DIR,
+                'openspec',
+                'schemas',
+                'superpowers-bridge-opencode',
+                'templates',
+                'tasks.md',
+            ),
+            'utf8',
+        );
+
+    it('requires a numeric exit code and names the pwsh trap', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('LASTEXITCODE'),
+                `${file}: must name $LASTEXITCODE so pwsh records a numeric exit code`,
+            );
+            assert.ok(content.includes('exit=0'), `${file}: must show a numeric exit-code example`);
+        }
+    });
+
+    it('requires the fourth tasks.md section and forbids silent empty checkboxes', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('## Verification'),
+                `${file}: must require the ## Verification section`,
+            );
+            assert.ok(content.includes('空框'), `${file}: must forbid silent empty checkboxes`);
+            assert.ok(!content.includes('末尾三节'), `${file}: three-section wording must be gone`);
+        }
+    });
+
+    it('ships the four sections in the tasks template', () => {
+        const content = readTasksTemplate();
+        for (const section of ['## Decisions', '## Deferred', '## Unverified', '## Verification']) {
+            assert.ok(content.includes(section), `tasks.md template: must ship ${section}`);
+        }
+    });
+
+    it('regenerates the brief whenever plan.md changes', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('brief regenerated for task'),
+                `${file}: must record brief regeneration after a plan.md change`,
+            );
+        }
+    });
+});
+
 // 任务粒度与派发单位:plan 的 task 必须自带测试周期、以 commit 收尾,且不得用时间/行数界定;
 // 同一类小改动必须合并派发(上游 batching.md)。见 backlog BUG030。
 describe('plan task unit stays commit-aligned (command file + schema)', () => {
