@@ -836,6 +836,29 @@ describe('apply leaves auditable evidence (command file + schema + tasks templat
             );
         }
     });
+
+    it('carries the no-stall principle instead of leaning on a 7.x-only section', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(content.includes('不阻断原则'), `${file}: must state the no-stall principle`);
+            assert.ok(
+                content.includes('Rulings, not stalls') && content.includes('无此节'),
+                `${file}: must scope Rulings, not stalls to 7.x and say 6.x lacks it`,
+            );
+        }
+    });
+
+    it('splits DONE_WITH_CONCERNS by concern type instead of banning every non-DONE status', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('观察性'),
+                `${file}: must keep the upstream observational-vs-correctness split`,
+            );
+            assert.ok(
+                content.includes('Handling Implementer Status'),
+                `${file}: must name the upstream section the ruling aligns with`,
+            );
+        }
+    });
 });
 
 // 任务粒度与派发单位:plan 的 task 必须自带测试周期、以 commit 收尾,且不得用时间/行数界定;
