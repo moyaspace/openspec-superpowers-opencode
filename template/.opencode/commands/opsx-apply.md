@@ -203,7 +203,9 @@ Superpowers skill 的唯一正确传递方式：`Read` 该 `.md` 文件，把内
 - **纯验证项**（`openspec validate`、工作区干净、全量测试）不由任何 plan task 代勾；由本命令在实际执行到该验证时勾选（如 Step 7 / Step 8）。未执行不得勾选。
 - 无法确定某 checkbox 是否已完成时 MUST NOT 勾选，并在本文件末尾写明原因 —— 宁可少勾（可见），不可错勾（不可见）；MUST NOT 留无声的空框（归档后无人能分辨那是「没做」还是「做了但按规则不勾」）。
 - 非 `DONE` 状态的处置 MUST 与上游 `Handling Implementer Status` 对齐，MUST NOT 一刀切：
-  - `DONE_WITH_CONCERNS`：顾虑属**正确性 / 范围** → 先处理（fix loop），MUST NOT 勾；顾虑属**观察性**（如「这个文件在变大」）→ 先记入 `## Decisions`，再按该 task 的审查是否 clean 决定：clean 则**可勾**（上游的完成判据是「review clean → ledger 记 complete」，状态字面不是判据），不 clean 则走 fix loop、不勾。
+  - `DONE_WITH_CONCERNS`：先分类，MUST NOT 一刀切 ——
+    - **正确性 / 范围**（会让 review 的结论或审查对象变化）→ 先处理（fix loop），MUST NOT 勾
+    - **`observations`（记录性备注）** → 先记入 `## Decisions`，再按该 task 的审查是否 clean 决定：clean 则**可勾**（上游的完成判据是「review clean → ledger 记 complete」，状态字面不是判据），不 clean 则走 fix loop、不勾。判据：与本次交付的正确性、边界都无关，**不能用「需要改」来描述，只是「值得知道」**（上游举例是「这个文件在变大」——那只是举例，不代表要监控文件大小之类的指标）
   - `NEEDS_CONTEXT` / `BLOCKED`：补齐上下文或降级拆分后重新派发，MUST NOT 勾。
 - MUST 逐条勾选，不得批量把所有 checkbox 一次勾完；审查回退的任务 MUST 改回未勾选。
 - 未真正执行的验收项（测试、构建、手工验证）MUST 记为「未验」，MUST NOT 写成通过。

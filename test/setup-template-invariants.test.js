@@ -854,8 +854,8 @@ describe('apply leaves auditable evidence (command file + schema + tasks templat
     it('splits DONE_WITH_CONCERNS by concern type instead of banning every non-DONE status', () => {
         for (const [file, content] of applySources()) {
             assert.ok(
-                content.includes('观察性'),
-                `${file}: must keep the upstream observational-vs-correctness split`,
+                content.includes('observations'),
+                `${file}: must keep the upstream observations-vs-correctness split`,
             );
             assert.ok(
                 content.includes('Handling Implementer Status'),
