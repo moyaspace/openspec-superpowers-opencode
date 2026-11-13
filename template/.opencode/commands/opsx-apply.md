@@ -28,7 +28,8 @@ description: Implement tasks from an OpenSpec change in existing worktree (Exper
 
 **只有以下情形 MUST 停下，且 MUST 在汇报里点名是哪一条：**
 
-1. SKILL.md 枚举的停止条件 —— 以你实际读到的版本为准（6.0–6.1 顶部 `Continuous execution` 为 3 条、7.x 为 4 条），MUST NOT 写死条数或内容；
+1. SKILL.md 枚举的停止条件 —— 以你实际读到的版本为准（6.0–6.1 顶部 `Continuous execution` 为 3 条、7.x 为 4 条），MUST NOT 写死条数或内容
+   - 「plan 坏了」这类条件 MUST 按上游的精度理解：只有**每条前进路径都只能靠猜**才算停止条件；plan 有具体缺陷但能裁决的，裁决 + 记录 + 继续。6.x 把「plan 本身错了」写在 `BLOCKED` 的处置里（escalate）—— 那是对 `BLOCKED` 状态的处置，不等于「凡 plan 有缺陷就停下」
 2. 本命令自身定义的 STOP：所需脚本缺失、需要修改 `openspec/schemas/` 或 `openspec/config.yaml`、`tests 0` 且退出码 0（假 RED）；
 3. 用户明确要求停下或改变方向。
 

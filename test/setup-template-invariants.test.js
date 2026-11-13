@@ -844,6 +844,10 @@ describe('apply leaves auditable evidence (command file + schema + tasks templat
                 content.includes('Rulings, not stalls') && content.includes('无此节'),
                 `${file}: must scope Rulings, not stalls to 7.x and say 6.x lacks it`,
             );
+            assert.ok(
+                content.includes('只能靠猜'),
+                `${file}: must gate the broken-plan stop on 7.x's "every path is a guess" precision`,
+            );
         }
     });
 
