@@ -623,7 +623,7 @@ apply:
 
        | plan 的形态 | category |
        |---|---|
-       | 计划里已含完整代码，实现等于照著抄 + 跑测试；或只碰 1–2 个文件且规格完整 | `quick` |
+       | 计划里已含完整代码，实现等于照抄 + 跑测试；或只碰 1–2 个文件且规格完整 | `quick` |
        | 要改多个文件，且它们彼此牵连（改签名、加字段、接新模组），但做法计划里已写明 | `deep` |
        | 计划没定方案，实现者必须自行决定方案、模组边界或资料结构；或实现者必须先理解大片代码库才能动手 | `ultrabrain` |
 
@@ -670,9 +670,13 @@ apply:
          MUST 以实际执行证据为准，并如实记录偏离，不得因声明对不上而中断流程。
        - **纯验证项**（`openspec validate`、工作区干净、全量测试）不由任何 plan task 代勾；
          由本命令在实际执行到该验证时勾选（如 Step 7 / Step 8）。未执行不得勾选。
-       - 无法确定某 checkbox 是否已完成时 MUST NOT 勾选，并在完成结果中列出待确认项 ——
+       - 无法确定某 checkbox 是否已完成时 MUST NOT 勾选，并写入本文件末尾的
+         `## Unverified`（未执行）或 `## Decisions`（已执行但状态非 DONE），写明原因 ——
          宁可少勾（可见），不可错勾（不可见）。
-       - 其它状态（`DONE_WITH_CONCERNS` / `NEEDS_CONTEXT` / `BLOCKED`）MUST NOT 勾选。
+       - 其它状态（`DONE_WITH_CONCERNS` / `NEEDS_CONTEXT` / `BLOCKED`）MUST NOT 勾选；
+         若该 task 实际已交付，MUST 在 `## Decisions` 记一条，写明「为何不勾 + 顾虑摘要 +
+         审查者对该顾虑的结论」。MUST NOT 留无声的空框 —— 归档后无人能分辨那是
+         「没做」还是「做了但按规则不勾」。
        - MUST 逐条勾选，不得批量把所有 checkbox 一次勾完；审查回退的任务 MUST 改回未勾选。
        - 未真正执行的验收项（测试、构建、手工验证）MUST 记为「未验」，MUST NOT 写成通过。
        - 只有当**凭现有信息无法判断**某个 checkbox 的完成状态时才询问用户；
@@ -821,22 +825,53 @@ apply:
        查不出原因才停下报告。`tests 0` 且退出码 0 属假 RED，MUST 停下。
        实现者报告里的「测试通过」只作线索，不作证据。
 
+       退出码 MUST 以数值写出（如 `exit=0`），MUST NOT 写布尔、MUST NOT 省略：
+       - bash / zsh：`cmd; echo "exit=$?"`
+       - pwsh / PowerShell：`cmd; echo "exit=$LASTEXITCODE"`
+         （`$?` 是布尔值，不是退出码，MUST NOT 当证据用）
+       取不到数值退出码 → 该项 MUST 记入 `## Unverified`，MUST NOT 写成通过。
+
        > 「测试通过即证明在测已有行为」出自 Superpowers `test-driven-development/SKILL.md` §Verify RED - Watch It Fail：
        > `Test passes? You're testing existing behavior. Fix test.` / `Test errors? Fix error, re-run until it fails correctly.`
        > 「`tests 0` 且退出码 0 属假 RED」与「独立复跑、数量核对」为本桥接补充，上游无对应原文。
 
-    5. **Commit**：提交前，若本次 apply 在 SDD ledger 中产生了 `Ruling:`、deferred Minor
-       或 ⚠️ 消解记录，MUST 把要点抄进 `openspec/changes/<name>/tasks.md` 末尾三节
-       （`## Decisions` / `## Deferred` / `## Unverified`），一节一条、写明理由；
-       无记录时留 `—`。这些内容随 change 归档，SDD workspace 删除后仍可追溯。
+     5. **Commit**：提交前 MUST 把 `openspec/changes/<name>/tasks.md` 末尾四节补齐
+        （`## Decisions` / `## Deferred` / `## Unverified` / `## Verification`），
+        一节一条、写明理由；无内容时留 `—`。这些内容随 change 归档，SDD workspace
+        删除后仍可追溯。四节分工（MUST，不得混装）：
+        - `## Decisions`：`Ruling:`、过程性偏离（结论仍成立）、未勾选的原因；
+        - `## Deferred`：不阻塞合并的 Minor，写明 file:line 与未修原因；
+        - `## Unverified`：**未真正执行**的验收项；
+        - `## Verification`：**执行过的命令与结果** —— 命令原文、汇总行、数值退出码、
+          测试数量。证据 MUST NOT 只留在对话里。
+        四节只对 apply 阶段新写的 change 生效；历史 change 不追溯、不要求补齐。
        若本次 apply 修改了 `plan.md` 或 `specs/**`：
        - 只允许两类改动：**事实错误**（版本号、命令写法等）与**范围措辞**（验收场景的表述边界）。
          MUST NOT 改验收断言、需求范围或行为约定；确需改这类内容 → STOP 并上报用户。
-       - MUST **独立提交**：先提交这些文件，再提交其余（含 tasks.md 的勾选与三节），两笔分开。
+        - MUST **独立提交**：先提交这些文件，再提交其余（含 tasks.md 的勾选与四节），两笔分开。
        - 该提交的 message MUST 写明：改了哪个 artifact、旧值 → 新值、为什么。
        - 默认不需要复审。若改动触及验收断言或需求范围（正常情况下应已被上一条拦下），
          MUST 先做一次 scoped re-review：`review-package` → `task-reviewer-prompt.md` →
          `task(subagent_type="oracle", ...)`，结论记入 `## Decisions` 后再提交。
+
+       **改了 `plan.md` 就必须让 brief 失效（MUST）**
+
+       brief 是一次性抽取的产物，实现者只读 brief、不读 plan。因此只要 `plan.md` 在
+       任何一步被修改（含 Step 8 的事实错误修正），MUST 重新生成受影响 task 的 brief，
+       否则实现者会按已废弃的指令继续做：
+
+       - 重跑 `task-brief <PLAN_FILE> <N>`（路径与参数以脚本打印的 usage 为准，
+         各版本目录不同，MUST NOT 写死路径）；
+       - 在 SDD ledger 记一行：`brief regenerated for task N (reason: plan 事实修正)`。
+
+       按该 task 的派发状态处置（MUST）：
+
+       - 尚未派发 → 正常派发，使用新 brief；
+       - 已返回 → 下一次续跑 / fix loop 派发 MUST 使用新 brief；
+       - 仍在运行 → MUST 等它返回（MUST NOT 并行派发实现者），返回后按新 brief 复核一次，
+         差异按 fix loop 处理。MUST NOT 假设可以向**运行中的**子 Agent 注入消息
+         —— `task(task_id=...)` 只能续跑已结束的会话。
+
        然后在 worktree 中提交其余变更：
 
        ```bash
