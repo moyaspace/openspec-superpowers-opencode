@@ -153,19 +153,19 @@ describe('opsx template commands are base-branch agnostic', () => {
 
     it('opsx-propose.md reads the base read-only at 2d and registers it via --base', () => {
         const content = readCommand('opsx-propose.md');
-        assertBaseReadStep('opsx-propose.md', content, '**2d. 读取 base', '### Step 3');
+        assertBaseReadStep('opsx-propose.md', content, '**2d. 读取基础分支', '### Step 3');
         assertRegistryAddCarriesBase('opsx-propose.md', content);
     });
 
     it('opsx-ff.md reads the base read-only at 2d and registers it via --base', () => {
         const content = readCommand('opsx-ff.md');
-        assertBaseReadStep('opsx-ff.md', content, '**2d. 读取 base', '### Step 3');
+        assertBaseReadStep('opsx-ff.md', content, '**2d. 读取基础分支', '### Step 3');
         assertRegistryAddCarriesBase('opsx-ff.md', content);
     });
 
     it('opsx-new.md reads the base read-only at 3d and registers it via --base', () => {
         const content = readCommand('opsx-new.md');
-        assertBaseReadStep('opsx-new.md', content, '**3d. 读取 base', '### Step 4');
+        assertBaseReadStep('opsx-new.md', content, '**3d. 读取基础分支', '### Step 4');
         assertRegistryAddCarriesBase('opsx-new.md', content);
     });
 
@@ -647,8 +647,8 @@ function assertVerifyBaseline(file) {
     for (const needle of [
         'openspec list --json',
         'baseBranch',
-        'git log --oneline "$base"..HEAD | wc -l',
-        'baseline: origin/main (registry had no baseBranch)',
+        'git log --oneline "$baseBranch"..HEAD | wc -l',
+        'baseBranch: not recorded in the change registry',
     ]) {
         assert.ok(
             body.includes(needle),
@@ -781,7 +781,7 @@ describe('apply instructions stay version-agnostic (command file + schema)', () 
 });
 
 // apply 收尾必须留下可复核的证据:未勾要有原因、退出码必须是数值、证据落盘到 tasks.md 第四节、
-// 改 plan 后 brief 必须重生成。见 backlog GAP043 / E1' / E4 / E6 / E7。
+// brief 在派发前即时生成(不做批次缓存)、数量不一致必须按用例名对号。见 GAP043 / E1' / E6 / E7 / GAP060 / GAP061。
 describe('apply leaves auditable evidence (command file + schema + tasks template)', () => {
     const applySources = () => [
         ['opsx-apply.md', readCommand('opsx-apply.md')],
@@ -828,13 +828,130 @@ describe('apply leaves auditable evidence (command file + schema + tasks templat
         }
     });
 
-    it('regenerates the brief whenever plan.md changes', () => {
+    it('cuts the brief at dispatch time instead of caching one batch up front', () => {
         for (const [file, content] of applySources()) {
             assert.ok(
-                content.includes('brief regenerated for task'),
-                `${file}: must record brief regeneration after a plan.md change`,
+                content.includes('brief MUST 在派发前即时生成'),
+                `${file}: must cut the brief right before each dispatch`,
+            );
+            assert.ok(
+                content.includes('MUST NOT 复用'),
+                `${file}: must forbid reusing the brief already sitting in the workspace`,
+            );
+            assert.ok(
+                content.includes('一次性批量生成'),
+                `${file}: must forbid generating every brief up front in one batch`,
             );
         }
+    });
+
+    it('decides a count mismatch by matching the gap against test names', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('差额能落到具体用例上') && content.includes('差额落不到任何用例上'),
+                `${file}: must split the gap into "maps onto test names" vs "maps onto nothing"`,
+            );
+            assert.ok(
+                content.includes('对得上就是数法不同'),
+                `${file}: must state the criterion as matching the gap against test names`,
+            );
+            assert.ok(
+                content.includes('不必因判不出边界'),
+                `${file}: must say the point is to decide without stopping to ask (不阻断原则)`,
+            );
+        }
+    });
+
+    it('shows a structural commit-message template and forbids backticks in -m', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('<旧值> -> <新值>'),
+                `${file}: plan/spec fix commits must show a placeholder-based message shape`,
+            );
+            assert.ok(
+                content.includes('MUST NOT 只写「修正错误」'),
+                `${file}: must require a traceable basis, not a content-free "fixed"`,
+            );
+            assert.ok(
+                content.includes('MUST NOT 用 markdown 反引号'),
+                `${file}: must forbid backticks in a double-quoted -m message`,
+            );
+        }
+    });
+
+    it('checks internal scripts the SKILL.md never names', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('对外入口') && content.includes('内部脚本'),
+                `${file}: must distinguish entry scripts from internal helpers`,
+            );
+            assert.ok(
+                content.includes('$here/'),
+                `${file}: must widen the check to same-directory references made by entry scripts`,
+            );
+            assert.ok(
+                content.includes('MUST NOT 因 SKILL.md 没提它就跳过存在性检查'),
+                `${file}: must not let "SKILL.md does not name it" excuse skipping the check`,
+            );
+        }
+    });
+
+    it('commits each task\'s ticks immediately instead of batching them into the final commit', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('勾选后 MUST 立即提交'),
+                `${file}: must commit the ticks right after ticking a task`,
+            );
+            assert.ok(
+                content.includes('MUST NOT 攒到'),
+                `${file}: must forbid batching the ticks until the end`,
+            );
+            assert.ok(
+                content.includes('MUST NOT 用 `git add -A`'),
+                `${file}: ticking commit must be path-scoped so implementer leftovers are not swept in`,
+            );
+        }
+    });
+
+    it('gates every dispatch on a clean working tree', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('派发门禁（MUST）'),
+                `${file}: must gate dispatch on a clean tree`,
+            );
+            assert.ok(
+                content.includes('MUST NOT 替它提交'),
+                `${file}: must not commit an implementer's leftovers on its behalf`,
+            );
+            assert.ok(
+                content.includes('假 finding'),
+                `${file}: must say why a dirty tree corrupts the review`,
+            );
+        }
+    });
+
+    it('pins the verify commit range to the same range PRECHECK counted', () => {
+        const template = fs.readFileSync(
+            path.join(TEMPLATE_DIR, 'openspec', 'schemas', 'superpowers-bridge-opencode', 'templates', 'verify.md'),
+            'utf8',
+        );
+        assert.ok(
+            template.includes('`<CHANGE_BASE_COMMIT>..<HEAD_COMMIT>`'),
+            'verify.md: §5 must name the commit range with the shared placeholders',
+        );
+        assert.ok(
+            !template.includes('若知道') && !template.includes('<from-sha>'),
+            'verify.md: the undefined `<from-sha>` placeholder and its "if known" escape must be gone',
+        );
+        const schema = fs.readFileSync(TEMPLATE_SCHEMA_PATH, 'utf8');
+        assert.ok(
+            schema.includes('git rev-parse <baseBranch>') && schema.includes('git rev-parse HEAD'),
+            'schema.yaml: §5 must say how to derive the two ends of the range',
+        );
+        assert.ok(
+            schema.includes('the same range PRECHECK'),
+            'schema.yaml: §5 range must be tied back to the PRECHECK count',
+        );
     });
 
     it('keeps change artifacts out of subagent scope on all three sides', () => {
