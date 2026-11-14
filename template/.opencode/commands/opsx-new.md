@@ -68,9 +68,9 @@ git status --porcelain
   - 显示有新 commit → 成功，跳到 3d
   - 无新 commit 或报错 → 失败，回到 3c-1 重试
 
-**3d. 读取 base（不可跳过）：**
+**3d. 读取基础分支（不可跳过）：**
 
-`ensure-worktree` 会以当前 HEAD 为 base。这里在**创建 worktree 之前**从项目根读出它，作为 Step 5a 写入注册表、以及 Output 展示的值：
+`ensure-worktree` 会以当前 HEAD 为基础分支。这里在**创建 worktree 之前**从项目根读出它，作为 Step 5a 写入注册表、以及 Output 展示的值：
 
 ```bash
 git rev-parse --abbrev-ref HEAD   # → BASE_BRANCH

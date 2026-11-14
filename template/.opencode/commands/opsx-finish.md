@@ -165,16 +165,16 @@ git rev-parse HEAD          # 与 <before-archive-head> 比较
 
 **方向约束（MUST）：**
 
-合并方向的唯一合法值是 feature/<name> → <base-branch>（base 由 Step 6a 确定）：
+合并方向的唯一合法值是 feature/<name> → <base-branch>（基础分支由 Step 6a 确定）：
 
 ```
   feature/<name>  →  <base-branch>
 ```
 
-- **合并只往 base 上合并。** 合并目标 MUST 等于 base，MUST NOT 换成任何别的分支。
-- base 就是 `main` 时，合并到 `main` 是**正确**的，照常执行。
-- 要禁止的是「不看 base、一律并回 `main`」：base 不是 `main` 时 MUST NOT 合并到 `main`。
-- base 未知时先按 Step 6a 确定，不得先行 rebase 或 merge。
+- **合并只往基础分支上合并。** 合并目标 MUST 等于基础分支，MUST NOT 换成任何别的分支。
+- 基础分支就是 `main` 时，合并到 `main` 是**正确**的，照常执行。
+- 要禁止的是「不看基础分支、一律并回 `main`」：基础分支不是 `main` 时 MUST NOT 合并到 `main`。
+- 基础分支未知时先按 Step 6a 确定，不得先行 rebase 或 merge。
 
 ### Step 6: 读取 finishing-a-development-branch skill
 
@@ -186,23 +186,23 @@ Read：
 **Step 6a: 确定基础分支（禁止默认推断）**
 
 > finish 执行时已在 `.worktrees/<name>` 内，`HEAD` 是 `feature/<name>`，
-> **base 无法从当前环境读出**，只能来自注册表记录或用户。MUST NOT 因此就默认某个分支。
+> **基础分支无法从当前环境读出**，只能来自注册表记录或用户。MUST NOT 因此就默认某个分支。
 
-base 的来源，按顺序取第一个可用的：
+基础分支的来源，按顺序取第一个可用的：
 
 1. 运行 `openspec list --json`，取本 change 条目的 `baseBranch` 字段 → 读到就用
    （在 worktree 内执行也会返回项目根注册表的数据；`registry list` 的**文本**输出不含该字段，不要用它判断）
-2. 读不到 → 用 **question** 工具问用户「这个 change 的 base 分支是哪个？」→ 用其回答
+2. 读不到 → 用 **question** 工具问用户「这个 change 的基础分支是哪个？」→ 用其回答
 3. 用户也答不出 / 仍无法确定 → **STOP**，不得先行 rebase 或 merge
 
-> 用户若在本轮对话里直接说明了 base（如「并回 release/1.1」），以用户为准——口头指令优先于注册表记录。
+> 用户若在本轮对话里直接说明了基础分支（如「并回 release/1.1」），以用户为准——口头指令优先于注册表记录。
 
 确定后 MUST 向用户复述一次：
   「基础分支 = <base-branch>，合并方向 feature/<name> → <base-branch>」
 得到确认后再继续。
 
 MUST NOT 按「通常是 `main` 或 `master`」自行假定。
-base 可以就是 `main`；但 MUST NOT 未经用户确认就把 base 与 `main` 混为一谈。
+基础分支可以就是 `main`；但 MUST NOT 未经用户确认就把基础分支与 `main` 混为一谈。
 
 **Step 6b: 展示 4 个选项给用户：**
 
@@ -233,14 +233,14 @@ base 可以就是 `main`；但 MUST NOT 未经用户确认就把 base 与 `main`
 
 ```bash
 # ── 阶段一：rebase（当前在开发 worktree 内 .worktrees/<name>）──
-git rebase <base-branch>              # 线性化到 base 最新；冲突在此暴露/解决（不测试）
+git rebase <base-branch>              # 线性化到基础分支最新；冲突在此暴露/解决（不测试）
 ```
 
 ```bash
 # ── 阶段二：临时测试台验证（<base-branch> 全程零接触）──
-# 注意：worktree add 必须带 --detach——base 分支已被主工作区检出，
+# 注意：worktree add 必须带 --detach——基础分支已被主工作区检出，
 # 不加 --detach 会报 fatal: '<base-branch>' is already used by worktree。
-# 测试台为游离 HEAD（树 = base 当前 commit），流程内禁止在测试台提交。
+# 测试台为游离 HEAD（树 = 基础分支当前 commit），流程内禁止在测试台提交。
 git worktree add --detach .worktrees/_merge-test-<name> <base-branch>
 cd .worktrees/_merge-test-<name>
 git merge --no-commit --no-ff <feature-branch>
@@ -285,7 +285,7 @@ git rev-parse --abbrev-ref HEAD
 git merge --ff-only <feature-branch>   # 树 = 刚测过的树，逐字节一致
 ```
 
-- 若 `--ff-only` 失败（base 在验证期间前进）→ 停止并报告，重跑 `/opsx-finish`
+- 若 `--ff-only` 失败（基础分支在验证期间前进）→ 停止并报告，重跑 `/opsx-finish`
 
 ```bash
 # ── 阶段四：清理（顺序不可调换）──
@@ -352,7 +352,7 @@ PR 创建后，change 已推送但尚未合入。worktree 和注册表条目均�
 ```bash
 openspec-superpowers-opencode registry remove <name>  # 1. 注册表（先于 git 操作）
 openspec-superpowers-opencode registry list           # 2. 验证：输出含 <name> 则重试上一步
-cd <project-root>                                     # 3. 回到项目根（base 已被主工作区检出）
+cd <project-root>                                     # 3. 回到项目根（基础分支已被主工作区检出）
 git checkout <base-branch>                            # 4. 回主工作区
 git worktree remove .worktrees/<name>                 # 5. 移除开发 worktree
 git branch -D <feature-branch>                        # 6. 删分支（丢弃用 -D 强删）

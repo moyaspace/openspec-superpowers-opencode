@@ -1,7 +1,7 @@
 # Retrospective: <change-name>
 
 > Written: <YYYY-MM-DD> (after verify passed)
-> Commit range: `<base-sha>..<head-sha>`
+> Commit range: `<CHANGE_BASE_COMMIT>..<HEAD_COMMIT>`
 > Worktree: <path or "merged to main">
 
 ---
@@ -12,7 +12,7 @@
 > 冷写场景(retro 写于 cycle 结束之后一段时间),只用 `git log` + `tasks.md` +
 > commit messages 也应能重建本节。
 
-- **Commit range**: `<base-sha>..<head-sha>` (<n> commits)
+- **Commit range**: `<CHANGE_BASE_COMMIT>..<HEAD_COMMIT>` (<n> commits)
 - **Diff size**: <+X / -Y lines across N files>
 - **Tasks done**: <x>/<y> (`grep -cE '^\s*- \[x\]' tasks.md` → x;regex 容许 sub-task 缩排)
 - **Active hours**: <estimate>
@@ -25,9 +25,9 @@
 Commit chain (时序):
 
 ```
-<base-sha> <one-line summary>
+<CHANGE_BASE_COMMIT> <one-line summary>
 ...
-<head-sha> <archive commit one-line>
+<HEAD_COMMIT> <archive commit one-line>
 ```
 
 ---

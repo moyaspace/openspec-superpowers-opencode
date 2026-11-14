@@ -71,7 +71,7 @@ Scenarios 中：
 - [ ] Worktree 内无未 staged 的文件
 - [ ] 所有相关 commit 已推送
 
-**Commit 范围**（若知道）：`<from-sha>..<to-sha>`
+**Commit 范围**：`<CHANGE_BASE_COMMIT>..<HEAD_COMMIT>`
 
 ---
 

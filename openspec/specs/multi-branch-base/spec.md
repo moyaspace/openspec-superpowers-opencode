@@ -92,8 +92,8 @@ Existing workflows that legitimately use `main` as the base SHALL continue to wo
 The verify artifact instruction in both `template/openspec/schemas/superpowers-bridge-opencode/schema.yaml` and `openspec/schemas/superpowers-bridge-opencode/schema.yaml` MUST determine the commit-evidence baseline in this order:
 
 1. Read the change's `baseBranch` through `openspec list --json`.
-2. If `baseBranch` is absent, fall back to `origin/main` and require `verify.md` §5 to record `baseline: origin/main (registry had no baseBranch)`.
-3. Count with `git log --oneline <base>..HEAD | wc -l`.
+2. If `baseBranch` is absent, fall back to `origin/main` for the count and require `verify.md` §5 to record `baseBranch: not recorded in the change registry`.
+3. Count with `git log --oneline <baseBranch>..HEAD | wc -l`.
 
 The `origin/main` form MUST NOT be the primary path. Both schema files MUST carry the same wording, so the repository's self-hosted copy and the copy deployed by `oso init` do not diverge.
 
@@ -107,7 +107,7 @@ The `origin/main` form MUST NOT be the primary path. Both schema files MUST carr
 
 - **WHEN** the change's entry has no `baseBranch`
 - **THEN** the baseline falls back to `origin/main`
-- **AND** `verify.md` §5 records `baseline: origin/main (registry had no baseBranch)`
+- **AND** `verify.md` §5 records `baseBranch: not recorded in the change registry`
 
 #### Scenario: both schema copies use the new wording
 

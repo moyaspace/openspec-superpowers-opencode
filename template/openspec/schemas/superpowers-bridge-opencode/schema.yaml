@@ -249,20 +249,20 @@ artifacts:
       yet produced reviewable changes.
 
       1. Commit evidence (must return > 0):
-         Read the baseline from this change's registry entry
+         Read baseBranch from this change's registry entry
          (primary path):
            openspec list --json
          Find the entry whose "name" equals <change-name> and take
          its "baseBranch" value. Then count the commits on top of
-         that baseline:
-           base="<baseBranch value from the entry>"
-           git log --oneline "$base"..HEAD | wc -l
+         baseBranch:
+           baseBranch="<baseBranch value from the entry>"
+           git log --oneline "$baseBranch"..HEAD | wc -l
          If the entry has no "baseBranch" (registry had no
          baseBranch), fall back to origin/main:
-           base=origin/main
-           git log --oneline "$base"..HEAD | wc -l
+           baseBranch=origin/main
+           git log --oneline "$baseBranch"..HEAD | wc -l
          and record this exact line in verify.md §5:
-           baseline: origin/main (registry had no baseBranch)
+           baseBranch: not recorded in the change registry
 
       2. Task progress (must return > 0):
          grep -c '^- \[x\]' openspec/changes/<change-name>/tasks.md
@@ -304,8 +304,12 @@ artifacts:
          in specs/. Record any drift as a warning (non-blocking).
 
       5. **Implementation signal**: Confirm all code changes are
-         committed (no unstaged files in the worktree). Cite the
-         commit range if known.
+         committed (no unstaged files in the worktree). Record the
+         commit range as `<CHANGE_BASE_COMMIT>..<HEAD_COMMIT>`, where
+         CHANGE_BASE_COMMIT = `git rev-parse <baseBranch>` (fall back to
+         `git rev-parse origin/main` when the registry has no baseBranch) and
+         HEAD_COMMIT = `git rev-parse HEAD` — the same range PRECHECK
+         item 1 counted.
 
       6. **Front-door routing leak detector** (warning, non-blocking):
 
@@ -415,7 +419,7 @@ artifacts:
       Process (follow these 3 steps):
 
       1. **Gather evidence**
-         - Run `git log --oneline <base>..HEAD` in the change worktree
+         - Run `git log --oneline <base-branch>..HEAD` in the change worktree
            (or main checkout if the worktree was already merged) to
            get the commit range
          - Read brainstorm.md, plan.md, tasks.md in this change
@@ -432,7 +436,7 @@ artifacts:
          `[evidence: commit X]` per line.
 
          §0) **Evidence** — quantitative front-matter populated
-             from `git log <base>..HEAD`, `tasks.md`, and
+             from `git log <base-branch>..HEAD`, `tasks.md`, and
              verify.md: commit count, diff size (lines/files),
              tasks-done ratio, active hours, subagent dispatch
              count, new external dependencies, post-merge bugs,
@@ -591,8 +595,13 @@ apply:
            {{SUPERPOWERS_BASE_PATH}}subagent-driven-development/SKILL.md
 
          并确认 SKILL.md 引用的脚本都存在（此处只确认可访问，不运行）。MUST NOT 写死脚本名单——
-         不同版本的脚本集合不同（6.0.x 无 `sdd-workspace`，7.0.2 多出 `sdd-repo`），
-         一律以 SKILL.md 实际引用为准。
+         不同版本的脚本集合不同（6.0.x 无 `sdd-workspace`），一律以 SKILL.md 实际引用为准。
+
+         SKILL.md 只列**对外入口**；入口脚本可能调用同目录下的内部脚本，后者不会出现在
+         SKILL.md 里（例：7.0.2 的 `sdd-workspace` 依赖同目录的 `sdd-repo`，而 SKILL.md 中
+         `sdd-repo` 零引用）。因此检查范围取「SKILL.md 引用的入口脚本 + 这些脚本内
+         `$here/` 形式的同目录引用」：MUST NOT 因某个脚本未被 SKILL.md 提到就认定它不该
+         存在，也 MUST NOT 因 SKILL.md 没提它就跳过存在性检查。
 
        如果有任一 Read 失败、或有脚本缺失，STOP 并明确输出：缺哪个脚本、当前 Superpowers 主版本号、
        以及「请升级 Superpowers 或改用 v5 分支」；不要静默降级。
@@ -724,6 +733,20 @@ apply:
              （上游举例是「这个文件在变大」——那只是举例，不代表要监控文件大小之类的指标）。
          - `NEEDS_CONTEXT` / `BLOCKED`：补齐上下文或降级拆分后重新派发，MUST NOT 勾。
        - MUST 逐条勾选，不得批量把所有 checkbox 一次勾完；审查回退的任务 MUST 改回未勾选。
+       - **勾选后 MUST 立即提交（MUST）**：勾完该 task 的 checkbox 后立刻提交，
+         MUST NOT 攒到 Commit 阶段：
+
+         ```bash
+         git add openspec/changes/<name>/tasks.md
+         git commit -m "tasks: mark <name> <ids> complete"
+         ```
+
+         MUST 用**路径式** `git add`，MUST NOT 用 `git add -A` —— 后者会把实现者未提交的
+         残留一起卷进来，等于替它提交、跳过该 task 的审查。
+
+         理由：git 历史是唯一能证明「哪条何时验过」的持久记录。攒到收尾一次性落盘，
+         「逐条勾选」这条义务在 artifact 上不再可证；而提交之后的树是干净的，
+         下一次派发与审查才有可判定的起点。
        - 未真正执行的验收项（测试、构建、手工验证）MUST 记为「未验」，MUST NOT 写成通过。
        - 只有当**凭现有信息无法判断**某个 checkbox 的完成状态时才询问用户；
          有事实依据的分歧 MUST 自行按证据处理，不把判断推回给用户。
@@ -746,6 +769,22 @@ apply:
        > 「可测 MUST 当场补」与「优先级语义补多候选用例」两条为本桥接补充，上游无对应原文。
 
     3. **Executor — 实现与审查**：
+
+       **派发门禁（MUST）**：每次 `task()` 派发（实现者与审查者都算）之前，
+       `git status --porcelain` MUST 为空。
+
+       - **空** → 派发。
+       - **非空** → 先 `git diff --stat` 判断归属，再处置：
+         - 控制方 artifact（`tasks.md` 的勾选与四节、`plan.md` / `specs/**` 的事实修正）
+           → 提交后再派；
+         - 实现者残留（它漏提交的代码）→ MUST NOT 替它提交，用同一 `task_id` 续跑让它
+           补提交（替它提交等于跳过该 task 的审查）。
+       - 处置完再核一次，空才派。
+
+       理由：子 Agent 的第一步几乎总是 `git status`。看到不属于自己范围的改动时，它必须
+       自行判断「这是谁的 / 我能不能碰 / 要不要在报告里提」—— 这三问都不该存在。脏树还会
+       让审查者的 diff（`TASK_BASE_COMMIT..HEAD`）与现场（working tree）互相矛盾，
+       产生由控制方自己制造的假 finding。
 
        **派发前分诊（MUST）**：逐个检查 plan task 的 `**Covers:**`。
 
@@ -826,13 +865,29 @@ apply:
 
        MUST NOT 用旧的自编排流程替代 SKILL.md。细节一律以 SKILL.md /
        `implementer-prompt.md` / `task-reviewer-prompt.md` / `references/` 为准；
-       本阶段只补两处 SKILL.md 没写明的 OmO 落地口径 —— 脚本的 bash 调用形态（见 2.①）
-       与 `BASE` 的记录口径（见下）。以下内容不在本节重述：
+       本阶段只补三处 SKILL.md 没写明的 OmO 落地口径 —— 脚本的 bash 调用形态（见 2.①）、
+       `TASK_BASE_COMMIT` 的记录口径（见下）与 brief 的生成时机（见下）。以下内容不在本节重述：
 
        - implementer / task reviewer 的 prompt 怎么填（含 TDD 指令怎么进入 prompt ——
          不再手工从 `test-driven-development/SKILL.md` 摘录 RED-GREEN-REFACTOR 前置指令）；
        - fix loop 的轮次上限、BLOCKED / NEEDS_CONTEXT / DONE_WITH_CONCERNS 的处置、
          断点续跑规则。
+
+       **brief MUST 在派发前即时生成（MUST）**
+
+       `task-brief` 从 `plan.md` 抽出的 brief 是实现者唯一的需求来源。因此**每个 task
+       派发前** MUST 用当前 `plan.md` 重新跑一次 `task-brief`，MUST NOT 复用 workspace 里
+       上一次留下的 `task-N-brief.md`（fix loop 重派、中断续跑同样要重跑）；路径与参数以
+       脚本打印的 usage 为准，各版本目录不同，MUST NOT 写死路径。
+
+       - MUST NOT 在 pre-flight 之后一次性批量生成多个 task 的 brief：brief 的年龄会从
+         批量生成时刻起算，而 `plan.md` 在 pre-flight、fix loop、收尾的事实错误修正、
+         中断续跑中都会被改。
+       - 已派发且尚未返回时 `plan.md` 被改：MUST 等该 task 返回（MUST NOT 并行派发
+         实现者），返回后重跑一次 `task-brief`，并用 git 判断期间是否真的变过 ——
+         `git status --porcelain` + `git log <TASK_BASE_COMMIT>..HEAD -- openspec/changes/<name>/plan.md`；
+         变了则按新 brief 复核一次，差异按 fix loop 处理。MUST NOT 假设可以向**运行中的**
+         子 Agent 注入消息 —— `task(task_id=...)` 只能续跑已结束的会话。
 
        派发语法 MUST 按 2.② 的「SDD → OmO 语法映射」改写：`task(category=<按档位表选>, load_skills=[])`，
        不写 `model` 参数，一律异步派发加 `run_in_background=true`，续跑带 `task_id="ses_..."`。
@@ -852,8 +907,9 @@ apply:
        - 单任务审查 → SKILL.md 的 Review the task 环节：用
          `bash "{{SUPERPOWERS_BASE_PATH}}subagent-driven-development/scripts/review-package" <参数按 usage>`
          生成 package，再用 `task-reviewer-prompt.md` 填 prompt、按
-         `task(subagent_type="oracle", ...)` 派审查者（`BASE` 是实现者派发前记录的 commit，
-         不是 `HEAD~1`）。
+         `task(subagent_type="oracle", ...)` 派审查者（`TASK_BASE_COMMIT` MUST 在上一个
+         task 的勾选提交**之后**取，不是 `HEAD~1`，也不是派发前随手取的 `HEAD` —— 这样
+         `TASK_BASE_COMMIT..HEAD` 只含该 task 的代码改动，不含控制方的 artifact 改动）。
        - 修复 → SKILL.md 的 fix loop 环节（7.x 另有 `references/fix-loop.md`，存在则一并读）。
        - 全分支审查 → SKILL.md 的 Final Review（7.x 另有 `references/final-review.md`）。
 
@@ -868,7 +924,7 @@ apply:
           正文前的过程叙述一律忽略，不据此下结论。缺必需 section 时才用同一 `task_id`
           要求重发；仅有过程叙述不触发重发。
        4. **审查者 prompt MUST 带范围声明（MUST）**：每次派审查者，prompt 里 MUST 含
-          一句等价声明 ——「本 task 的 review 范围是 `BASE..HEAD` 的代码改动；
+          一句等价声明 ——「本 task 的 review 范围是 `TASK_BASE_COMMIT..HEAD` 的代码改动；
           `openspec/changes/<name>/tasks.md` 等 change artifact 由控制方在 Commit 阶段
           填写，**不属于本 task 的交付物**。若你发现 artifact 状态与 brief 不一致，
           请报为 ⚠️ 交控制方裁决，**不要判为 task 缺陷**」。
@@ -889,6 +945,22 @@ apply:
        （用例被跳过、plan 计数口径不同等）：能解释则继续并记入 `## Unverified`，
        查不出原因才停下报告。`tests 0` 且退出码 0 属假 RED，MUST 停下。
        实现者报告里的「测试通过」只作线索，不作证据。
+
+       **数量不一致 MUST 先对号，不许一句话带过（MUST）**
+
+       实测数与 plan 声明数不一致时，MUST 先把差额逐条对到用例名上，按下述两类之一处置，
+       MUST NOT 以「预测值来自另一次测量」或「另一版 Node 的计数」结案：
+
+       - **差额能落到具体用例上 → 记录并继续**：差异来自**计数方式**不同（计数单位：
+         1 个测试文件 vs 1 个 `test()` 条目；`skipped` 统计；参数展开），且能列出被计 /
+         未被计的分别是哪些用例。此时 `plan.md` 不动，写进 `## Unverified`。
+       - **差额落不到任何用例上 → 判 plan 数错，改 plan**：差额既非 `skipped`、也非文件
+         未被发现，即 plan 宣告的那个数在实际文件里根本不存在。这属 Commit 段允许的
+         **事实错误**：改 `plan.md`（旧值 → 新值 + 原因）并独立提交。
+
+       判据是机械的：**把差额逐条对到用例名上——对得上就是数法不同，对不上就是 plan
+       数错了。** 两个目的——其一，错误数字不留在归档的 `plan.md` 里；其二，让控制方
+       **自己就能判**，不必因判不出边界而停下来问人（见「不阻断原则」）。
 
        退出码 MUST 以数值写出（如 `exit=0`），MUST NOT 写布尔、MUST NOT 省略：
        - bash / zsh：`cmd; echo "exit=$?"`
@@ -913,29 +985,31 @@ apply:
        若本次 apply 修改了 `plan.md` 或 `specs/**`：
        - 只允许两类改动：**事实错误**（版本号、命令写法等）与**范围措辞**（验收场景的表述边界）。
          MUST NOT 改验收断言、需求范围或行为约定；确需改这类内容 → STOP 并上报用户。
-        - MUST **独立提交**：先提交这些文件，再提交其余（含 tasks.md 的勾选与四节），两笔分开。
+        - MUST **独立提交**：先提交这些文件，再提交其余（**只剩四节**）；`tasks.md` 的勾选
+         已随各 task 逐条提交（见 2.③），此处不重复提交。
        - 该提交的 message MUST 写明：改了哪个 artifact、旧值 → 新值、为什么。
+         三要素一行写完：
+
+         ```bash
+         git commit -m "plan: correct <artifact> <旧值> -> <新值> — <依据>"
+         ```
+
+         `<旧值>` / `<新值>` 填实际值（版本号、命令写法、计数）；`<依据>` 填判定
+         来源（哪个文件、哪条命令的输出），MUST NOT 只写「修正错误」这类无信息量
+         的表述。
+       - message 里 MUST NOT 用 markdown 反引号包命令或代码：双引号下 pwsh 把
+         反引号当转义符（反引号 + `n` 变成换行、反引号 + `t` 变成制表符）、bash
+         把它当命令替换，message 会在到达 git 之前静默变形。需要引用命令时写裸
+         文本，或整条 message 用单引号包裹。
        - 默认不需要复审。若改动触及验收断言或需求范围（正常情况下应已被上一条拦下），
          MUST 先做一次 scoped re-review：`review-package` → `task-reviewer-prompt.md` →
          `task(subagent_type="oracle", ...)`，结论记入 `## Decisions` 后再提交。
 
-       **改了 `plan.md` 就必须让 brief 失效（MUST）**
+       **改了 `plan.md` / `specs/**` 之后的 brief 处置**
 
-       brief 是一次性抽取的产物，实现者只读 brief、不读 plan。因此只要 `plan.md` 在
-       任何一步被修改（含 Step 8 的事实错误修正），MUST 重新生成受影响 task 的 brief，
-       否则实现者会按已废弃的指令继续做：
-
-       - 重跑 `task-brief <PLAN_FILE> <N>`（路径与参数以脚本打印的 usage 为准，
-         各版本目录不同，MUST NOT 写死路径）；
-       - 在 SDD ledger 记一行：`brief regenerated for task N (reason: plan 事实修正)`。
-
-       按该 task 的派发状态处置（MUST）：
-
-       - 尚未派发 → 正常派发，使用新 brief；
-       - 已返回 → 下一次续跑 / fix loop 派发 MUST 使用新 brief；
-       - 仍在运行 → MUST 等它返回（MUST NOT 并行派发实现者），返回后按新 brief 复核一次，
-         差异按 fix loop 处理。MUST NOT 假设可以向**运行中的**子 Agent 注入消息
-         —— `task(task_id=...)` 只能续跑已结束的会话。
+       brief 是派发时刻的产物，不是批次的缓存 —— 生成时机与派发期间改 plan 的处置写在
+       第 3 步的「brief MUST 在派发前即时生成」。收尾这一步改完 plan 之后不需要额外动作：
+       下一次任何派发（含 fix loop 续跑）都会用当前 `plan.md` 重新生成 brief。
 
        然后在 worktree 中提交其余变更：
 
