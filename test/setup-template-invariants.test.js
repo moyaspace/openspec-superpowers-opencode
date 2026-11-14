@@ -837,6 +837,23 @@ describe('apply leaves auditable evidence (command file + schema + tasks templat
         }
     });
 
+    it('keeps change artifacts out of subagent scope on all three sides', () => {
+        for (const [file, content] of applySources()) {
+            assert.ok(
+                content.includes('不在你的写入范围'),
+                `${file}: dispatch prompt must exclude change artifacts from the implementer`,
+            );
+            assert.ok(
+                content.includes('不属于本 task 的交付物'),
+                `${file}: reviewer prompt must scope change artifacts out of the task`,
+            );
+        }
+        assert.ok(
+            fs.readFileSync(TEMPLATE_SCHEMA_PATH, 'utf8').includes('change artifact 的写入不在 task 范围内'),
+            'schema.yaml: plan instruction must forbid artifact writes inside task steps',
+        );
+    });
+
     it('carries the no-stall principle instead of leaning on a 7.x-only section', () => {
         for (const [file, content] of applySources()) {
             assert.ok(content.includes('不阻断原则'), `${file}: must state the no-stall principle`);
