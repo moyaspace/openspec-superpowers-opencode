@@ -281,6 +281,12 @@ MUST NOT 用旧的自编排流程替代 SKILL.md。细节一律以 SKILL.md / `i
 
 派发语法 MUST 按 Step 4.5 的「② SDD → OmO 语法映射」改写：`task(category=<按档位表选>, load_skills=[])`，不写 `model` 参数，一律异步派发加 `run_in_background=true`，续跑带 `task_id="ses_..."`。
 
+**派发 prompt MUST 声明 artifact 归属（MUST）**：每次派发实现者，prompt 里 MUST 含一句等价的声明 ——
+
+> `openspec/changes/<name>/` 下的 `tasks.md`、`plan.md`、`specs/**` 由 apply 控制方维护，**不在你的写入范围**。你需要留证据时，把命令原文、汇总行与数值退出码写进**你的 report**，由控制方转抄。
+
+这条对 v5 与 v6+ 两条路径都适用。即使 plan 的某个 step 写了「写入 tasks.md」，也按本声明覆盖，并在 `## Decisions` 记一条（plan 写的，但 artifact 归控制方）。
+
 ### Step 6: 审查每个任务的产出
 
 根据 Superpowers 版本执行对应审查流程。
@@ -311,11 +317,12 @@ Read：
 - 修复 → SKILL.md 的 fix loop 环节（7.x 另有 `references/fix-loop.md`，存在则一并读）。
 - 全分支审查 → SKILL.md 的 Final Review（7.x 另有 `references/final-review.md`）。
 
-除 SDD 流程之外，OSO 只追加三条额外约束（MUST）：
+除 SDD 流程之外，OSO 只追加四条额外约束（MUST）：
 
 1. 实现者 report 中 `status = DONE` 的任务，控制方 MUST 在 `openspec/changes/<name>/tasks.md` 勾选对应 checkbox（见 Step 4.5 ③）；其它状态不勾。
 2. MUST NOT 修改 `openspec/schemas/` 下任何文件与 `openspec/config.yaml`。发现确需修改时，STOP 并向 OSO 维护者（oso 仓库 / npm 包作者）报告：说明哪个文件、哪一段、为什么模板本身需要改。执行阶段不得改动这些文件。
 3. 审查者报告只采信结构化区块（Spec Compliance / Issues / Assessment 等）；正文前的过程叙述一律忽略，不据此下结论。缺必需 section 时才用同一 `task_id` 要求重发；仅有过程叙述不触发重发。
+4. **审查者 prompt MUST 带范围声明（MUST）**：每次派审查者，prompt 里 MUST 含一句等价声明 ——「本 task 的 review 范围是 `BASE..HEAD` 的代码改动；`openspec/changes/<name>/tasks.md` 等 change artifact 由控制方在 Commit 阶段填写，**不属于本 task 的交付物**。若你发现 artifact 状态与 brief 不一致，请报为 ⚠️ 交控制方裁决，**不要判为 task 缺陷**」。MUST NOT 写成「不要检查这一项」—— 那是预先压制发现；要给的是归属与处置路径（上游的 `⚠️ Cannot verify from diff` 通道正好可承接）。
 
 ### Step 7: Verification
 

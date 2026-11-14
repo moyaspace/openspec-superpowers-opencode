@@ -213,6 +213,23 @@ artifacts:
          由 apply 在验证阶段执行并勾选，不需要、也不允许为它们单独建一个 task。
        - `Covers:` 是覆盖索引与定位依据，不改变 task 的划分；MUST NOT 为了凑编号而拆 task。
 
+       **change artifact 的写入不在 task 范围内（MUST）**
+
+       task 的 step 是交给实现者（subagent）执行的。`openspec/changes/<name>/` 下的
+       `tasks.md` / `plan.md` / `specs/**` 由 apply 阶段的控制方维护，**MUST NOT 写进任何
+       task step 的指令里** —— 包括「把输出写入 tasks.md 的 `## Verification`」「更新
+       tasks.md 的勾选」「修改 spec」这类表述。
+
+       需要留证据时，step 的写法是「**输出到 report**」：
+
+       > 运行 X，把命令原文、汇总行与数值退出码写进**本 task 的 report**，
+       > 由 apply 阶段统一留档到 tasks.md。
+
+       理由：实现者的交付物是代码与 report；change artifact 不在其写入范围。把它写进
+       task step 会让实现者被「plan 要求写」与「artifact 归控制方」两条规则夹住，且
+       task review 会拿「artifact 未更新」判 task 缺陷 —— 而该文件根本不在被审查的
+       diff 范围内，fix loop 无法收敛。
+
        **RED 步骤的自证（MUST）**
 
        计划中任何标注 RED（预期失败）的步骤，MUST 同时写明如何确认测试已被 runner 发现
@@ -820,6 +837,16 @@ apply:
        派发语法 MUST 按 2.② 的「SDD → OmO 语法映射」改写：`task(category=<按档位表选>, load_skills=[])`，
        不写 `model` 参数，一律异步派发加 `run_in_background=true`，续跑带 `task_id="ses_..."`。
 
+       **派发 prompt MUST 声明 artifact 归属（MUST）**：每次派发实现者，prompt 里 MUST 含
+       一句等价的声明 ——
+
+       > `openspec/changes/<name>/` 下的 `tasks.md`、`plan.md`、`specs/**` 由 apply 控制方
+       > 维护，**不在你的写入范围**。你需要留证据时，把命令原文、汇总行与数值退出码写进
+       > **你的 report**，由控制方转抄。
+
+       这条对 v5 与 v6+ 两条路径都适用。即使 plan 的某个 step 写了「写入 tasks.md」，也按
+       本声明覆盖，并在 `## Decisions` 记一条（plan 写的，但 artifact 归控制方）。
+
        审查同样交给 SDD：本阶段不另起一套审查流程，审查者按 SKILL.md §3 派发：
 
        - 单任务审查 → SKILL.md 的 Review the task 环节：用
@@ -830,7 +857,7 @@ apply:
        - 修复 → SKILL.md 的 fix loop 环节（7.x 另有 `references/fix-loop.md`，存在则一并读）。
        - 全分支审查 → SKILL.md 的 Final Review（7.x 另有 `references/final-review.md`）。
 
-       除 SDD 流程之外，OSO 只追加三条额外约束（MUST）：
+       除 SDD 流程之外，OSO 只追加四条额外约束（MUST）：
 
        1. 实现者 report 中 `status = DONE` 的任务，控制方 MUST 在
           `openspec/changes/<name>/tasks.md` 勾选对应 checkbox（见 2.③）；其它状态不勾。
@@ -840,6 +867,13 @@ apply:
        3. 审查者报告只采信结构化区块（Spec Compliance / Issues / Assessment 等）；
           正文前的过程叙述一律忽略，不据此下结论。缺必需 section 时才用同一 `task_id`
           要求重发；仅有过程叙述不触发重发。
+       4. **审查者 prompt MUST 带范围声明（MUST）**：每次派审查者，prompt 里 MUST 含
+          一句等价声明 ——「本 task 的 review 范围是 `BASE..HEAD` 的代码改动；
+          `openspec/changes/<name>/tasks.md` 等 change artifact 由控制方在 Commit 阶段
+          填写，**不属于本 task 的交付物**。若你发现 artifact 状态与 brief 不一致，
+          请报为 ⚠️ 交控制方裁决，**不要判为 task 缺陷**」。
+          MUST NOT 写成「不要检查这一项」—— 那是预先压制发现；要给的是归属与处置路径
+          （上游的 `⚠️ Cannot verify from diff` 通道正好可承接）。
 
     4. **Verification**：所有任务完成后，在 worktree 中执行验证：
 
