@@ -202,18 +202,32 @@ git push github <branch>
 
 ```bash
 npm publish
-npm dist-tag add @moyaspace/openspec-superpowers-opencode@<ver> v1
+npm dist-tag add @moyaspace/openspec-superpowers-opencode@<ver> <tag>
 npm view @moyaspace/openspec-superpowers-opencode dist-tags
 ```
+
+- **dist-tag 名 MUST NOT 能被解析成 SemVer range**，否则 registry 直接拒绝：
+
+  ```text
+  npm error Tag name must not be a valid SemVer range: v1
+  ```
+
+  被拒的例子：`v1`、`v1.x`、`v1.4`、`1`、`1.1`。原因见官方 `npm-dist-tag` 文档：tag 与版本号共用同一个语法槽（`npm i pkg@<槽>`），`v1` 会被 semver 读成 `>=1.0.0 <2.0.0`，于是「装哪个」产生歧义。**规避办法是选不以数字或字母 `v` 开头的名字。**
+
+  可用的例子：`legacy`、`lts`、`stable`、`v1-lts`、`release-1`。
 
 - **`npm dist-tag` 与 `git tag` 是两回事**，两者都要做，不能互相替代：
 
   | | git tag | npm dist-tag |
   |---|---|---|
   | 位置 | git 仓库 | npm registry |
-  | 决定 | 源码快照 | `npm i pkg@v1` 装哪个版本 |
+  | 决定 | 源码快照 | `npm i pkg@<tag>` 装哪个版本 |
 
-- 本项目的 dist-tag 约定：`latest` 跟随当前发布版本；`v1` 固定指向最新的 1.x。将来 2.0.0 发布用 `npm publish --tag latest`，`v1` 保持指向最后一个 1.x。
+- dist-tag 约定：`latest` 跟随当前发布版本（`npm publish` 自动设置）。维护线（1.x / 2.x）是否各留一个长期 tag **由发布者决定**，不做强制：
+  - 要留：选一个合法名（如 `legacy` 指向最后一个 1.x），2.0.0 发布时 `latest` 自动转到 2.x，`legacy` 不动
+  - 不留：用户用 `npm i pkg@1.1.2` 指定版本号即可，功能上无缺失
+
+- **删除 dist-tag 只能走 CLI，官网没有界面**（`npm dist-tag rm <pkg> <tag>`）；且它是破坏性操作，账号未启用 2FA 时返回 403，需先开 2FA 并带 `--otp`。因此**不要用试错的方式探测哪些名字可用**——`add` 成功的会真的写进 registry，而删不掉。
 - **发布前最后一道自检**（版本号、分支、tag 三者一致）：
 
   ```bash
@@ -252,7 +266,7 @@ git push github v<ver>
 - **全新环境**：干净目录 `npm i -g @moyaspace/openspec-superpowers-opencode@<ver>` → `oso --version` → `oso init` 端到端可用。
 - **棕地升级**：构造「已装上一个版本」的项目（旧命令文件 + `openspec/config.yaml` + `.opencode/install-manifest.json`），重跑 `oso init` → 变更的命令与模板逐字一致、部署后验证通过、exit 0。
 - **版本写入正确**：`oso init` 落盘的版本是 `<ver>`，模板中不含 `@latest` 之类浮动引用。
-- **dist-tag 正确**：`npm view ... dist-tags` 中 `latest` 与 `v1` 均指向 `<ver>`。
+- **dist-tag 正确**：`npm view ... dist-tags` 中 `latest` 指向 `<ver>`；若按 §7 另设了维护线 tag，该 tag 也指向预期版本。
 - 发布后若发现缺陷：**不要试图用同一个版本号重发**（见附 A）。
 
 ---
@@ -316,7 +330,7 @@ gh release create v<ver> --title "<ver>" --notes-file local/docs/YYYY-MM-DD-rele
 | tag 已推送 | `git push origin :refs/tags/v<ver>` 两个远端都删 | **别人 fetch 过就会留下悬空引用**；宁可发补丁版本 |
 | 分支推错（推到了错误的远端/分支） | 先确认没有 CI 消费方，再删远端分支 | 已触发的 CI run 无法撤销记录 |
 | npm 已 publish 但发现严重问题 | **72 小时内**可 `npm unpublish <pkg>@<ver>`；超过 72 小时只能 `npm deprecate` 并尽快发补丁版本 | **同一个版本号不可复用**：unpublish 之后重新 publish 同号在多数配置下被拒 |
-| dist-tag 指错 | `npm dist-tag add <pkg>@<旧版本> v1` 指回去 | dist-tag 可反复覆盖，无副作用 |
+| dist-tag 指错 | `npm dist-tag add <pkg>@<旧版本> <tag>` 指回去 | dist-tag 可反复覆盖，无副作用。**改不了 `/@` 部分**——tag 名本身不合法时（如 `v1`）只能换名，见 §7 |
 | 发布后发现只是文档错 | 发补丁版本修；**不要**为了改 README 而 unpublish | npm 页面渲染的是 tarball 内的 README |
 
 **紧急路径**（凭据泄露 / 账号被接管）：轮换 npm token、检查 `npm owner ls`、对受影响版本 `npm deprecate` 并在 GitHub 发安全公告。凭据本身**绝不写进本文件或任何仓库文件**。
