@@ -216,7 +216,7 @@ artifacts:
        **change artifact 的写入不在 task 范围内（MUST）**
 
        task 的 step 是交给实现者（subagent）执行的。`openspec/changes/<name>/` 下的
-       `tasks.md` / `plan.md` / `specs/**` 由 apply 阶段的控制方维护，**MUST NOT 写进任何
+       `tasks.md` / `plan.md` / `specs/**` / `design.md` 由 apply 阶段的控制方维护，**MUST NOT 写进任何
        task step 的指令里** —— 包括「把输出写入 tasks.md 的 `## Verification`」「更新
        tasks.md 的勾选」「修改 spec」这类表述。
 
@@ -468,6 +468,12 @@ artifacts:
                sentence learning
              - `→ **Promote to** <destination>` (memory /
                CLAUDE.md / schema / skill / one-off)
+             - **目的地按 harness 映射**（完整表见 `templates/retrospective.md` §6）：
+               `memory` → OpenCode 用 `~/.config/opencode/AGENTS.md`；`CLAUDE.md` → 项目根
+               `AGENTS.md` 的**非托管区**（写进 `<!-- openspec-superpowers-opencode_instructions -->`
+               托管区块内，重跑 `oso init` 即丢）；`schema` / `skill` / `one-off` 同名。
+               本环境不存在的目的地 MUST NOT 假装投放 —— 改判 `one-off` 并在 `Why` 里写明
+               「本环境无对应载体」。
              - Two body lines aligned with the feedback memory
                schema: `> **Why**: <reason>` and
                `> **How to apply**: <trigger condition>`
@@ -475,8 +481,8 @@ artifacts:
              Unchecked `- [ ]` items represent in-flight
              candidates that carry into the next cycle's retro
              for re-evaluation. The checklist + Why/How body
-             shape lets candidates transfer mechanically to
-             `~/.claude/memory/` without re-writing.
+             shape lets candidates transfer mechanically to the
+             mapped destination (above) without re-writing.
 
          **Skipped-skill rules for §4**:
 
@@ -775,7 +781,7 @@ apply:
 
        - **空** → 派发。
        - **非空** → 先 `git diff --stat` 判断归属，再处置：
-         - 控制方 artifact（`tasks.md` 的勾选与四节、`plan.md` / `specs/**` 的事实修正）
+         - 控制方 artifact（`tasks.md` 的勾选与四节、`plan.md` / `specs/**` / `design.md` 的事实修正）
            → 提交后再派；
          - 实现者残留（它漏提交的代码）→ MUST NOT 替它提交，用同一 `task_id` 续跑让它
            补提交（替它提交等于跳过该 task 的审查）。
@@ -895,7 +901,7 @@ apply:
        **派发 prompt MUST 声明 artifact 归属（MUST）**：每次派发实现者，prompt 里 MUST 含
        一句等价的声明 ——
 
-       > `openspec/changes/<name>/` 下的 `tasks.md`、`plan.md`、`specs/**` 由 apply 控制方
+       > `openspec/changes/<name>/` 下的 `tasks.md`、`plan.md`、`specs/**`、`design.md` 由 apply 控制方
        > 维护，**不在你的写入范围**。你需要留证据时，把命令原文、汇总行与数值退出码写进
        > **你的 report**，由控制方转抄。
 
@@ -982,9 +988,17 @@ apply:
         - `## Verification`：**执行过的命令与结果** —— 命令原文、汇总行、数值退出码、
           测试数量。证据 MUST NOT 只留在对话里。
         四节只对 apply 阶段新写的 change 生效；历史 change 不追溯、不要求补齐。
-       若本次 apply 修改了 `plan.md` 或 `specs/**`：
+       若本次 apply 修改了 `plan.md`、`specs/**` 或 `design.md`：
        - 只允许两类改动：**事实错误**（版本号、命令写法等）与**范围措辞**（验收场景的表述边界）。
          MUST NOT 改验收断言、需求范围或行为约定；确需改这类内容 → STOP 并上报用户。
+        - **`design.md` 另加两条（MUST）**：
+          - **MUST NOT 改写 design 去迁就实现**：允许改的只有「写错了」（与实现不符的事实
+            陈述），不允许改「想错了」（取舍、理由、范围边界）。若实现违背了 design 的
+            决策，正确处置是记 `## Deferred`（不阻塞）或 STOP 上报，并在 `## Decisions`
+            标注「实现未遵循 `D_x`」—— 而不是把 design 改成与实现一致。
+          - 每次修改 MUST 按 `Ruling: 决定 — 理由 — 判错代价` 三段式记入 `## Decisions`；
+            `判错代价` MUST 写出真实后果（如「若实现本身有缺陷，design 已被改成掩盖它」，
+            归档后无人能追溯），MUST NOT 只写「无」或「可撤」。
         - MUST **独立提交**：先提交这些文件，再提交其余（**只剩四节**）；`tasks.md` 的勾选
          已随各 task 逐条提交（见 2.③），此处不重复提交。
        - 该提交的 message MUST 写明：改了哪个 artifact、旧值 → 新值、为什么。

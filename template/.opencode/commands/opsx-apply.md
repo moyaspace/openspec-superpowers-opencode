@@ -240,7 +240,7 @@ pre-flight 扫描发现的冲突或缺口，若某条 MUST 可测、且补测试
 
 - **空** → 派发。
 - **非空** → 先 `git diff --stat` 判断归属，再处置：
-  - 控制方 artifact（`tasks.md` 的勾选与四节、`plan.md` / `specs/**` 的事实修正）→ 提交后再派；
+  - 控制方 artifact（`tasks.md` 的勾选与四节、`plan.md` / `specs/**` / `design.md` 的事实修正）→ 提交后再派；
   - 实现者残留（它漏提交的代码）→ MUST NOT 替它提交，用同一 `task_id` 续跑让它补提交（替它提交等于跳过该 task 的审查）。
 - 处置完再核一次，空才派。
 
@@ -311,7 +311,7 @@ MUST NOT 用旧的自编排流程替代 SKILL.md。细节一律以 SKILL.md / `i
 
 **派发 prompt MUST 声明 artifact 归属（MUST）**：每次派发实现者，prompt 里 MUST 含一句等价的声明 ——
 
-> `openspec/changes/<name>/` 下的 `tasks.md`、`plan.md`、`specs/**` 由 apply 控制方维护，**不在你的写入范围**。你需要留证据时，把命令原文、汇总行与数值退出码写进**你的 report**，由控制方转抄。
+> `openspec/changes/<name>/` 下的 `tasks.md`、`plan.md`、`specs/**`、`design.md` 由 apply 控制方维护，**不在你的写入范围**。你需要留证据时，把命令原文、汇总行与数值退出码写进**你的 report**，由控制方转抄。
 
 这条对 v5 与 v6+ 两条路径都适用。即使 plan 的某个 step 写了「写入 tasks.md」，也按本声明覆盖，并在 `## Decisions` 记一条（plan 写的，但 artifact 归控制方）。
 
@@ -400,9 +400,12 @@ MUST NOT 因为 `isComplete: false` 就在本阶段补写这两个 artifact，�
 
 四节只对 apply 阶段新写的 change 生效；历史 change 不追溯、不要求补齐。
 
-若本次 apply 修改了 `plan.md` 或 `specs/**`：
+若本次 apply 修改了 `plan.md`、`specs/**` 或 `design.md`：
 
 - 只允许两类改动：**事实错误**（版本号、命令写法等）与**范围措辞**（验收场景的表述边界）。MUST NOT 改验收断言、需求范围或行为约定；确需改这类内容 → STOP 并上报用户。
+- **`design.md` 另加两条（MUST）**：
+  - **MUST NOT 改写 design 去迁就实现**：允许改的只有「写错了」（与实现不符的事实陈述），不允许改「想错了」（取舍、理由、范围边界）。若实现违背了 design 的决策，正确处置是记 `## Deferred`（不阻塞）或 STOP 上报，并在 `## Decisions` 标注「实现未遵循 `D_x`」—— 而不是把 design 改成与实现一致。
+  - 每次修改 MUST 按 `Ruling: 决定 — 理由 — 判错代价` 三段式记入 `## Decisions`；`判错代价` MUST 写出真实后果（如「若实现本身有缺陷，design 已被改成掩盖它，归档后无人能追溯」），MUST NOT 只写「无」或「可撤」。
 - MUST **独立提交**：先提交这些文件，再提交其余（**只剩四节**）；`tasks.md` 的勾选已随各 task 逐条提交（见 Step 4.5 ③），此处不重复提交。
 - 该提交的 message MUST 写明：改了哪个 artifact、旧值 → 新值、为什么。三要素一行写完：
 

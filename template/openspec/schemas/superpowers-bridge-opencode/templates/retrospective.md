@@ -92,6 +92,26 @@ Commit chain (时序):
 
 - 标题:严重程度 emoji(🔴/🟡/📌)+ 一句话 learning
 - `→ **Promote to** <destination>`(memory / CLAUDE.md / schema / skill / one-off)
+
+> **目的地按你的 harness 映射**(上游词汇保留,便于与 superpowers 上游对齐):
+>
+> | 上游目的地 | OpenCode 落点 | Claude Code 落点 | 装什么 |
+> | --- | --- | --- | --- |
+> | `memory` | `~/.config/opencode/AGENTS.md`(跨项目) | `~/.claude/memory/` | 「我该怎么做事」的个人偏好 |
+> | `CLAUDE.md` | 项目根 `AGENTS.md` 的**非托管区** | `CLAUDE.md` | 本项目约定、技术栈、禁忌 |
+> | `schema` | 同名:`openspec/schemas/<schema>/schema.yaml` | 同左 | 步骤顺序、门禁、artifact 契约 |
+> | `skill` | 同名:Superpowers skill 文件 | 同左 | 可复用的操作流程 |
+> | `one-off` | 同名:就地记录,不投放 | 同左 | 不会重演的具体情况 |
+>
+> **判定规则一句话**:这条规则约束的是「**流程该怎么走**」还是「**我该怎么想**」?
+> 前者 → `schema`;后者 → `memory` / `CLAUDE.md`。
+>
+> 若某目的地在本环境不存在(例如没有 `~/.config/opencode/AGENTS.md`),MUST NOT 假装投放 ——
+> 改判 `one-off` 并在 `> **Why**:` 里写明「本环境无对应载体」。
+>
+> **不要往 `AGENTS.md` 的托管区块里写**:`<!-- openspec-superpowers-opencode_instructions -->`
+> 之间那一段由 `oso init` 重新生成,重跑即丢失。自定义规则只能加在托管区块之外。
+
 - 两行 body(对应 superpowers feedback memory body schema):
   - `> **Why**: <reason; often a past incident or strong preference>`
   - `> **How to apply**: <when/where this guidance kicks in>`
