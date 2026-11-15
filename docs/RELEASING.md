@@ -20,14 +20,15 @@
                 │                              ▲
                 │                              └── 未通过 → 修复 → 回到 3
                 ▼
-      7 npm publish + dist-tag ──► 8 发布后验证
+      7 npm publish + dist-tag ──► 8 发布后验证 ──► 9 GitHub Release（release notes）
 ```
 
-**三条不可颠倒的顺序**：
+**四条不可颠倒的顺序**：
 
 1. **tag 在验证之后**，不是之前（§5）
 2. **CI 与人工跨平台在 publish 之前**，不是之后（§4b / §4c）
-3. **bump 提交在修复之后**——若验证期发现要修的东西，先把 bump 撤掉，修完再重新 bump，让 bump 提交成为该版本的最后一个代码提交（§1）
+3. **tag 跟「发布提交」走**——发布提交是 bump 版本号与 `CHANGELOG` 定稿之后的最后一个提交；验证期若还有修复，修完再提交，tag 打在最终 HEAD 上（§5）
+4. **release notes 在发布后验证之后**，不是之前——验证没通过就发公告，等于替一个还没确认可用的版本做宣传（§10）
 
 ---
 
@@ -52,7 +53,7 @@ npm version <ver> --no-git-tag-version
 
 **为什么必须带 `--no-git-tag-version`**：
 
-裸 `npm version <ver>` 会自己 `git commit -m "<ver>"` 并打 tag。而本项目的发布提交要与 `CHANGELOG.md` 同一个提交、且用约定式 message（`chore(release): ...`）。用 `--no-git-tag-version` 拿到「只改文件、不提交不打 tag」，提交与 tag 由 §2 与 §5 显式控制。
+裸 `npm version <ver>` 会自己 `git commit -m "<ver>"` 并打 tag。而本项目的 **bump 提交**要与 `CHANGELOG.md` 同一个提交、且用约定式 message（`chore(release): ...`）。用 `--no-git-tag-version` 拿到「只改文件、不提交不打 tag」，提交与 tag 由 §2 与 §5 显式控制。`CHANGELOG.md` 后续若还需补充，用独立提交追加，不改写 bump 提交。
 
 **实例命令**：
 
@@ -154,12 +155,14 @@ git tag -a v<ver> -m "<ver>"
 ```
 
 - **必须用 annotated tag（`-a`）**。本仓库从 `v1.0.6` 起全部是 annotated；更早的 `v1.0.1`–`v1.0.5` 是 lightweight，属历史遗留，不要沿用。
-- **tag 必须打在 bump 提交上**（即该版本的最后一个代码提交）。若 §4 期间发现要修的问题，先撤销 bump、修完、重新 bump，让 bump 提交重新成为 HEAD（见 §9 的重做流程）。
+- **tag 必须打在「发布提交」上**——发布提交 = 版本号 bump 与 `CHANGELOG` 定稿之后的那个提交，也就是 `npm pack` / `npm publish` 所依据的树（正常就是 HEAD）。
+- **「bump 提交」不等于「发布提交」**：bump 之后仍可能因为验证期的修复而追加提交（模板、文档、命令层都算）。tag 跟 HEAD 走，不跟 bump 走——tag 的语义是「这棵树已验证」，而不是「版本号在哪次改动里」。
+- 若 §4 期间发现要修的问题：修完提交，让发布提交成为新的 HEAD，再打 tag。**不要**在旧提交上补打，也**不要**为此重写历史去把 bump 挪到最后。
 - 确认 tag 指向正确：
 
   ```bash
-  git show --stat v<ver>     # 应只含 package.json / package-lock.json / CHANGELOG.md
-  git describe --tags --exact-match HEAD
+  git describe --tags --exact-match HEAD            # 必须有输出：tag 就在 HEAD 上
+  git show v<ver>:package.json | grep '"version"'   # 应为 "<ver>"
   ```
 
 - **本地打错可以重来**（`git tag -d v<ver>`）；**一旦推送，回收代价极高**（见附 A）。
@@ -251,6 +254,57 @@ git push github v<ver>
 
 ---
 
+## 10. GitHub Release（release notes）
+
+**位置：§9 发布后验证通过之后**（见 §0 第 4 条顺序约束）。
+
+**release notes 不进代码库。** 它属于「某个 tag」，不属于某个提交：写在 GitHub Release 页面，仓库里只有 `CHANGELOG.md`。本项目 `v1.0.5`–`v1.1.1` 六个 Release 全部如此，没有 `RELEASE_NOTES.md` 之类文件。
+
+**正文先落成私有仓文件再发布**，便于评审与留存：
+
+```text
+local/docs/YYYY-MM-DD-release-notes-<ver>.md
+```
+
+`local/` 被主仓 `.gitignore` 排除、由私有仓单独跟踪，因此这份草稿不会进 npm 包，也不污染主仓历史。
+
+**与 CHANGELOG 的分工**：
+
+| | `CHANGELOG.md` | release notes |
+|---|---|---|
+| 覆盖 | 所有版本累积 | 只有这一版 |
+| 读者 | 已装、要升级的人 | 路过的人、搜索引擎 |
+| 颗粒度 | 每条一个事实 | 合并同类，突出 3–5 条 |
+| 生命周期 | 永久 | 一版一份，发布后不改 |
+
+**MUST NOT 直接把 CHANGELOG 贴上去，更 MUST NOT 贴 commit 列表**——`v1.1.1` 的正文后半段就是 commit 列表，读者看不出重点。
+
+**正文结构**（三节足够）：
+
+```markdown
+# <ver>
+
+## 升级前必读
+不知道就会踩坑的事：运行时要求变化、默认值翻转、机制退役。
+
+## 亮点
+3–5 条，每条一句话说清「用户得到什么」。
+
+## 完整变更
+指向 CHANGELOG 的链接。
+```
+
+**创建**：
+
+```bash
+gh release create v<ver> --title "<ver>" --notes-file local/docs/YYYY-MM-DD-release-notes-<ver>.md
+```
+
+- **不要用 `--generate-notes`**：它按 PR / commit 自动生成，口径与 §2 已定稿的 CHANGELOG 不一致，还会把内部提交（`test(...)`、`docs(...)`、探针修正）当成亮点暴露。
+- 发布后核对：`gh release view v<ver> --json body` 与私有仓那份文件逐字一致。
+
+---
+
 ## 附 A. 失败与回滚
 
 | 场景 | 做法 | 注意 |
@@ -275,6 +329,7 @@ git push github v<ver>
 5. **认为 `npm dist-tag` 等于 `git tag`** → 前者决定安装解析，后者定位源码；缺任一个都会让「这次发布了什么」无法追溯。
 6. **把实例数据写进本文件** → 版本号、提交区间、当次验收结论属于 Sprint 任务；写进来就会与文档一起漂移。
 7. **改了发布流水线却不更新本文件** → 描述去年流程的 runbook 比没有更糟（它会误导）。每次改 `ci.yml` 的发布相关步骤、改 `package.json` 的 `scripts`/`files`/`bin`、改远端布局时，**同步改这里**。
+8. **把 release notes 写进代码库，或直接把 CHANGELOG / commit 列表贴上去** → 前者让公告跟着 tag 一起漂移、还会被打进 npm 包；后者读者看不出重点（`v1.1.1` 的正文就是贴的 commit）。见 §10。
 
 ---
 
