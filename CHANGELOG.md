@@ -3,7 +3,7 @@
 本文件记录 `@moyaspace/openspec-superpowers-opencode`（`oso`）的对外变更，自 1.1.2 起维护（此前版本无 CHANGELOG）。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
-## [1.1.2] - 2026-11-04
+## [1.1.2] - 2026-11-15
 
 ### 升级前必读
 

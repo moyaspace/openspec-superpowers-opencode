@@ -68,6 +68,7 @@ npm version <ver> --no-git-tag-version
 ## 2. 编写 CHANGELOG
 
 - 文件：仓库根 `CHANGELOG.md`；格式用 [Keep a Changelog](https://keepachangelog.com/)，标题形如 `## [<ver>] - YYYY-MM-DD`。
+- **标题里的日期填实际发布日，不填编写日**。CHANGELOG 在 bump 阶段写、发布在验证之后，两者常隔几天；bump 时先按当时日期写，**发布前**改成当天。改日期本身要产生一个提交，而该提交会让 §5 的 tag 不在 HEAD 上——因此**顺序是：改日期 → 提交 → 打 tag**，不要把日期修正留到 tag 之后（1.1.2 就把 `2026-11-04` 带进了发布版）。
 - 素材三处：**上一个 tag 到 HEAD 的全部提交**、`openspec/changes/archive/` 里本次涉及的 `proposal.md`、以及当次 Sprint 任务列出的必写条目。
 - **提交范围以 bump 当刻的 HEAD 为准**，不要写死提交区间：
 
@@ -233,14 +234,16 @@ git push github v<ver>
 ```
 
 - **两个远端都要推**。本仓库既有惯例：`v1.0.1`–`v1.1.1` 的全部 tag 在 `origin` 与 `github` 上都存在。
-- 校验：
+- 校验（**必须带 `refs/tags/v<ver>*` 通配**，见下）：
 
   ```bash
-  git ls-remote --tags origin v<ver>
-  git ls-remote --tags github v<ver>
+  git ls-remote --tags origin "refs/tags/v<ver>*"
+  git ls-remote --tags github "refs/tags/v<ver>*"
   ```
 
   输出应包含两行——`refs/tags/v<ver>`（tag 对象本身）与 `refs/tags/v<ver>^{}`（tag 指向的提交）。**只出现一行说明是 lightweight tag，打错了。**
+
+  > **不要写成 `git ls-remote --tags origin v<ver>`**：用具体名字当过滤模式时，git 按名字精确匹配，会把 `v<ver>^{}` 这一行滤掉，于是 annotated tag 看起来也只有一行——按上一条判据会误判成 lightweight 并白白重打一次 tag（1.1.2 发布时实际踩到）。
 
 ---
 
