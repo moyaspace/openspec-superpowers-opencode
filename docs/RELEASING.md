@@ -168,6 +168,22 @@ git tag -a v<ver> -m "<ver>"
 
 - **本地打错可以重来**（`git tag -d v<ver>`）；**一旦推送，回收代价极高**（见附 A）。
 
+**发布之后的提交：tag 不移动。**
+
+tag 记录的是「**交付了什么**」，不是「分支走到哪了」。发布完成后再提交的文档、流程、测试注释等修正，照常提交并推送，tag 保持在原处——**不要**为「让 tag 回到 HEAD」而移动或重打 tag。
+
+由此产生两个预期现象，都不构成问题：
+
+- `git describe --tags --exact-match HEAD` **不再成立**（HEAD 已经在 tag 之后）。它只在发布当刻用于确认「tag 就在 HEAD 上」，之后不必再跑。
+- 分支 HEAD 领先 tag 若干个提交。判断「发出去的到底是什么」时**看 tag 指向的树**，不看分支 HEAD：
+
+  ```bash
+  git show v<ver>:package.json | grep '"version"'   # 该 tag 的版本号
+  git diff v<ver> HEAD --stat                       # 发布后又改了什么（应不含 dist/ template/ assets/）
+  ```
+
+**唯一例外**：若发布后发现了会让**包内容**不同于 tag 的问题（`src/` / `template/` / `assets/` / `docs/QUICKSTART.md` / `package.json`），那不是「发布后修正」，而是**发了坏版本**——按附 A 处理，别无他法（同版本号不可重发，只能发补丁版本）。
+
 ---
 
 ## 6. 提交并推送分支
