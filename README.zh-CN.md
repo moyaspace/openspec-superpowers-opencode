@@ -1,8 +1,8 @@
 # openspec-superpowers-opencode（简称 oso）
 
-**一个 AI Coding 开发者工具集 —— OpenSpec + Superpowers 在 OpenCode 上的编排层。**
+**AI Coding 开发者工具集 —— 桥接 OpenSpec 的流程骨架与 Superpowers 的方法论，并承担让它真正跑起来的工程。**
 
-- **oso** 管谁来做、在哪做、什么时候做、怎么落地。
+- **oso** 既管谁来做、在哪做、什么时候做、怎么落地，也负责把这套流程真正跑起来的那部分工程。
 - **Superpowers** 管怎么做。
 - **OpenSpec** 管做什么、按什么顺序。
 

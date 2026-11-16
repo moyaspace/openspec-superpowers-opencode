@@ -1,7 +1,7 @@
 {
   "name": "@moyaspace/openspec-superpowers-opencode",
   "version": "1.1.2",
-  "description": "An AI coding toolset — the orchestration layer for OpenSpec + Superpowers on OpenCode.",
+  "description": "An AI coding toolset — wires OpenSpec + Superpowers on OpenCode, and owns the engineering that makes the workflow run.",
   "keywords": [
     "openspec",
     "superpowers",

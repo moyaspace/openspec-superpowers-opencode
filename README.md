@@ -1,8 +1,8 @@
 # oso (openspec-superpowers-opencode)
 
-**An AI coding toolset — the orchestration layer for OpenSpec + Superpowers on OpenCode.**
+**An AI coding toolset — wires OpenSpec + Superpowers together on OpenCode, and owns the engineering that makes the whole pipeline actually run.**
 
-- **oso** decides who does the work, where, when, and how it lands.
+- **oso** decides who does the work, where, when, and how it lands, and also builds the machinery that makes the workflow run.
 - **Superpowers** decides how.
 - **OpenSpec** decides what, and in what order.
 
